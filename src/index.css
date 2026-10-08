@@ -1,6 +1,31 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+/* The token map stays in tailwind.config.js so it keeps deriving from
+   src/theme/colorSchemes.js. v4 reads a v3 config through this directive. */
+@config '../tailwind.config.js';
+
+/* v4 stores a named size's line-height as a unitless ratio, so a descendant that
+   only overrides font-size — the 50-odd text-[10px]/text-[11px] cells and chips —
+   inherits the ratio and shrinks with it. v3 inherited a length, which is what the
+   row and toolbar metrics were tuned against. Pin the five sizes this app uses back
+   to lengths. */
+@theme {
+  --text-xs--line-height: 1rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl--line-height: 1.75rem;
+}
+
+/* v4's preflight stopped making buttons clickable-looking (it now inherits the
+   platform `cursor: default`), which would take the pointer off every button in a
+   dense tool. v3 preflight set this; keeping it so the upgrade is cursor-neutral. */
+@layer base {
+  button,
+  [role='button'],
+  label:has(input[type='file']) {
+    cursor: pointer;
+  }
+}
 
 body {
   background-color: rgb(var(--k-page, 31 31 40));

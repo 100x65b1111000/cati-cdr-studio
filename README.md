@@ -1,6 +1,6 @@
 # CATI CDR Studio
 
-Call Detail Record (CDR) and agent performance analyzer for a CATI phone team. React 18, Vite, Tailwind CSS 3, Chart.js. Single user, runs entirely in the browser, no backend.
+Call Detail Record (CDR) and agent performance analyzer for a CATI phone team. React 18, Vite, Tailwind CSS 4, Chart.js. Single user, runs entirely in the browser, no backend.
 
 ## Usage
 
@@ -102,7 +102,7 @@ src/
     shiftCalculator.js        CSV parse, shift grouping, idle break detection
     demoDataGenerator.js      Synthetic dataset
     exportService.js          xlsx, csv, json
-  theme/colorSchemes.js       Five schemes as semantic roles
+  theme/colorSchemes.js       Six schemes as semantic roles
   utils/
     dateRange.js              Preset and range resolution
     timeFormatter.js          Durations

@@ -11,11 +11,13 @@ export default {
       colors: {
         // `k-*` utilities resolve to CSS vars applied by the active color scheme
         // (see src/theme/colorSchemes.js). The Kanagawa values act as fallbacks so
-        // the page renders correctly before React mounts.
+        // the page renders correctly before React mounts. Tailwind v4 applies the
+        // `/alpha` modifiers with color-mix() on top of this value, so the var()
+        // reference survives re-theming; v3's `<alpha-value>` placeholder is gone.
         k: Object.fromEntries(
           Object.entries(COLOR_SCHEMES[DEFAULT_SCHEME].colors).map(([role, hex]) => [
             role,
-            `rgb(var(${cssVarName(role)}, ${hexToRgbTriplet(hex)}) / <alpha-value>)`
+            `rgb(var(${cssVarName(role)}, ${hexToRgbTriplet(hex)}))`
           ])
         )
       },

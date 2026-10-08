@@ -14,7 +14,7 @@ export default function AppHeader() {
   return (
     <header className="panel no-print sticky top-0 z-40 flex flex-wrap items-center justify-between gap-4 px-6 py-4">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="glow-accent flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-k-accent to-k-region text-k-accent-ink">
+        <div className="glow-accent flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-linear-to-tr from-k-accent to-k-region text-k-accent-ink">
           <Phone size={20} weight="fill" />
         </div>
         <div className="min-w-0">
