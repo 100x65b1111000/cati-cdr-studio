@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <rect width="32" height="32" rx="8" fill="#16161D"/>
+  <!-- Call-activity trace over record bars: CATI CDR Studio mark -->
+  <path d="M5 8h6l2.8-3.6 3.4 6.8 2.6-4.2H27" stroke="#7AA89F" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M7 27v-7.5M16 27v-10M25 27v-6" stroke="#7E9CD8" stroke-width="3" stroke-linecap="round"/>
+</svg>
