@@ -1,12 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useCdr } from '../../context/CdrContext';
 import { createShiftDateResolver } from '../../services/shiftCalculator';
 import { inDateRange, rangeDates } from '../../utils/dateRange';
 import Pagination from '../common/Pagination';
+import DayScopeSelect from '../ui/DayScopeSelect';
 import SearchInput from '../ui/SearchInput';
+import ExtensionFilter from '../ui/ExtensionFilter';
 import Segmented from '../ui/Segmented';
 import SortHeaderCell from '../ui/SortHeaderCell';
 import EmptyState from '../ui/EmptyState';
+import Chip from '../ui/Chip';
 
 const COLUMNS = [
   { id: 'start_time', label: 'Call start', align: 'left', value: (c) => c.start_time.getTime(), cell: (c) => c.start_time.toISOString().replace('T', ' ').slice(0, 19) },
@@ -31,6 +34,8 @@ const COLUMNS = [
 const FLEX_COLUMN = 'destination';
 const colWidth = (id) => (id === FLEX_COLUMN ? 'w-full' : 'w-1');
 
+const collator = new Intl.Collator(undefined, { numeric: true });
+
 const RESPONSES = [
   { id: 'ALL', label: 'All' },
   { id: 'ANSWERED', label: 'Answered' },
@@ -38,10 +43,12 @@ const RESPONSES = [
 ];
 
 export default function RawCDRTable() {
-  const { rawCalls, shiftConfig, dateRange, analysis } = useCdr();
+  const { rawCalls, shiftConfig, dateRange, analysis, extNameMap } = useCdr();
 
   const [search, setSearch] = useState('');
+  const [selectedExts, setSelectedExts] = useState([]);
   const [response, setResponse] = useState('ALL');
+  const [dayScope, setDayScope] = useState('');
   const [sortField, setSortField] = useState('start_time');
   const [sortAsc, setSortAsc] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -50,10 +57,29 @@ export default function RawCDRTable() {
   const resolveShiftDate = useMemo(() => createShiftDateResolver(shiftConfig), [shiftConfig]);
   const dateSet = useMemo(() => new Set(rangeDates(dateRange, analysis)), [dateRange, analysis]);
 
-  const filtered = useMemo(() => {
+  // Every extension the loaded file actually contains, so the badge denominator is
+  // the population in front of you rather than the whole directory. Deliberately not
+  // date-scoped: narrowing the range must not silently drop an agent you picked.
+  const extensions = useMemo(
+    () => [...new Set(rawCalls.map((c) => c.extension))].sort(collator.compare),
+    [rawCalls]
+  );
+  useEffect(() => {
+    setSelectedExts(extensions);
+    setCurrentPage(1);
+  }, [extensions]);
+
+  // A call's shift is not its calendar day: a 01:00 call belongs to the shift that
+  // opened the evening before. Everything below — the filter, the bands, the counts —
+  // speaks that same shift date.
+  const shiftOf = useCallback((call) => resolveShiftDate(call.start_time), [resolveShiftDate]);
+
+  const allRows = useMemo(() => {
     const q = search.toLowerCase().trim();
-    const rows = rawCalls.filter((call) => {
-      if (!inDateRange(resolveShiftDate(call.start_time), dateRange, dateSet)) return false;
+    const picked = new Set(selectedExts);
+    return rawCalls.filter((call) => {
+      if (!inDateRange(shiftOf(call), dateRange, dateSet)) return false;
+      if (!picked.has(call.extension)) return false;
       if (response === 'ANSWERED' && call.response !== 'ANSWERED') return false;
       if (response === 'NOT_ANSWERED' && call.response === 'ANSWERED') return false;
       if (!q) return true;
@@ -64,18 +90,42 @@ export default function RawCDRTable() {
         (call.region || '').toLowerCase().includes(q)
       );
     });
+  }, [rawCalls, search, selectedExts, response, shiftOf, dateRange, dateSet]);
 
+  const shiftDays = useMemo(() => {
+    const counts = new Map();
+    allRows.forEach((call) => {
+      const day = shiftOf(call);
+      counts.set(day, (counts.get(day) || 0) + 1);
+    });
+    return Array.from(counts, ([date, calls]) => ({
+      date,
+      hint: `${calls} ${calls === 1 ? 'call' : 'calls'}`
+    })).sort((a, b) => (a.date < b.date ? -1 : 1));
+  }, [allRows, shiftOf]);
+
+  // A day that left the range stops scoping the list without the control lying about
+  // what was picked.
+  const scope = shiftDays.some((d) => d.date === dayScope) ? dayScope : '';
+  const grouped = !scope && shiftDays.length > 1;
+
+  const filtered = useMemo(() => {
+    const rows = allRows.filter((call) => !scope || shiftOf(call) === scope);
     const col = COLUMNS.find((c) => c.id === sortField);
     if (!col?.value) return rows;
     const dir = sortAsc ? 1 : -1;
-    return rows.sort((a, b) => {
+    rows.sort((a, b) => {
       const av = col.value(a);
       const bv = col.value(b);
       if (av < bv) return -1 * dir;
       if (av > bv) return 1 * dir;
       return 0;
     });
-  }, [rawCalls, search, response, sortField, sortAsc, resolveShiftDate, dateRange, dateSet]);
+    // Stable sort again: the chosen column orders the calls, the shift date orders
+    // the blocks they sit in.
+    if (grouped) rows.sort((a, b) => (shiftOf(a) < shiftOf(b) ? -1 : shiftOf(a) > shiftOf(b) ? 1 : 0));
+    return rows;
+  }, [allRows, sortField, sortAsc, scope, grouped, shiftOf]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   useEffect(() => {
@@ -108,6 +158,16 @@ export default function RawCDRTable() {
           className="w-64 flex-none"
         />
 
+        <ExtensionFilter
+          extensions={extensions}
+          names={extNameMap}
+          selected={selectedExts}
+          onChange={(exts) => {
+            setSelectedExts(exts);
+            setCurrentPage(1);
+          }}
+        />
+
         <Segmented
           label="Response filter"
           options={RESPONSES}
@@ -118,11 +178,20 @@ export default function RawCDRTable() {
           }}
         />
 
-        <p className="num ml-auto text-[11px] text-k-ink-muted">
-          {filtered.length} of {rawCalls.length} calls
-          <span className="text-k-ink-muted"> · {answered} answered</span>
-        </p>
+        <div className="ml-auto flex items-center gap-1.5">
+          <Chip tone="throughput">{rawCalls.length} calls</Chip>
+          <Chip tone="success">{answered} answered</Chip>
+        </div>
       </div>
+
+      <DayScopeSelect
+        days={shiftDays}
+        value={scope}
+        onChange={(day) => {
+          setDayScope(day);
+          setCurrentPage(1);
+        }}
+      />
 
       <div className="panel overflow-hidden rounded-xl">
         <div className="max-h-[70vh] overflow-auto print:max-h-none">
@@ -158,31 +227,46 @@ export default function RawCDRTable() {
                   </td>
                 </tr>
               ) : (
-                pageRows.map((call, idx) => (
-                  <tr
-                    key={`${call.extension}_${call.start_time.getTime()}_${idx}`}
-                    className="h-[34px] transition-colors hover:bg-k-surface-hover/40"
-                  >
-                    {COLUMNS.map((col) => (
-                      <td
-                        key={col.id}
-                        className={`num whitespace-nowrap px-3 align-middle ${colWidth(col.id)} ${
-                          col.align === 'right' ? 'text-right' : 'text-left'
-                        } ${
-                          col.id === 'extension'
-                            ? 'font-semibold text-k-accent'
-                            : col.id === 'duration'
-                              ? 'text-k-throughput'
-                              : col.id === 'start_time' || col.id === 'region' || col.id === 'direction' || col.id === 'response'
-                                ? 'text-k-ink-muted'
-                                : 'text-k-ink'
-                        }`}
-                      >
-                        {col.cell(call)}
-                      </td>
-                    ))}
-                  </tr>
-                ))
+                pageRows.map((call, idx) => {
+                  const day = shiftOf(call);
+                  const firstOfDay = idx === 0 || shiftOf(pageRows[idx - 1]) !== day;
+                  return (
+                    <Fragment key={`${call.extension}_${call.start_time.getTime()}_${idx}`}>
+                      {grouped && firstOfDay && (
+                        <tr>
+                          <td colSpan={COLUMNS.length} className="bg-k-sunken/70 px-3 py-1.5">
+                            <span className="num text-[10px] font-semibold uppercase tracking-wider text-k-ink-muted">
+                              {day}
+                            </span>
+                            <span className="num ml-2 text-[10px] text-k-ink-faint">
+                              {` · ${shiftDays.find((d) => d.date === day)?.hint || ''}`}
+                            </span>
+                          </td>
+                        </tr>
+                      )}
+                      <tr className="glow-row h-[34px]">
+                        {COLUMNS.map((col) => (
+                          <td
+                            key={col.id}
+                            className={`num whitespace-nowrap px-3 align-middle ${colWidth(col.id)} ${
+                              col.align === 'right' ? 'text-right' : 'text-left'
+                            } ${
+                              col.id === 'extension'
+                                ? 'font-semibold text-k-accent'
+                                : col.id === 'duration'
+                                  ? 'text-k-throughput'
+                                  : col.id === 'start_time' || col.id === 'region' || col.id === 'direction' || col.id === 'response'
+                                    ? 'text-k-ink-muted'
+                                    : 'text-k-talk'
+                            }`}
+                          >
+                            {col.cell(call)}
+                          </td>
+                        ))}
+                      </tr>
+                    </Fragment>
+                  );
+                })
               )}
             </tbody>
           </table>

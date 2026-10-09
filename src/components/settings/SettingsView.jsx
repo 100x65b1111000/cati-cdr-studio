@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash, Sliders } from '@phosphor-icons/react';
+import { Trash, Sliders, Check } from '@phosphor-icons/react';
 import { useCdr } from '../../context/CdrContext';
 import { COLOR_SCHEMES } from '../../theme/colorSchemes';
 import { availableDates } from '../../utils/dateRange';
@@ -52,12 +52,17 @@ export default function SettingsView() {
               onClick={() => setColorScheme(id)}
               aria-pressed={colorScheme === id}
               className={`glass-card card-hover rounded-xl p-4 text-left ${
-                colorScheme === id ? 'border-k-accent ring-1 ring-inset ring-k-accent/40' : 'hover:border-k-hairline-strong'
+                colorScheme === id ? 'card-active' : ''
               }`}
             >
               <span className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-k-ink">{scheme.label}</span>
-                {colorScheme === id && <span className="text-[11px] text-k-accent">Active</span>}
+                {colorScheme === id && (
+                  <span className="flex items-center gap-1 rounded-md bg-k-accent px-1.5 py-0.5 text-[10px] font-bold text-k-accent-ink">
+                    <Check size={10} weight="bold" />
+                    Active
+                  </span>
+                )}
               </span>
               <span className="mt-2 block">
                 <Swatches colors={scheme.colors} />
@@ -111,7 +116,7 @@ export default function SettingsView() {
         ) : (
           <ul className="mt-3 max-h-72 divide-y divide-k-hairline/60 overflow-y-auto rounded-xl border border-k-hairline">
             {savedViews.map(view => (
-              <li key={view.id} className="flex items-center justify-between gap-4 px-4 py-2.5 transition-colors hover:bg-k-surface-hover/40">
+              <li key={view.id} className="glow-row flex items-center justify-between gap-4 px-4 py-2.5">
                 <span className="min-w-0">
                   <span className="block truncate text-xs font-semibold text-k-ink">{view.name}</span>
                   <span className="num block text-[11px] text-k-ink-muted">

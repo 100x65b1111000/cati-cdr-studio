@@ -81,7 +81,7 @@ export default function AgentDetailModal() {
                   </tr>
                 ) : (
                   data.breaks_list.map((b, idx) => (
-                    <tr key={idx} className="transition-colors hover:bg-k-surface-hover/40">
+                    <tr key={idx} className="glow-row">
                       <td className="num px-3.5 py-2 text-k-ink-muted">{idx + 1}</td>
                       <td className="num px-3.5 py-2 text-k-ink">{b.start}</td>
                       <td className="num px-3.5 py-2 text-k-ink">{b.end}</td>

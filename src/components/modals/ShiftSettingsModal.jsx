@@ -64,7 +64,7 @@ export default function ShiftSettingsModal() {
       <button
         type="button"
         onClick={close}
-        className="rounded-lg border border-k-hairline-strong bg-k-surface-hover/60 px-3.5 py-2 text-xs font-medium text-k-ink transition-colors hover:bg-k-surface-hover active:translate-y-[1px]"
+        className="glow-hover rounded-lg border border-k-hairline-strong bg-k-surface-hover/60 px-3.5 py-2 text-xs font-medium text-k-ink active:translate-y-[1px]"
       >
         Cancel
       </button>

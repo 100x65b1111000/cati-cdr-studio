@@ -34,7 +34,8 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeydown);
   }, [setActiveTab]);
 
-  const View = NAV.find((n) => n.id === activeTab)?.component;
+  const view = NAV.find((n) => n.id === activeTab) || NAV[0];
+  const View = view.component;
 
   return (
     <div className="dot-bg relative flex min-h-[100dvh] flex-col bg-k-page text-k-ink antialiased selection:bg-k-accent selection:text-k-accent-ink">
@@ -55,25 +56,37 @@ export default function App() {
 
       <div className="relative flex min-w-0 flex-1 flex-col lg:pl-20">
         <header className="hidden print:block print:pb-2">
-          <h2 className="text-sm font-semibold text-k-ink">
-            {NAV.find((n) => n.id === activeTab)?.label || 'CATI CDR Studio'}
-          </h2>
+          <h2 className="text-sm font-semibold text-k-ink">{view.label}</h2>
           <p className="num text-[11px] text-k-ink-muted">
             {rangeLabel(dateRange, availableDates(analysis))}
           </p>
         </header>
 
         <main className="mx-auto w-full max-w-7xl flex-1 space-y-6 p-4 sm:p-6">
-          <div className="no-print flex flex-wrap items-center gap-3">
+          {/* The rail is 48px of icons and the floating bar stays on the brand, so this
+              is the only place a view says what it is. It borrows the tiles' icon plate
+              and the header's title ink rather than inventing a third heading style. */}
+          {/* z-40 because the calendar popover opens from here and the table toolbars
+              below are also z-30; equal depth means DOM order, which buries the panel. */}
+          <div className="no-print relative z-40 space-y-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-k-accent/25 bg-k-accent/10 text-k-accent">
+                <view.Icon size={18} />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-lg font-bold leading-tight tracking-tight text-k-ink">{view.label}</h2>
+                <p className="text-xs leading-tight text-k-ink-muted">{view.desc}</p>
+              </div>
+              <div className="ml-auto">
+                <DateRangeControl />
+              </div>
+            </div>
             <p className="text-xs text-k-ink-muted">
               <kbd className="num rounded-md border border-k-hairline px-1">1</kbd> to{' '}
               <kbd className="num rounded-md border border-k-hairline px-1">5</kbd> switch views,{' '}
               <kbd className="num rounded-md border border-k-hairline px-1">Ctrl</kbd>+
               <kbd className="num rounded-md border border-k-hairline px-1">K</kbd> searches
             </p>
-            <div className="ml-auto">
-              <DateRangeControl />
-            </div>
           </div>
 
           {parseError && <ErrorBanner message={parseError} onDismiss={clearParseError} />}

@@ -5,7 +5,9 @@ import { inDateRange } from '../../utils/dateRange';
 import { formatDurationCompact } from '../../utils/timeFormatter';
 import MetricStrip from '../ui/MetricStrip';
 
-export function deriveMetrics(analysis, dateRange) {
+// `dayScope` is the analytics view's per-shift filter: one shift picked in the
+// dropdown above the charts, and the tiles have to describe that shift too.
+export function deriveMetrics(analysis, dateRange, dayScope = '') {
   let totalCalls = 0,
     connected = 0,
     notConnected = 0,
@@ -21,7 +23,7 @@ export function deriveMetrics(analysis, dateRange) {
 
   Object.entries(analysis).forEach(([ext, byDate]) => {
     Object.entries(byDate).forEach(([dateStr, data]) => {
-      if (!inDateRange(dateStr, dateRange)) return;
+      if (!inDateRange(dateStr, dateRange) || (dayScope && dateStr !== dayScope)) return;
       const agent = perAgent[ext] || (perAgent[ext] = { calls: 0, net: 0 });
       agent.calls += data.total_calls;
       agent.net += data.net_active_sec;
@@ -78,9 +80,9 @@ export function deriveMetrics(analysis, dateRange) {
   };
 }
 
-export default function MetricsStrip() {
+export default function MetricsStrip({ dayScope = '' }) {
   const { analysis, dateRange } = useCdr();
-  const metrics = useMemo(() => deriveMetrics(analysis, dateRange), [analysis, dateRange]);
+  const metrics = useMemo(() => deriveMetrics(analysis, dateRange, dayScope), [analysis, dateRange, dayScope]);
 
   return (
     <MetricStrip

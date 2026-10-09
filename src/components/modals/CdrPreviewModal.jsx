@@ -34,7 +34,7 @@ export default function CdrPreviewModal() {
       <button
         type="button"
         onClick={cancelPendingUpload}
-        className="rounded-lg border border-k-hairline-strong bg-k-surface-hover/60 px-3.5 py-2 text-xs font-medium text-k-ink transition-colors hover:bg-k-surface-hover active:translate-y-[1px]"
+        className="glow-hover rounded-lg border border-k-hairline-strong bg-k-surface-hover/60 px-3.5 py-2 text-xs font-medium text-k-ink active:translate-y-[1px]"
       >
         Cancel
       </button>
@@ -106,7 +106,7 @@ export default function CdrPreviewModal() {
                   const answered = resp.toUpperCase() === 'ANSWERED';
 
                   return (
-                    <tr key={i} className="transition-colors hover:bg-k-surface-hover/40">
+                    <tr key={i} className="glow-row">
                       <td className="num px-3 py-1.5 text-k-ink-muted">{i + 1}</td>
                       <td className="num px-3 py-1.5 font-semibold text-k-accent">{ext}</td>
                       <td className="num px-3 py-1.5 text-k-ink">{date}</td>

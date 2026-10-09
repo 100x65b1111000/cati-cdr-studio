@@ -1,14 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { UsersThree, Trash } from '@phosphor-icons/react';
+import { UsersThree, Trash, CaretUp, CaretDown } from '@phosphor-icons/react';
 import { useCdr } from '../../context/CdrContext';
 import AddAgentModal from './AddAgentModal';
 import EmptyState from '../ui/EmptyState';
 import SearchInput from '../ui/SearchInput';
-import SortHeaderCell from '../ui/SortHeaderCell';
+import Segmented from '../ui/Segmented';
 
 const numeric = new Intl.Collator(undefined, { numeric: true });
 
-function AgentRow({ ext, name, onRename, onDelete }) {
+const SORT_OPTIONS = [
+  { id: 'extension', label: 'Extension' },
+  { id: 'name', label: 'Name' }
+];
+
+// A row was two characters of extension and one name against a full page of width.
+// Paired cards let the grid spend that width on the names that actually need it.
+function AgentCard({ ext, name, onRename, onDelete }) {
   const [draft, setDraft] = useState(name);
 
   useEffect(() => {
@@ -23,37 +30,35 @@ function AgentRow({ ext, name, onRename, onDelete }) {
   };
 
   return (
-    <tr className="h-[38px] transition-colors hover:bg-k-surface-hover/40">
-      <td className="num w-1 whitespace-nowrap px-3 font-semibold text-k-accent">{ext}</td>
-      <td className="w-full px-3">
-        <input
-          type="text"
-          value={draft}
-          aria-label={`Name for extension ${ext}`}
-          placeholder={`Agent ${ext}`}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') e.currentTarget.blur();
-            if (e.key === 'Escape') setDraft(name);
-          }}
-          className={`glass-input w-full max-w-xs rounded-lg px-2.5 py-1.5 text-xs text-k-ink placeholder:text-k-ink-muted ${
-            dirty ? 'border-k-accent' : 'hover:border-k-accent/50'
-          }`}
-        />
-      </td>
-      <td className="px-3 text-right whitespace-nowrap">
-        <button
-          type="button"
-          onClick={() => onDelete(ext)}
-          aria-label={`Remove the mapping for ${ext}`}
-          title="Remove this mapping"
-          className="rounded-lg p-1.5 text-k-ink-muted transition-colors hover:bg-k-danger/10 hover:text-k-critical"
-        >
-          <Trash size={14} />
-        </button>
-      </td>
-    </tr>
+    <div className="glass-card card-hover flex items-center gap-2 rounded-lg px-2 py-1.5">
+      <span className="num w-14 flex-none rounded-md bg-k-accent/15 py-1 text-center text-[11px] font-semibold text-k-accent">
+        {ext}
+      </span>
+      <input
+        type="text"
+        value={draft}
+        aria-label={`Name for extension ${ext}`}
+        placeholder={`Agent ${ext}`}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+          if (e.key === 'Escape') setDraft(name);
+        }}
+        className={`glass-input min-w-0 flex-1 rounded-lg px-2.5 py-1.5 text-xs text-k-ink placeholder:text-k-ink-muted focus:border-k-accent focus:outline-none ${
+          dirty ? 'border-k-accent' : 'hover:border-k-accent/50'
+        }`}
+      />
+      <button
+        type="button"
+        onClick={() => onDelete(ext)}
+        aria-label={`Remove the mapping for ${ext}`}
+        title="Remove this mapping"
+        className="flex-none rounded-lg p-1.5 text-k-ink-muted transition-colors hover:bg-k-critical/15 hover:text-k-critical"
+      >
+        <Trash size={14} />
+      </button>
+    </div>
   );
 }
 
@@ -77,15 +82,6 @@ export default function AgentDirectory() {
     return list;
   }, [extNameMap, search, sortField, sortAsc]);
 
-  const handleSort = (field) => {
-    if (field === sortField) {
-      setSortAsc((v) => !v);
-    } else {
-      setSortField(field);
-      setSortAsc(true);
-    }
-  };
-
   const mapped = Object.keys(extNameMap).length;
 
   return (
@@ -105,79 +101,68 @@ export default function AgentDirectory() {
           placeholder="Extension or name"
           className="w-56 flex-none"
         />
-        <button
-          type="button"
-          onClick={() => setIsAddAgentOpen(true)}
-          className="glow-accent ml-auto rounded-lg bg-k-accent px-3.5 py-2 text-xs font-medium text-k-accent-ink transition-colors hover:bg-k-accent/90 active:translate-y-[1px]"
-        >
-          Add mapping
-        </button>
+        <div className="ml-auto flex items-center gap-1.5">
+          <Segmented
+            label="Sort mappings by"
+            options={SORT_OPTIONS}
+            value={sortField}
+            onChange={(field) => {
+              setSortField(field);
+              setSortAsc(true);
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => setSortAsc((v) => !v)}
+            aria-label={sortAsc ? 'Sort descending' : 'Sort ascending'}
+            title={sortAsc ? 'Ascending' : 'Descending'}
+            className="glow-hover flex-none rounded-lg border border-k-hairline-strong p-1.5 text-k-ink-muted"
+          >
+            {sortAsc ? <CaretUp size={14} /> : <CaretDown size={14} />}
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsAddAgentOpen(true)}
+            className="glow-accent rounded-lg bg-k-accent px-3.5 py-2 text-xs font-medium text-k-accent-ink transition-colors hover:bg-k-accent/90 active:translate-y-[1px]"
+          >
+            Add mapping
+          </button>
+        </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs text-k-ink-muted">
-          <thead className="sticky top-0 z-[25] border-b border-k-hairline glass-head text-[10px] uppercase tracking-wider">
-            <tr>
-              <SortHeaderCell
-                label="Extension"
-                field="extension"
-                sortField={sortField}
-                sortAsc={sortAsc}
-                onSort={handleSort}
-                className="w-1"
-              />
-              <SortHeaderCell
-                label="Agent name"
-                field="name"
-                sortField={sortField}
-                sortAsc={sortAsc}
-                onSort={handleSort}
-                className="w-full"
-              />
-              <th scope="col" className="w-16 px-3 py-3.5 text-right text-[10px] font-semibold uppercase tracking-wider text-k-ink-muted">
-                Remove
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-k-hairline/60">
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={3}>
-                  <EmptyState
-                    title={mapped === 0 ? 'No extensions mapped yet' : 'No agent matches that'}
-                    body={
-                      mapped === 0
-                        ? 'Maps are optional. Unmapped extensions show as their number in the rundown.'
-                        : 'Try a shorter search, or clear it to see every mapping.'
-                    }
-                    action={
-                      mapped === 0 ? (
-                        <button
-                          type="button"
-                          onClick={() => setIsAddAgentOpen(true)}
-                          className="rounded-lg bg-k-accent px-3.5 py-2 text-xs font-medium text-k-accent-ink transition-colors hover:bg-k-accent/90 active:translate-y-[1px]"
-                        >
-                          Add a mapping
-                        </button>
-                      ) : null
-                    }
-                  />
-                </td>
-              </tr>
-            ) : (
-              rows.map((ext) => (
-                <AgentRow
-                  key={ext}
-                  ext={ext}
-                  name={extNameMap[ext] || ''}
-                  onRename={updateExtMapping}
-                  onDelete={removeExtMapping}
-                />
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      {rows.length === 0 ? (
+        <EmptyState
+          title={mapped === 0 ? 'No extensions mapped yet' : 'No agent matches that'}
+          body={
+            mapped === 0
+              ? 'Maps are optional. Unmapped extensions show as their number in the rundown.'
+              : 'Try a shorter search, or clear it to see every mapping.'
+          }
+          action={
+            mapped === 0 ? (
+              <button
+                type="button"
+                onClick={() => setIsAddAgentOpen(true)}
+                className="rounded-lg bg-k-accent px-3.5 py-2 text-xs font-medium text-k-accent-ink transition-colors hover:bg-k-accent/90 active:translate-y-[1px]"
+              >
+                Add a mapping
+              </button>
+            ) : null
+          }
+        />
+      ) : (
+        <div className="grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          {rows.map((ext) => (
+            <AgentCard
+              key={ext}
+              ext={ext}
+              name={extNameMap[ext] || ''}
+              onRename={updateExtMapping}
+              onDelete={removeExtMapping}
+            />
+          ))}
+        </div>
+      )}
 
       <AddAgentModal />
     </div>

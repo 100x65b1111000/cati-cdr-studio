@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -19,6 +19,7 @@ import { DEFAULT_SHIFT_CONFIG } from '../../constants/defaultData';
 import { themeColor, themeSeries } from '../../theme/colorSchemes';
 import { createShiftDateResolver } from '../../services/shiftCalculator';
 import { inDateRange, rangeDates } from '../../utils/dateRange';
+import DayScopeSelect from '../ui/DayScopeSelect';
 import EmptyState from '../ui/EmptyState';
 import MetricsStrip from '../dashboard/MetricsStrip';
 
@@ -62,6 +63,25 @@ function Chart({ icon: Icon, title, note, empty, children }) {
 
 export default function AnalyticsView() {
   const { analysis, extNameMap, rawCalls, shiftConfig, dateRange, colorScheme } = useCdr();
+  const [dayScope, setDayScope] = useState('');
+
+  // Every chart here blends the shifts in range, which is exactly what you do not
+  // want when one night went badly. The scope pulls all of them back to one shift.
+  const shiftDays = useMemo(() => {
+    const dateSet = new Set(rangeDates(dateRange, analysis));
+    const counts = new Map();
+    Object.values(analysis).forEach((byDate) => {
+      Object.keys(byDate).forEach((dateStr) => {
+        if (dateSet.has(dateStr)) counts.set(dateStr, (counts.get(dateStr) || 0) + 1);
+      });
+    });
+    return Array.from(counts, ([date, agentDays]) => ({
+      date,
+      hint: `${agentDays} agent-days`
+    })).sort((a, b) => (a.date < b.date ? -1 : 1));
+  }, [analysis, dateRange]);
+
+  const scope = shiftDays.some((d) => d.date === dayScope) ? dayScope : '';
 
   const { volumeData, regionalData, timeData, hourlyData, options, scales, agentDays, regions, hours } =
     useMemo(() => {
@@ -87,7 +107,7 @@ export default function AnalyticsView() {
         .forEach((ext) => {
           const name = extNameMap[ext] || ext;
           Object.keys(analysis[ext]).forEach((dateStr) => {
-            if (!inDateRange(dateStr, dateRange, dateSet)) return;
+            if (!inDateRange(dateStr, dateRange, dateSet) || (scope && dateStr !== scope)) return;
             const data = analysis[ext][dateStr];
             labels.push(`${name} ${dateStr.slice(5)} (${ext})`);
             callCounts.push(data.total_calls);
@@ -100,9 +120,10 @@ export default function AnalyticsView() {
           });
         });
 
-      const callsInRange = rawCalls.filter((c) =>
-        inDateRange(resolveShiftDate(c.start_time), dateRange, dateSet)
-      );
+      const callsInRange = rawCalls.filter((c) => {
+        const day = resolveShiftDate(c.start_time);
+        return inDateRange(day, dateRange, dateSet) && (!scope || day === scope);
+      });
 
       const startHour = parseInt((shiftConfig.shiftStartTime || D.shiftStartTime).split(':')[0], 10) || 20;
       const endHour = parseInt((shiftConfig.shiftEndTime || D.shiftEndTime).split(':')[0], 10) || 5;
@@ -201,7 +222,7 @@ export default function AnalyticsView() {
           ]
         }
       };
-    }, [analysis, extNameMap, rawCalls, shiftConfig, dateRange, colorScheme]);
+    }, [analysis, extNameMap, rawCalls, shiftConfig, dateRange, colorScheme, scope]);
 
   if (agentDays === 0) {
     return (
@@ -216,7 +237,9 @@ export default function AnalyticsView() {
 
   return (
     <div className="space-y-6">
-      <MetricsStrip />
+      <DayScopeSelect days={shiftDays} value={scope} onChange={setDayScope} />
+
+      <MetricsStrip dayScope={scope} />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Chart icon={ChartBar} title="Calls per agent-day" note={`${agentDays} agent-days`}>
@@ -226,7 +249,7 @@ export default function AnalyticsView() {
         <Chart
           icon={ChartDonut}
           title="Calls by region"
-          note={regions > 0 ? `${regions} regions` : 'no region column'}
+          note={regions > 0 ? `${regions} ${regions === 1 ? 'region' : 'regions'}` : 'no region column'}
           empty={regions === 0 ? 'No region recorded' : null}
         >
           <Doughnut

@@ -22,7 +22,7 @@ export default function ToastContainer() {
             key={toast.id}
             type="button"
             onClick={() => removeToast(toast.id)}
-            className={`panel animate-slide-in pointer-events-auto flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-left text-xs font-medium shadow-2xl ${tone}`}
+            className={`panel animate-slide-in pointer-events-auto flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-left text-xs font-medium ${tone}`}
           >
             <Icon size={16} className="shrink-0" />
             <span>{toast.message}</span>

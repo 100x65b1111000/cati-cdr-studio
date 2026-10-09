@@ -64,6 +64,9 @@ function Preview({ item, stats, top }) {
       <div className="flex items-center gap-1.5">
         <Icon size={14} className="text-k-accent" />
         <span className="text-xs font-semibold text-k-ink">{item.label}</span>
+        <kbd className="num ml-auto rounded-[4px] border border-k-hairline px-1.5 text-[10px] text-k-ink-muted">
+          {item.hotkey}
+        </kbd>
       </div>
       <div className="mt-2">
         <Thumb item={item} />
@@ -108,13 +111,13 @@ export default function AppSidebar() {
   const peeked = peek && NAV.find((n) => n.id === peek.id);
 
   return (
-    // Detached rail: 48px of icons until the pointer claims it, then it expands
-    // over the content rather than shoving the content aside. The preview is a
-    // sibling of the nav because the nav has to clip its own labels.
+    // Detached rail: 48px of icons, each with its key at the top-right corner, and
+    // it never grows. The card that opens beside it is the long version of the hint
+    // rather than the only one, so reading the view list costs no layout shift.
     <aside className="no-print fixed left-4 top-1/2 z-40 hidden -translate-y-1/2 lg:block">
       <nav
         aria-label="Views"
-        className="group/rail panel relative w-12 overflow-hidden rounded-2xl shadow-2xl shadow-black/40 transition-[width] duration-200 ease-out hover:w-60"
+        className="panel relative w-12 overflow-hidden rounded-2xl shadow-2xl shadow-black/40"
       >
         <ul className="space-y-1 p-1.5">
           {NAV.map((item) => {
@@ -131,23 +134,21 @@ export default function AppSidebar() {
                   type="button"
                   onClick={() => setActiveTab(item.id)}
                   aria-current={active ? 'page' : undefined}
-                  className={`flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-xs font-medium transition-colors ${
+                  aria-label={`${item.label} (${item.hotkey})`}
+                  className={`relative flex w-full items-center justify-center rounded-xl px-1 py-2 text-xs font-medium transition-colors ${
                     active
                       ? 'glow-accent bg-k-accent text-k-accent-ink'
-                      : 'text-k-ink-muted hover:bg-k-surface-hover hover:text-k-ink'
+                      : 'glow-hover text-k-ink-muted'
                   }`}
                 >
                   <item.Icon size={17} className="shrink-0" />
-                  <span className="min-w-0 flex-1 truncate text-left opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100">
-                    {item.label}
-                  </span>
-                  <kbd
-                    className={`num shrink-0 rounded-[4px] border px-1 text-[10px] ${
-                      active ? 'border-k-accent-ink/40 text-k-accent-ink' : 'border-k-hairline text-k-ink-muted'
-                    }`}
-                  >
+                  {/* The key is the hint, so it lives on the strip rather than in the
+                      card: the view list has to be readable without the pointer ever
+                      finding the rail. It carries its own plate so the badge reads the
+                      same on the accent fill as it does on the idle surface. */}
+                  <span className="num absolute right-0.5 top-0.5 rounded-[3px] bg-k-sunken/85 px-[2px] text-[9px] font-semibold leading-[10px] text-k-ink-muted ring-1 ring-inset ring-k-hairline">
                     {item.hotkey}
-                  </kbd>
+                  </span>
                 </button>
               </li>
             );

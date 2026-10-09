@@ -54,7 +54,7 @@ export default function Modal({ title, subtitle, onClose, children, footer, widt
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className={`panel animate-pop-up mx-auto w-full ${width} rounded-2xl shadow-2xl outline-none`}
+        className={`panel animate-pop-up mx-auto w-full ${width} rounded-2xl outline-none`}
       >
         <div className="flex items-start justify-between gap-4 border-b border-k-hairline px-6 py-4">
           <div>
@@ -65,7 +65,7 @@ export default function Modal({ title, subtitle, onClose, children, footer, widt
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded-lg bg-k-surface-hover/80 p-1.5 text-k-ink-muted transition-colors hover:bg-k-surface-hover hover:text-k-ink"
+            className="close-btn rounded-lg p-1.5"
           >
             <X size={18} />
           </button>

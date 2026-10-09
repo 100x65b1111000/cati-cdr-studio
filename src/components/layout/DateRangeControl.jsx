@@ -1,6 +1,9 @@
 import React from 'react';
+import { Calendar } from '@phosphor-icons/react';
 import { useCdr } from '../../context/CdrContext';
 import Segmented from '../ui/Segmented';
+import FilterPopover from '../ui/FilterPopover';
+import DateRangePicker from '../ui/DateRangePicker';
 import { availableDates, inDateRange, todayKey } from '../../utils/dateRange';
 
 const PRESETS = [
@@ -32,23 +35,18 @@ export default function DateRangeControl() {
 
       {dateRange.preset === 'custom' && (
         <div className="flex items-center gap-1.5">
-          <input
-            type="date"
-            value={dateRange.from}
-            min={dates[0]}
-            max={dateRange.to || dates[dates.length - 1]}
-            onChange={(e) => setDateRange({ ...dateRange, from: e.target.value })}
-            className="num glass-input rounded-lg px-2.5 py-1.5 text-xs text-k-ink focus:border-k-accent"
-          />
-          <span className="text-xs text-k-ink-muted">to</span>
-          <input
-            type="date"
-            value={dateRange.to}
-            min={dateRange.from || dates[0]}
-            max={dates[dates.length - 1]}
-            onChange={(e) => setDateRange({ ...dateRange, to: e.target.value })}
-            className="num glass-input rounded-lg px-2.5 py-1.5 text-xs text-k-ink focus:border-k-accent"
-          />
+          <FilterPopover
+            label={`${dateRange.from || 'start'} – ${dateRange.to || 'end'}`}
+            icon={Calendar}
+            width="w-[16.5rem]"
+          >
+            <DateRangePicker
+              dates={dates}
+              from={dateRange.from}
+              to={dateRange.to}
+              onPick={(from, to) => setDateRange({ ...dateRange, from, to })}
+            />
+          </FilterPopover>
           <button
             type="button"
             onClick={() => setDateRange({ preset: 'last7', from: '', to: '' })}

@@ -20,7 +20,7 @@ export default function Segmented({ label, options, value, onChange }) {
             className={`rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors active:translate-y-[1px] ${
               active
                 ? 'bg-k-accent text-k-accent-ink'
-                : 'text-k-ink-muted hover:bg-k-surface-hover/70 hover:text-k-ink'
+                : 'glow-hover text-k-ink-muted'
             }`}
           >
             {opt.label}

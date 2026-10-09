@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useCdr } from '../../context/CdrContext';
 import { rangeDates } from '../../utils/dateRange';
 import { loadFromStorage, saveToStorage } from '../../utils/storage';
+import DayScopeSelect from '../ui/DayScopeSelect';
 import Pagination from '../common/Pagination';
 import EmptyState from '../ui/EmptyState';
 import SkeletonRows from '../ui/SkeletonRows';
@@ -21,10 +22,14 @@ function mergeVisibleColumns(saved) {
   const base = defaultVisibleColumns();
   if (!saved) return base;
   Object.keys(base).forEach((id) => {
+    // Locked columns ignore whatever an old view_state or saved view stored.
+    if (COLUMN_BY_ID[id]?.locked) return;
     if (typeof saved[id] === 'boolean') base[id] = saved[id];
   });
   return base;
 }
+
+const agentCount = (n) => `${n} ${n === 1 ? 'agent' : 'agents'}`;
 
 export default function RundownTable({ preview = false }) {
   const {
@@ -48,6 +53,7 @@ export default function RundownTable({ preview = false }) {
   const [sortAsc, setSortAsc] = useState(() => restoredRef.current?.sort?.asc !== false);
   const [pageSize, setPageSize] = useState(() => restoredRef.current?.pageSize || 25);
   const [selectedExtensions, setSelectedExtensions] = useState([]);
+  const [dayScope, setDayScope] = useState(() => restoredRef.current?.dayScope || '');
   const [currentPage, setCurrentPage] = useState(1);
 
   const datasetKey = useMemo(() => Object.keys(analysis).sort(numeric).join(','), [analysis]);
@@ -79,7 +85,10 @@ export default function RundownTable({ preview = false }) {
     if (valid.length > 0) setSelectedExtensions(valid);
   }, [extensionsInRange]);
 
-  const rows = useMemo(() => {
+  // The table is already one row per agent per shift; what a multi-day range lacked
+  // is any way to tell the shifts apart. This list is the source for both fixes — the
+  // day scope control and the bands that split the flat list into one block per date.
+  const allRows = useMemo(() => {
     const selected = new Set(selectedExtensions);
     const q = searchQuery.toLowerCase().trim();
     const out = [];
@@ -101,6 +110,22 @@ export default function RundownTable({ preview = false }) {
       });
     });
 
+    return out;
+  }, [analysis, extNameMap, selectedExtensions, searchQuery, dateSet]);
+
+  const shiftDays = useMemo(() => {
+    const counts = new Map();
+    allRows.forEach((row) => counts.set(row.date, (counts.get(row.date) || 0) + 1));
+    return Array.from(counts, ([date, agents]) => ({ date, agents })).sort((a, b) => (a.date < b.date ? -1 : 1));
+  }, [allRows]);
+
+  // A day that left the range stops scoping the table, but the control keeps showing
+  // what the user picked until they pick something else.
+  const scope = shiftDays.some((d) => d.date === dayScope) ? dayScope : '';
+  const grouped = !scope && shiftDays.length > 1;
+
+  const rows = useMemo(() => {
+    const out = allRows.filter((row) => !scope || row.date === scope);
     const col = COLUMN_BY_ID[sortField];
     if (col?.value) {
       const dir = sortAsc ? 1 : -1;
@@ -112,8 +137,11 @@ export default function RundownTable({ preview = false }) {
         return 0;
       });
     }
+    // Array#sort is stable, so this second pass keeps the order above inside each
+    // day while making the days themselves the outer grouping.
+    if (grouped) out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
     return out;
-  }, [analysis, extNameMap, selectedExtensions, searchQuery, dateSet, sortField, sortAsc]);
+  }, [allRows, sortField, sortAsc, scope, grouped]);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   useEffect(() => {
@@ -130,12 +158,15 @@ export default function RundownTable({ preview = false }) {
       dateRange,
       search: searchQuery,
       extensions: selectedExtensions,
+      // The effective scope, not the raw pick: a saved view must not resurrect a day
+      // that the saved range no longer covers.
+      dayScope: scope,
       visibleColumns,
       connView,
       sort: { field: sortField, asc: sortAsc },
       pageSize
     }),
-    [dateRange, searchQuery, selectedExtensions, visibleColumns, connView, sortField, sortAsc, pageSize]
+    [dateRange, searchQuery, selectedExtensions, scope, visibleColumns, connView, sortField, sortAsc, pageSize]
   );
 
   // The sidebar preview mounts a second copy of this view. Only the real one
@@ -152,6 +183,7 @@ export default function RundownTable({ preview = false }) {
     if (saved.dateRange) setDateRange(saved.dateRange);
     setSearchQuery(saved.search || '');
     setSelectedExtensions((saved.extensions || []).filter((e) => extensionsInRange.includes(e)));
+    setDayScope(typeof saved.dayScope === 'string' ? saved.dayScope : '');
     setVisibleColumns(mergeVisibleColumns(saved.visibleColumns));
     setConnView(saved.connView === 'split' ? 'split' : 'total');
     if (COLUMN_BY_ID[saved.sort?.field]) {
@@ -159,6 +191,11 @@ export default function RundownTable({ preview = false }) {
       setSortAsc(saved.sort.asc !== false);
     }
     setPageSize(saved.pageSize || 25);
+    setCurrentPage(1);
+  };
+
+  const pickDay = (date) => {
+    setDayScope(date);
     setCurrentPage(1);
   };
 
@@ -199,6 +236,12 @@ export default function RundownTable({ preview = false }) {
         filters={filters}
         onApplyFilters={applyFilters}
         rows={rows}
+      />
+
+      <DayScopeSelect
+        days={shiftDays.map((d) => ({ date: d.date, hint: agentCount(d.agents) }))}
+        value={scope}
+        onChange={pickDay}
       />
 
       <div className="panel overflow-hidden rounded-xl">
@@ -269,26 +312,33 @@ export default function RundownTable({ preview = false }) {
                   </td>
                 </tr>
               ) : (
-                pageRows.map((row) => (
-                  <tr
-                    key={`${row.extension}_${row.date}`}
-                    onClick={(e) => {
-                      if (e.target.closest('input, button, a')) return;
-                      openDetail(row);
-                    }}
-                    className="h-[38px] cursor-default transition-colors hover:bg-k-surface-hover/40"
-                  >
-                    {shownColumns.map((col) => (
-                      <td
-                        key={col.id}
-                        className={`whitespace-nowrap px-3 align-middle ${colWidth(col.id)} ${
-                          col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
-                        }`}
-                      >
-                        {col.cell(row, ctx)}
-                      </td>
-                    ))}
-                  </tr>
+                pageRows.map((row, i) => (
+                  <Fragment key={`${row.extension}_${row.date}`}>
+                    {grouped && (i === 0 || pageRows[i - 1].date !== row.date) && (
+                      <tr>
+                        <td colSpan={shownColumns.length} className="bg-k-sunken/70 px-3 py-1.5">
+                          <span className="num text-[10px] font-semibold uppercase tracking-wider text-k-ink-muted">
+                            {row.date}
+                          </span>
+                          <span className="num ml-2 text-[10px] text-k-ink-faint">
+                            {` · ${agentCount(shiftDays.find((d) => d.date === row.date)?.agents || 0)}`}
+                          </span>
+                        </td>
+                      </tr>
+                    )}
+                    <tr className="glow-row h-[38px]">
+                      {shownColumns.map((col) => (
+                        <td
+                          key={col.id}
+                          className={`whitespace-nowrap px-3 align-middle ${colWidth(col.id)} ${
+                            col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
+                          }`}
+                        >
+                          {col.cell(row, ctx)}
+                        </td>
+                      ))}
+                    </tr>
+                  </Fragment>
                 ))
               )}
             </tbody>

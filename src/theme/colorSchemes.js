@@ -7,6 +7,10 @@
 // and destructive-action marking. They must never share a hex, or the two meanings
 // collapse into one colour.
 //
+// `warning` is a metric hue, not an alert: it marks the call rate, which is neither
+// destructive (`critical`) nor a failed call (`danger`). Every scheme paints it a true
+// orange, so it never doubles as either red.
+//
 // `ink-faint` sits below `ink-muted` in luminance. It is for separators and
 // placeholder dashes, not for secondary text.
 //
@@ -41,7 +45,8 @@ export const COLOR_SCHEMES = {
       'accent-ink': '#060A12',
       success: '#34d399',        // emerald-400
       danger: '#f87171',         // red-400
-      critical: '#f43f5e',       // rose-500
+      critical: '#f43f5e',         // rose-500
+      warning: '#fb923c',          // orange-400
       talk: '#22d3ee',           // cyan-400
       throughput: '#fbbf24',     // amber-400
       'break-time': '#a78bfa',   // violet-400
@@ -66,6 +71,7 @@ export const COLOR_SCHEMES = {
       success: '#98BB6C',        // AutumnGreen
       danger: '#E82424',         // PeachRed
       critical: '#FF5D57',       // Efflorescence
+      warning: '#D97B4F',          // Kaki persimmon
       talk: '#7AA89F',           // WaveAqua
       throughput: '#E6C384',     // CarpYellow
       'break-time': '#D27E99',   // SakuraPink
@@ -90,6 +96,7 @@ export const COLOR_SCHEMES = {
       success: '#B8BB26',
       danger: '#FB4934',
       critical: '#FE8019',
+      warning: '#F28C28',                // tangerine: gruvbox's orange is taken by critical
       talk: '#8EC07C',
       throughput: '#FABD2F',
       'break-time': '#D3869B',
@@ -114,6 +121,7 @@ export const COLOR_SCHEMES = {
       success: '#9ECE6A',
       danger: '#F7768E',
       critical: '#FF9E64',
+      warning: '#F87C3C',
       talk: '#73DACA',
       throughput: '#E0AF68',
       'break-time': '#BB9AF7',
@@ -138,6 +146,7 @@ export const COLOR_SCHEMES = {
       success: '#A6E3A1',
       danger: '#F38BA8',
       critical: '#E78284',
+      warning: '#FAB387',                // Peach
       talk: '#94E2D5',
       throughput: '#F9E2AF',
       'break-time': '#F5C2E7',
@@ -162,6 +171,7 @@ export const COLOR_SCHEMES = {
       success: '#A7C080',
       danger: '#E67E80',
       critical: '#E69875',
+      warning: '#E8A34D',                // harvest orange, light enough to clear AA on the surface
       talk: '#83C092',
       throughput: '#DBBC7F',
       'break-time': '#D699B6',

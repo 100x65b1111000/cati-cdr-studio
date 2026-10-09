@@ -1,4 +1,5 @@
 import React from 'react';
+import Chip from './Chip';
 
 const TILE = {
   accent: 'border-k-accent/25 bg-k-accent/10 text-k-accent',
@@ -8,19 +9,6 @@ const TILE = {
   throughput: 'border-k-throughput/25 bg-k-throughput/10 text-k-throughput',
   region: 'border-k-region/25 bg-k-region/10 text-k-region',
   danger: 'border-k-danger/25 bg-k-danger/10 text-k-danger'
-};
-
-// Dark pill, hue carried by ring + text. A role-tinted fill lifted the card
-// surface enough to drop accent/region labels under AA at 10px.
-const CHIP = 'num rounded-md px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset';
-const BADGE = {
-  accent: 'bg-k-sunken/70 ring-k-accent/35 text-k-accent',
-  success: 'bg-k-sunken/70 ring-k-success/35 text-k-success',
-  talk: 'bg-k-sunken/70 ring-k-talk/35 text-k-talk',
-  'break-time': 'bg-k-sunken/70 ring-k-break-time/35 text-k-break-time',
-  throughput: 'bg-k-sunken/70 ring-k-throughput/35 text-k-throughput',
-  region: 'bg-k-sunken/70 ring-k-region/35 text-k-region',
-  danger: 'bg-k-sunken/70 ring-k-danger/35 text-k-danger'
 };
 
 export default function MetricStrip({ items }) {
@@ -47,12 +35,9 @@ export default function MetricStrip({ items }) {
           {chips.length > 0 && (
             <div className="mt-auto flex flex-wrap gap-1.5 pt-3">
               {chips.map(({ text, tone = role }) => (
-                <span
-                  key={text}
-                  className={`${CHIP} ${BADGE[tone] || BADGE[role]}`}
-                >
+                <Chip key={text} tone={tone}>
                   {text}
-                </span>
+                </Chip>
               ))}
             </div>
           )}

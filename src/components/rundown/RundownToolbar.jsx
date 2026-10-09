@@ -1,39 +1,36 @@
 import React, { useEffect, useState } from 'react';
 import {
   BracketsCurly,
+  CaretDown,
+  CaretUp,
   Columns,
   FileCsv,
   FileXls,
   FloppyDisk,
   Printer,
   Timer,
-  Trash,
-  UserFocus
+  Trash
 } from '@phosphor-icons/react';
 import { useCdr } from '../../context/CdrContext';
 import { DEFAULT_SHIFT_CONFIG } from '../../constants/defaultData';
 import { exportRundownToExcel, exportRundownToCSV, exportAnalysisToJSON } from '../../services/exportService';
+import ExtensionFilter, { Checkbox } from '../ui/ExtensionFilter';
 import FilterPopover from '../ui/FilterPopover';
 import SearchInput from '../ui/SearchInput';
 import Segmented from '../ui/Segmented';
-import { COLUMN_BY_ID } from './columns';
+import { COLUMN_BY_ID, FILTERABLE_COLUMN_IDS } from './columns';
 
 const menuItem =
-  'flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs text-k-ink transition-colors hover:bg-k-surface-hover';
+  'glow-hover flex w-full items-center gap-2 rounded-md border border-transparent px-2.5 py-1.5 text-left text-xs text-k-ink';
 
-function Checkbox({ checked, onChange, children }) {
-  return (
-    <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-xs text-k-ink hover:bg-k-surface">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={onChange}
-        className="h-3.5 w-3.5 accent-k-accent"
-      />
-      <span className="flex min-w-0 flex-1 items-center gap-2">{children}</span>
-    </label>
-  );
-}
+// The stepper and the typed value share one clamp, so the two paths cannot disagree
+// about what a valid threshold is.
+const THRESHOLD_MIN = 1;
+const THRESHOLD_MAX = 120;
+const clampThreshold = (n) => Math.min(THRESHOLD_MAX, Math.max(THRESHOLD_MIN, n));
+
+const stepBtn =
+  'glow-hover flex h-[9px] w-[11px] items-center justify-center rounded-[3px] leading-none text-k-ink-muted disabled:cursor-not-allowed disabled:opacity-35';
 
 export default function RundownToolbar({
   searchQuery,
@@ -61,7 +58,6 @@ export default function RundownToolbar({
     deleteSavedView
   } = useCdr();
 
-  const [extSearch, setExtSearch] = useState('');
   const [threshold, setThreshold] = useState(String(shiftConfig.breakThresholdMinutes ?? DEFAULT_SHIFT_CONFIG.breakThresholdMinutes));
   const [viewName, setViewName] = useState('');
 
@@ -70,29 +66,26 @@ export default function RundownToolbar({
   }, [shiftConfig.breakThresholdMinutes]);
 
   const parsedThreshold = parseInt(threshold, 10);
+  const thresholdValue = Number.isFinite(parsedThreshold) ? parsedThreshold : shiftConfig.breakThresholdMinutes;
   const thresholdDirty = Number.isFinite(parsedThreshold) && parsedThreshold !== shiftConfig.breakThresholdMinutes;
 
   const applyThreshold = () => {
     if (!thresholdDirty) return;
-    const clamped = Math.min(120, Math.max(1, parsedThreshold));
-    updateShiftConfig({ ...shiftConfig, breakThresholdMinutes: clamped });
+    updateShiftConfig({ ...shiftConfig, breakThresholdMinutes: clampThreshold(parsedThreshold) });
   };
 
-  const extMatches = availableExtensions.filter((ext) => {
-    const q = extSearch.toLowerCase().trim();
-    if (!q) return true;
-    return ext.toLowerCase().includes(q) || (extNameMap[ext] || '').toLowerCase().includes(q);
-  });
-
-  const toggleExtension = (ext) =>
-    setSelectedExtensions(
-      selectedExtensions.includes(ext)
-        ? selectedExtensions.filter((e) => e !== ext)
-        : [...selectedExtensions, ext]
-    );
+  // The stepper commits instead of only editing the draft: clicking a button blurs
+  // the field on some browsers and not others, and a draft-only bump would sit there
+  // looking unapplied.
+  const nudgeThreshold = (delta) => {
+    const next = clampThreshold(thresholdValue + delta);
+    if (next === thresholdValue) return;
+    setThreshold(String(next));
+    updateShiftConfig({ ...shiftConfig, breakThresholdMinutes: next });
+  };
 
   const toggleColumn = (id) => setVisibleColumns({ ...visibleColumns, [id]: !visibleColumns[id] });
-  const shownColumns = Object.keys(visibleColumns).filter((id) => visibleColumns[id]).length;
+  const shownColumns = FILTERABLE_COLUMN_IDS.filter((id) => visibleColumns[id]).length;
 
   const saveCurrentView = () => {
     const name = viewName.trim();
@@ -127,43 +120,20 @@ export default function RundownToolbar({
         onChange={setSearchQuery}
         label="Agent or extension"
         placeholder="Agent or extension"
-        className="w-52 flex-none"
+        className="w-44 flex-none"
         primary
       />
 
-      <FilterPopover
-        label="Agents"
-        icon={UserFocus}
-        badge={`${selectedExtensions.length}/${availableExtensions.length}`}
-      >
-        <div className="space-y-1.5 p-2">
-          <SearchInput value={extSearch} onChange={setExtSearch} label="Filter agents" placeholder="Filter agents" />
-          <div className="flex items-center justify-between border-b border-k-hairline px-2 pb-1.5 text-[11px] text-k-ink-muted">
-            <button type="button" className="hover:text-k-accent" onClick={() => setSelectedExtensions([...availableExtensions])}>
-              All
-            </button>
-            <button type="button" className="hover:text-k-danger" onClick={() => setSelectedExtensions([])}>
-              None
-            </button>
-          </div>
-          <div className="max-h-56 space-y-0.5 overflow-y-auto pr-1">
-            {extMatches.length === 0 ? (
-              <p className="px-2 py-2 text-[11px] text-k-ink-muted">No agent matches that.</p>
-            ) : (
-              extMatches.map((ext) => (
-                <Checkbox key={ext} checked={selectedExtensions.includes(ext)} onChange={() => toggleExtension(ext)}>
-                  <span className="num min-w-[3.75rem] shrink-0">{ext}</span>
-                  {extNameMap[ext] && <span className="min-w-0 truncate text-k-ink-muted">{extNameMap[ext]}</span>}
-                </Checkbox>
-              ))
-            )}
-          </div>
-        </div>
-      </FilterPopover>
+      <ExtensionFilter
+        extensions={availableExtensions}
+        names={extNameMap}
+        selected={selectedExtensions}
+        onChange={setSelectedExtensions}
+      />
 
-      <FilterPopover label="Columns" icon={Columns} tone="region" badge={`${shownColumns}/${Object.keys(visibleColumns).length}`}>
+      <FilterPopover label="Columns" icon={Columns} tone="region" badge={`${shownColumns}/${FILTERABLE_COLUMN_IDS.length}`}>
         <div className="space-y-0.5 p-2">
-          {Object.keys(visibleColumns).map((id) => (
+          {FILTERABLE_COLUMN_IDS.map((id) => (
             <Checkbox key={id} checked={!!visibleColumns[id]} onChange={() => toggleColumn(id)}>
               {COLUMN_BY_ID[id]?.label || id}
             </Checkbox>
@@ -184,25 +154,50 @@ export default function RundownToolbar({
         onChange={setConnView}
       />
 
+      {/* The stepper lives inside the field, stacked on the right the way a native
+          number input does it. Flanking buttons cost the pill 40px, and this row has
+          no room to spare: at 1440px a wrap drops Print/Export below the panel. */}
       <div
-        className={`flex flex-none items-center gap-1.5 rounded-lg bg-k-sunken/80 px-2.5 py-1.5 text-[11px] ring-1 ring-inset transition-colors ${
+        className={`flex flex-none items-center gap-1 rounded-lg bg-k-sunken/80 px-2 py-1.5 text-[11px] ring-1 ring-inset transition-colors focus-within:ring-k-accent/70 ${
           thresholdDirty ? 'ring-k-accent/70 text-k-ink' : 'ring-k-hairline-strong/50 text-k-ink-muted'
         }`}
       >
         <Timer size={14} className="text-k-break-time" />
         <span>Break &gt;</span>
-        <input
-          type="text"
-          inputMode="numeric"
-          aria-label="Idle break threshold in minutes"
-          value={threshold}
-          onChange={(e) => setThreshold(e.target.value.replace(/[^\d]/g, ''))}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') applyThreshold();
-          }}
-          onBlur={applyThreshold}
-          className="num w-9 rounded-md bg-k-surface/70 px-1 py-0.5 text-right text-k-ink"
-        />
+        <span className="relative inline-flex">
+          <input
+            type="text"
+            inputMode="numeric"
+            aria-label="Idle break threshold in minutes"
+            value={threshold}
+            onChange={(e) => setThreshold(e.target.value.replace(/[^\d]/g, ''))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') applyThreshold();
+            }}
+            onBlur={applyThreshold}
+            className="num w-[2.6rem] rounded-md border border-k-hairline-strong bg-k-surface/70 px-0 py-0.5 text-center text-k-ink focus:border-k-accent focus:outline-none"
+          />
+          <span className="absolute inset-y-0 right-0 flex w-[13px] flex-col items-center justify-center gap-px pr-px">
+            <button
+              type="button"
+              aria-label="Increase the break threshold by one minute"
+              disabled={thresholdValue >= THRESHOLD_MAX}
+              onClick={() => nudgeThreshold(1)}
+              className={stepBtn}
+            >
+              <CaretUp size={8} weight="bold" />
+            </button>
+            <button
+              type="button"
+              aria-label="Decrease the break threshold by one minute"
+              disabled={thresholdValue <= THRESHOLD_MIN}
+              onClick={() => nudgeThreshold(-1)}
+              className={stepBtn}
+            >
+              <CaretDown size={8} weight="bold" />
+            </button>
+          </span>
+        </span>
         <span>min</span>
       </div>
 
@@ -216,15 +211,15 @@ export default function RundownToolbar({
             </p>
           ) : (
             savedViews.map((view) => (
-              <div key={view.id} className="flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-k-surface">
-                <button type="button" className="flex-1 truncate px-1 py-0.5 text-left text-xs text-k-ink hover:text-k-accent" onClick={() => onApplyFilters(view.filters)}>
+              <div key={view.id} className="glow-row flex items-center gap-1 rounded-md px-1 py-0.5">
+                <button type="button" className="glow-hover flex-1 truncate rounded-md border border-transparent px-1 py-0.5 text-left text-xs text-k-ink" onClick={() => onApplyFilters(view.filters)}>
                   {view.name}
                 </button>
                 <span className="num text-[10px] text-k-ink-muted">{view.createdAt}</span>
                 <button
                   type="button"
                   aria-label={`Overwrite ${view.name} with the current filters`}
-                  className="rounded-md p-1 text-k-ink-muted hover:bg-k-surface-hover hover:text-k-ink"
+                  className="glow-hover rounded-md p-1 text-k-ink-muted"
                   onClick={() => {
                     replaceSavedView(view.id, filters);
                     addToast(`View "${view.name}" overwritten`, 'info');
@@ -235,7 +230,7 @@ export default function RundownToolbar({
                 <button
                   type="button"
                   aria-label={`Delete ${view.name}`}
-                  className="rounded-md p-1 text-k-ink-muted hover:bg-k-surface-hover hover:text-k-critical"
+                  className="rounded-md p-1 text-k-ink-muted hover:bg-k-critical/15 hover:text-k-critical"
                   onClick={() => deleteSavedView(view.id)}
                 >
                   <Trash size={13} />
@@ -258,7 +253,7 @@ export default function RundownToolbar({
             <button
               type="button"
               onClick={saveCurrentView}
-              className="rounded-lg bg-k-accent px-2.5 py-1 text-[11px] font-semibold text-k-accent-ink transition-opacity hover:opacity-90 active:translate-y-[1px]"
+              className="tone-btn rounded-lg px-2.5 py-1 text-[11px] font-semibold active:translate-y-[1px]"
             >
               Save
             </button>
@@ -270,9 +265,10 @@ export default function RundownToolbar({
         <button
           type="button"
           onClick={() => window.print()}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-k-hairline-strong bg-k-surface-hover/60 px-3 py-1.5 text-xs font-medium text-k-ink-muted transition-colors hover:bg-k-surface-hover hover:text-k-ink active:translate-y-[1px]"
+          style={{ '--tone': 'var(--k-danger)' }}
+          className="glow-hover inline-flex items-center gap-1.5 rounded-lg border border-k-hairline-strong bg-k-surface-hover/60 px-3 py-1.5 text-xs font-medium text-k-ink-muted active:translate-y-[1px]"
         >
-          <Printer size={15} />
+          <Printer size={15} className="text-k-danger" />
           Print
         </button>
         <FilterPopover label="Export" icon={FileXls} tone="success" align="right">

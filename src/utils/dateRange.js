@@ -1,6 +1,6 @@
 export const DEFAULT_DATE_RANGE = { preset: 'all', from: '', to: '' };
 
-function key(date) {
+export function key(date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
@@ -48,6 +48,13 @@ export function rangeDates(range, analysis) {
     return availableDates(analysis).filter((d) => (!from || d >= from) && (!to || d <= to));
   }
   return availableDates(analysis);
+}
+
+// Two clicks in one panel: the first sets the far end, the second closes the range and
+// swaps if you worked backwards. Anything after a complete range starts a new one.
+export function pickRange(from, to, iso) {
+  if (!from || to) return [iso, ''];
+  return iso < from ? [iso, from] : [from, iso];
 }
 
 export function inDateRange(dateStr, range, dateSet) {

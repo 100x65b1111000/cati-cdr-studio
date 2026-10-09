@@ -25,6 +25,13 @@
   label:has(input[type='file']) {
     cursor: pointer;
   }
+
+  /* Base, not unlayered: the modal and the search fields carry `outline-none` and
+     focus their own border instead, and a utility can only beat this from base. */
+  :focus-visible {
+    outline: 2px solid rgb(var(--k-accent, 126 156 216));
+    outline-offset: 2px;
+  }
 }
 
 body {
@@ -35,14 +42,11 @@ body {
 }
 
 /* Figures line up in columns. Every metric cell uses this. */
-.num {
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-variant-numeric: tabular-nums;
-}
-
-:focus-visible {
-  outline: 2px solid rgb(var(--k-accent, 126 156 216));
-  outline-offset: 2px;
+@layer components {
+  .num {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 /* Custom Scrollbars */
@@ -70,76 +74,151 @@ body {
    lives only where live content passes underneath — .glass-menu and .glass-head —
    and the page-level plates are flat fills. Keeping .panel unfiltered also matters
    for correctness: a backdrop-filter makes the element a backdrop root, which
-   blinds every popover nested inside it. */
-.panel {
-  background-color: rgb(var(--k-surface, 42 42 55) / 0.9);
-  background-image: linear-gradient(to bottom, rgb(var(--k-accent, 126 156 216) / 0.07), transparent 45%);
-  border: 1px solid rgb(var(--k-hairline-strong, 84 84 109) / 0.7);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.07),
-    0 12px 28px -18px rgb(0 0 0 / 0.9);
+   blinds every popover nested inside it.
+
+   These are @layer components on purpose, which is the one rule that decides
+   whether a call-site utility paints at all: unlayered beats layered, so a
+   resting surface written outside a layer silently discards the
+   `focus:border-k-accent`, `border-k-success` and `border-k-accent` overrides
+   sprinkled over them. States (.card-active, .card-hover, .glow-hover, .glow-row,
+   .cbox) stay unlayered below, because those have to outrank the utilities they
+   sit on top of.
+
+   `--tone` is the second half of the accent story. Each FilterPopover sets it on
+   its wrapper to its own hue, and everything the popover owns — trigger hover,
+   menu edge, checkbox fill, row wash, focus ring — reads it back. An unset
+   `--tone` falls through to `--k-accent`, so the rest of the app is unchanged. */
+@layer components {
+  .panel {
+    background-color: rgb(var(--k-surface, 42 42 55) / 0.9);
+    background-image: linear-gradient(to bottom, rgb(var(--k-accent, 126 156 216) / 0.07), transparent 45%);
+    border: 1px solid rgb(var(--k-hairline-strong, 84 84 109) / 0.7);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.07),
+      0 12px 28px -18px rgb(0 0 0 / 0.9);
+  }
+
+  .glass-card {
+    background-color: rgb(var(--k-surface, 42 42 55) / 0.9);
+    background-image: linear-gradient(to bottom, rgb(var(--k-accent, 126 156 216) / 0.07), transparent 45%);
+    border: 1px solid rgb(var(--k-hairline-strong, 84 84 109) / 0.6);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.06),
+      0 10px 24px -16px rgb(0 0 0 / 0.85);
+  }
+
+  /* The app bar. It sits one layer *below* the cards rather than beside them: every
+     scheme orders sunken < page < surface, so a sunken fill separates the bar from the
+     content without needing distance, and a crisper edge plus a deeper cast shadow
+     carries the lift. Flat on purpose — a backdrop-filter here would make it a
+     backdrop root and blind any popover nested inside. */
+  .floating-bar {
+    background-color: rgb(var(--k-sunken, 22 22 29) / 0.96);
+    background-image: linear-gradient(to bottom, rgb(var(--k-accent, 126 156 216) / 0.12), transparent 55%);
+    border: 1px solid rgb(var(--k-hairline-strong, 84 84 109) / 0.95);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.09),
+      0 18px 40px -14px rgb(0 0 0 / 0.9);
+  }
+
+  /* Popovers and previews float over table text, so they blur what is behind them
+     and thin out enough for the softened result to actually reach the eye. The
+     edge and the cast glow carry the owning trigger's hue, so a menu reads as an
+     extension of the button that opened it. */
+  .glass-menu {
+    background-color: rgb(var(--k-surface, 42 42 55) / 0.68);
+    background-image: linear-gradient(
+      to bottom,
+      rgb(var(--tone, var(--k-accent, 126 156 216)) / 0.07),
+      transparent 45%
+    );
+    -webkit-backdrop-filter: blur(28px) saturate(1.8);
+    backdrop-filter: blur(28px) saturate(1.8);
+    border: 1px solid rgb(var(--tone, var(--k-accent, 126 156 216)) / 0.7);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.08),
+      0 0 22px -8px rgb(var(--tone, var(--k-accent, 126 156 216)) / 0.6),
+      0 18px 40px -12px rgb(0 0 0 / 0.75);
+  }
+
+  /* The one surface with rows sliding under it all day: the sticky table head, which
+     floats inside its own scroll container. Rows are 11-13px text on a ~34px pitch, so
+     the radius stays under the pitch — the glyphs go, the row bands stay, and that
+     banding moving under the head is exactly what frost looks like. */
+  .glass-head {
+    background-color: rgb(var(--k-sunken, 22 22 29) / 0.62);
+    -webkit-backdrop-filter: blur(10px) saturate(1.7);
+    backdrop-filter: blur(10px) saturate(1.7);
+  }
+
+  .glass-input {
+    background-color: rgb(var(--k-sunken, 22 22 29) / 0.92);
+    border: 1px solid rgb(var(--k-hairline-strong, 84 84 109) / 0.7);
+  }
+
+  .glow-accent {
+    box-shadow: 0 0 25px -5px rgb(var(--k-accent, 126 156 216) / 0.3);
+  }
+
+  /* A filled primary action inside a popover. The hue comes from the trigger that
+     owns the panel, so nothing in there looks like it belongs to a different
+     control. The ink stays `accent-ink`: every scheme sets it to a near-black,
+     which is the right punch-through on any of the saturated tone hues. */
+  .tone-btn {
+    background-color: rgb(var(--tone, var(--k-accent, 126 156 216)) / 1);
+    color: rgb(var(--k-accent-ink, 22 22 29) / 1);
+    transition: background-color 140ms ease, box-shadow 140ms ease;
+  }
+
+  /* Dismissal. Ending the panel is not a destructive act, so the red is a whisper at
+     rest — a tint, not an alarm — and only steps forward under the cursor. `danger`
+     rather than `critical` because every scheme paints danger a true red, while
+     critical wanders into orange. */
+  .close-btn {
+    border: 1px solid rgb(var(--k-danger, 248 113 113) / 0.22);
+    background-color: rgb(var(--k-danger, 248 113 113) / 0.1);
+    color: rgb(var(--k-danger, 248 113 113) / 0.8);
+    transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease, color 140ms ease;
+  }
 }
 
-.glass-card {
-  background-color: rgb(var(--k-surface, 42 42 55) / 0.9);
-  background-image: linear-gradient(to bottom, rgb(var(--k-accent, 126 156 216) / 0.07), transparent 45%);
-  border: 1px solid rgb(var(--k-hairline-strong, 84 84 109) / 0.6);
+/* The selected scheme card. A rule rather than `border-k-accent` plus `ring-*`
+   utilities because box-shadow is one property: the utilities would replace
+   .glass-card's inset highlight and cast, and this keeps all three. The :hover twin
+   out-specifies .card-hover:hover, so the accent survives the lift. */
+.glass-card.card-active,
+.glass-card.card-active:hover {
+  border-color: rgb(var(--k-accent, 126 156 216) / 1);
+  background-image:
+    linear-gradient(rgb(var(--k-accent, 126 156 216) / 0.14), rgb(var(--k-accent, 126 156 216) / 0.14)),
+    linear-gradient(to bottom, rgb(var(--k-accent, 126 156 216) / 0.07), transparent 45%);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    0 0 0 3px rgb(var(--k-accent, 126 156 216) / 0.3),
     0 10px 24px -16px rgb(0 0 0 / 0.85);
 }
 
-/* Popovers and previews float over table text, so they blur what is behind them
-   and thin out enough for the softened result to actually reach the eye. */
-.glass-menu {
-  background-color: rgb(var(--k-surface, 42 42 55) / 0.68);
-  background-image: linear-gradient(to bottom, rgb(var(--k-accent, 126 156 216) / 0.06), transparent 45%);
-  -webkit-backdrop-filter: blur(28px) saturate(1.8);
-  backdrop-filter: blur(28px) saturate(1.8);
-  border: 1px solid rgb(var(--k-hairline-strong, 54 54 70) / 0.9);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.08),
-    0 18px 40px -12px rgb(0 0 0 / 0.75);
-}
+@layer components {
+  /* The backdrop from the Kanagawa edition: a 24px dot lattice. The colour comes
+     from the scheme's `dot` role rather than a fixed alpha over `hairline`, because
+     a fixed alpha cannot survive the range of page levels here. Against studio's
+     near-black page a 0.22 mix reads at 2.7x the background; against evergreen's
+     it reads at 1.24x and vanishes. See colorSchemes.js. */
+  .dot-bg {
+    background-image: radial-gradient(rgb(var(--k-dot, 54 54 70)) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
 
-/* The one surface with rows sliding under it all day: the sticky table head, which
-   floats inside its own scroll container. Rows are 11-13px text on a ~34px pitch, so
-   the radius stays under the pitch — the glyphs go, the row bands stay, and that
-   banding moving under the head is exactly what frost looks like. */
-.glass-head {
-  background-color: rgb(var(--k-sunken, 22 22 29) / 0.62);
-  -webkit-backdrop-filter: blur(10px) saturate(1.7);
-  backdrop-filter: blur(10px) saturate(1.7);
-}
-
-.glass-input {
-  background-color: rgb(var(--k-sunken, 22 22 29) / 0.92);
-  border: 1px solid rgb(var(--k-hairline-strong, 84 84 109) / 0.7);
-}
-
-.glow-accent {
-  box-shadow: 0 0 25px -5px rgb(var(--k-accent, 126 156 216) / 0.3);
-}
-
-/* The backdrop from the Kanagawa edition: a 24px dot lattice. The colour comes
-   from the scheme's `dot` role rather than a fixed alpha over `hairline`, because
-   a fixed alpha cannot survive the range of page levels here. Against studio's
-   near-black page a 0.22 mix reads at 2.7x the background; against evergreen's
-   it reads at 1.24x and vanishes. See colorSchemes.js. */
-.dot-bg {
-  background-image: radial-gradient(rgb(var(--k-dot, 54 54 70)) 1px, transparent 1px);
-  background-size: 24px 24px;
-}
-
-.blob {
-  position: fixed;
-  height: 24rem;
-  width: 24rem;
-  border-radius: 9999px;
-  pointer-events: none;
-  filter: blur(64px);
-  /* Static value for prefers-reduced-motion, where the pulse above is neutered. */
-  opacity: 0.22;
+  .blob {
+    position: fixed;
+    height: 24rem;
+    width: 24rem;
+    border-radius: 9999px;
+    pointer-events: none;
+    filter: blur(64px);
+    /* Static value for prefers-reduced-motion, where the pulse above is neutered. */
+    opacity: 0.22;
+  }
 }
 
 @keyframes pulseSlow {
@@ -152,8 +231,10 @@ body {
   50% { opacity: 0.22; }
 }
 
-.animate-pulse-slow {
-  animation: pulseSlow 4s infinite ease-in-out;
+@layer components {
+  .animate-pulse-slow {
+    animation: pulseSlow 4s infinite ease-in-out;
+  }
 }
 
 /* Entrance animations. Every one is one-shot (`both`) so nothing keeps moving
@@ -175,18 +256,20 @@ body {
   to { opacity: 1; transform: none; }
 }
 
-.animate-pop-down {
-  animation: popDown 150ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  transform-origin: top;
-}
-.animate-pop-up {
-  animation: popUp 190ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.animate-fade-in {
-  animation: fadeIn 160ms ease-out both;
-}
-.animate-slide-in {
-  animation: slideInRight 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+@layer components {
+  .animate-pop-down {
+    animation: popDown 150ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    transform-origin: top;
+  }
+  .animate-pop-up {
+    animation: popUp 190ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .animate-fade-in {
+    animation: fadeIn 160ms ease-out both;
+  }
+  .animate-slide-in {
+    animation: slideInRight 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
 }
 
 /* Cards lift on hover. Kept off box-shadow-free surfaces so the glow utilities
@@ -196,8 +279,107 @@ body {
 }
 .card-hover:hover {
   transform: translateY(-2px);
-  border-color: rgb(var(--k-hairline-strong, 84 84 109) / 1);
-  box-shadow: 0 14px 30px -14px rgb(0 0 0 / 0.7);
+  border-color: rgb(var(--k-accent, 126 156 216) / 0.9);
+  box-shadow:
+    0 0 22px -5px rgb(var(--k-accent, 126 156 216) / 0.55),
+    0 14px 30px -14px rgb(0 0 0 / 0.7);
+}
+
+/* Hover that announces itself. Nearly every interactive element in this app hovered
+   to the same single grey step (k-surface-hover), which is barely a level above the
+   surface it sits on, so the accent edge, tint and glow live here rather than in
+   twenty call sites. Unlayered, so it outranks both the surfaces and the resting
+   utilities on the element; :not(:disabled) keeps the parked pagination arrows from
+   lighting up. */
+.glow-hover {
+  transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease, color 140ms ease;
+}
+.glow-hover:not(:disabled):hover {
+  border-color: rgb(var(--tone, var(--k-accent, 126 156 216)) / 0.9);
+  background-color: rgb(var(--tone, var(--k-accent, 126 156 216)) / 0.15);
+  color: rgb(var(--k-ink, 220 215 186));
+  box-shadow: 0 0 16px -3px rgb(var(--tone, var(--k-accent, 126 156 216)) / 0.6);
+}
+
+/* Rows are wide and stacked twenty deep: a glow on each would be noise, so a row
+   gets a coloured wash instead of the grey one. */
+.glow-row:hover {
+  background-color: rgb(var(--tone, var(--k-accent, 126 156 216)) / 0.13);
+}
+
+/* Unlayered on the same contract as the rest of the states: a field inside a panel
+   takes the panel's hue for its focus edge whatever the call site painted, because
+   `focus:border-k-accent` is what every search field uses outside a popover. */
+.tone-btn:hover {
+  background-color: rgb(var(--tone, var(--k-accent, 126 156 216)) / 0.88);
+  box-shadow: 0 0 16px -3px rgb(var(--tone, var(--k-accent, 126 156 216)) / 0.6);
+}
+.close-btn:hover {
+  border-color: rgb(var(--k-danger, 248 113 113) / 0.55);
+  background-color: rgb(var(--k-danger, 248 113 113) / 0.2);
+  color: rgb(var(--k-danger, 248 113 113) / 1);
+  box-shadow: 0 0 16px -4px rgb(var(--k-danger, 248 113 113) / 0.55);
+}
+.glass-menu .glass-input:focus {
+  border-color: rgb(var(--tone, var(--k-accent, 126 156 216)) / 1);
+}
+/* A field that only reacts on focus reads as inert to a mouse. This is `.glow-hover`
+   applied to inputs — same edge, same wash, same cast — so a search bar answers the
+   pointer like the triggers sitting beside it. One rule, on `--tone`, so the fields
+   inside a popover light in that panel's hue and the ones on the toolbar fall through
+   to the accent. Three constraints: no transition, because ui-check reads these in the
+   frame it moves to them and any duration hands back the from-value; `:not(:focus)`,
+   because unlayered rules outrank every call site's `focus:border-k-accent` and would
+   dim a field the caret is already in; and the wash as a background-image, because a
+   field that swaps its sunken fill for a translucent tint reads as inverted on hover. */
+.glass-input:not(:focus):hover {
+  border-color: rgb(var(--tone, var(--k-accent, 126 156 216)) / 0.9);
+  background-image: linear-gradient(
+    rgb(var(--tone, var(--k-accent, 126 156 216)) / 0.15),
+    rgb(var(--tone, var(--k-accent, 126 156 216)) / 0.15)
+  );
+  box-shadow: 0 0 16px -3px rgb(var(--tone, var(--k-accent, 126 156 216)) / 0.6);
+}
+
+/* Theme checkboxes. The native box is replaced, not removed: the input still owns
+   the click, the keyboard and the accessible name, so the label wraps a real control.
+   The tick is a rotated border, which keeps it in the same accent ink as the fill. */
+.cbox {
+  appearance: none;
+  -webkit-appearance: none;
+  display: grid;
+  flex: none;
+  place-content: center;
+  height: 0.95rem;
+  width: 0.95rem;
+  cursor: pointer;
+  border: 1px solid rgb(var(--k-hairline-strong, 84 84 109) / 1);
+  border-radius: 4px;
+  background-color: rgb(var(--k-sunken, 22 22 29) / 0.9);
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+}
+.cbox:hover {
+  border-color: rgb(var(--tone, var(--k-accent, 126 156 216)) / 0.9);
+  box-shadow: 0 0 14px -3px rgb(var(--tone, var(--k-accent, 126 156 216)) / 0.65);
+}
+.cbox:checked {
+  border-color: rgb(var(--tone, var(--k-accent, 126 156 216)) / 1);
+  background-color: rgb(var(--tone, var(--k-accent, 126 156 216)) / 1);
+  box-shadow: 0 0 14px -2px rgb(var(--tone, var(--k-accent, 126 156 216)) / 0.7);
+}
+.cbox:checked::after {
+  content: '';
+  width: 3px;
+  height: 6px;
+  border: solid rgb(var(--k-accent-ink, 22 22 29) / 1);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translate(-1px, -1px);
+}
+
+/* Every scheme's `accent-ink` is a near-black, which is the right punch-through on
+   any of the saturated tone hues, so the tick stays put while the fill moves. */
+.glass-menu :focus-visible {
+  outline-color: rgb(var(--tone, var(--k-accent, 126 156 216)));
 }
 
 @media (prefers-reduced-motion: reduce) {
