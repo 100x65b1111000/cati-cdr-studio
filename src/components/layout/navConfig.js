@@ -11,10 +11,9 @@ import {
 // the route in app/(app)/[view]/page.jsx, so the view list has exactly one source. `id` is
 // also the URL segment, and `hotkey` feeds VIEW_BY_KEY in App.jsx.
 //
-// Every view is lazy: the route gives it a URL and React.lazy gives it a chunk, which is
-// the code splitting Vite used to need the stale-chunk retry hack for. Nothing downstream
-// can cache a rejected payload here because App Router refetches a missing chunk on the
-// next navigation.
+// Every view is lazy: the route gives it a URL and React.lazy gives it a chunk. A chunk
+// that fails to arrive is retried by the router on the next navigation, so nothing here
+// has to stash a reload stamp to recover from a stale build.
 export const NAV = [
   {
     id: 'rundown',

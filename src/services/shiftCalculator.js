@@ -1,4 +1,4 @@
-import { formatDuration, formatTimeOnly } from '../utils/timeFormatter';
+import { formatDuration, formatTimeOnly } from '../utils/timeFormatter.js';
 
 function formatShiftDate(date) {
   const yyyy = date.getFullYear();

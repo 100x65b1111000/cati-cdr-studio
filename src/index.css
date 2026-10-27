@@ -36,7 +36,7 @@
 }
 
 /* The canvas colour and the native-widget tint have to be decided before any token
-   exists, so they key off `data-mode` (set in index.html, before first paint) rather
+   exists, so they key off `data-mode` (set in app/layout.jsx, before first paint) rather
    than off `--k-page`. Two literal hexes here is the price of not shipping the whole
    palette twice; everything else still resolves through the variables. */
 html {

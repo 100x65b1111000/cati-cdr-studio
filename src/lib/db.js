@@ -1,5 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 
 // node:sqlite ships with Node 22.5+, so there is no native module to build on the
@@ -35,6 +36,11 @@ CREATE INDEX IF NOT EXISTS calls_ext_time ON calls(extension, start_time);
 -- Exactly one active upload, enforced by the engine rather than by remembering to
 -- check it in every caller.
 CREATE UNIQUE INDEX IF NOT EXISTS uploads_one_active ON uploads(active) WHERE active = 1;
+-- Signed-out session tokens, until their own expiry would have passed.
+CREATE TABLE IF NOT EXISTS revoked (
+  token      TEXT    PRIMARY KEY,
+  expires_at INTEGER NOT NULL
+);
 `;
 
 // next dev reloads modules constantly; without this each reload opens a fresh handle
@@ -147,4 +153,27 @@ export function clearDataset() {
   const db = getDb();
   // Child rows go with them via ON DELETE CASCADE; the pragma is set at connect.
   db.prepare('DELETE FROM uploads').run();
+}
+
+const fingerprint = (token) => createHash('sha256').update(token).digest('hex');
+
+/**
+ * Signing out has to retract the token itself, not just this browser's copy of it: the
+ * value is a self-contained HMAC, so the bytes another machine kept would stay good until
+ * their own expiry. Only the digest is stored, so this table is not a list of live keys.
+ * `exp` is read straight off the `exp.sig` shape auth.js writes.
+ */
+export function revokeSession(token) {
+  const exp = Number(String(token).split('.')[0]);
+  if (!Number.isFinite(exp)) return;
+  const db = getDb();
+  db.prepare('DELETE FROM revoked WHERE expires_at < ?').run(Date.now());
+  db.prepare('INSERT OR IGNORE INTO revoked (token, expires_at) VALUES (?, ?)').run(fingerprint(token), exp);
+}
+
+export function isRevoked(token) {
+  // Cheap because it is short: a malformed value was never a valid session anyway, so
+  // it can only fail signature verification a moment later in proxy.js.
+  if (!/^\d+\./.test(String(token))) return false;
+  return Boolean(getDb().prepare('SELECT 1 FROM revoked WHERE token = ?').get(fingerprint(token)));
 }

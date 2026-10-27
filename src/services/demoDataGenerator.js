@@ -1,4 +1,4 @@
-import { DEMO_REGIONS } from '../constants/defaultData';
+import { DEMO_REGIONS } from '../constants/defaultData.js';
 
 // A fixed calendar date goes stale: the Today and 7d presets land on an empty
 // table. Day 0 is the day the sample is generated — read per call, not at module

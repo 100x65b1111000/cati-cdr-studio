@@ -1,5 +1,6 @@
-// Shared by src/proxy.js (Edge runtime) and the route handlers (Node runtime), so
-// it sticks to globals both have: crypto.subtle, btoa/atob. No node:crypto, no Buffer.
+// Shared by src/proxy.js and the auth route handlers. Web Crypto rather than node:crypto:
+// the same code runs in the request pipeline and in a plain `node ui-check.mjs` process,
+// and crypto.subtle is a global in both.
 
 export const SESSION_COOKIE = 'cati_cdr_session';
 const TTL_MS = 12 * 60 * 60 * 1000;
@@ -26,8 +27,6 @@ async function hmac(secret, message) {
 
 // `===` is not constant time, but both sides here are fixed-length HMAC digests, never
 // the secret or the password, so early exit leaks nothing an attacker can act on.
-// ponytail: if this ever gates more than a shared team password, move to a real
-// credential check with node:crypto's timingSafeEqual in the Node handlers.
 export async function createSession(secret) {
   const exp = Date.now() + TTL_MS;
   return `${exp}.${toB64Url(await hmac(secret, String(exp)))}`;
