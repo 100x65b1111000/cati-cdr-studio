@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   BracketsCurly,
-  CaretDown,
-  CaretUp,
   Columns,
   FileCsv,
   FileXls,
@@ -18,19 +16,17 @@ import ExtensionFilter, { Checkbox } from '../ui/ExtensionFilter';
 import FilterPopover from '../ui/FilterPopover';
 import SearchInput from '../ui/SearchInput';
 import Segmented from '../ui/Segmented';
+import Stepper from '../ui/Stepper';
 import { COLUMN_BY_ID, FILTERABLE_COLUMN_IDS } from './columns';
 
 const menuItem =
-  'glow-hover flex w-full items-center gap-2 rounded-md border border-transparent px-2.5 py-1.5 text-left text-xs text-k-ink';
+  'hoverable flex w-full items-center gap-2 rounded-md border border-transparent px-2.5 py-1.5 text-left text-xs text-k-ink';
 
 // The stepper and the typed value share one clamp, so the two paths cannot disagree
 // about what a valid threshold is.
 const THRESHOLD_MIN = 1;
 const THRESHOLD_MAX = 120;
 const clampThreshold = (n) => Math.min(THRESHOLD_MAX, Math.max(THRESHOLD_MIN, n));
-
-const stepBtn =
-  'glow-hover flex h-[9px] w-[11px] items-center justify-center rounded-[3px] leading-none text-k-ink-muted disabled:cursor-not-allowed disabled:opacity-35';
 
 export default function RundownToolbar({
   searchQuery,
@@ -138,7 +134,7 @@ export default function RundownToolbar({
               {COLUMN_BY_ID[id]?.label || id}
             </Checkbox>
           ))}
-          <p className="px-2 pt-1.5 text-[10px] text-k-ink-muted">
+          <p className="px-2 pt-1.5 text-2xs text-k-ink-muted">
             Excel writes the columns that are visible here.
           </p>
         </div>
@@ -157,9 +153,20 @@ export default function RundownToolbar({
       {/* The stepper lives inside the field, stacked on the right the way a native
           number input does it. Flanking buttons cost the pill 40px, and this row has
           no room to spare: at 1440px a wrap drops Print/Export below the panel. */}
+      {/* One hue, one hover surface. This control is about breaks, so it owns the same
+          token the Timer glyph and the Break metric use: `--tone` is what the stylesheet
+          hands to the edge, the glow and the stepper hovers, and leaving it unset made
+          them fall through to the app accent — a blue light on a violet control. The
+          number sits in a well inside the pill, separated by fill rather than by a
+          second outline. */}
+      {/* The height is pinned, not derived. Left to its own box this pill is 35px while
+          every other control in the row is 30, because its content height is the number
+          input's 21px line-and-well, not the 15px of text beside it — so any change to
+          the type scale moved this one control and nothing else. */}
       <div
-        className={`flex flex-none items-center gap-1 rounded-lg bg-k-sunken/80 px-2 py-1.5 text-[11px] ring-1 ring-inset transition-colors focus-within:ring-k-accent/70 ${
-          thresholdDirty ? 'ring-k-accent/70 text-k-ink' : 'ring-k-hairline-strong/50 text-k-ink-muted'
+        style={{ '--tone': 'var(--k-break-time)' }}
+        className={`field flex h-[30px] flex-none items-center gap-1 rounded-lg px-2 text-meta focus-within:border-k-break-time/70 ${
+          thresholdDirty ? 'border-k-break-time/70 text-k-ink' : 'text-k-ink-muted'
         }`}
       >
         <Timer size={14} className="text-k-break-time" />
@@ -175,28 +182,16 @@ export default function RundownToolbar({
               if (e.key === 'Enter') applyThreshold();
             }}
             onBlur={applyThreshold}
-            className="num w-[2.6rem] rounded-md border border-k-hairline-strong bg-k-surface/70 px-0 py-0.5 text-center text-k-ink focus:border-k-accent focus:outline-none"
+            className="num h-[18px] w-[2.6rem] rounded-md border border-k-break-time/25 bg-k-surface/70 px-0 text-center text-k-ink focus:outline-none"
           />
-          <span className="absolute inset-y-0 right-0 flex w-[13px] flex-col items-center justify-center gap-px pr-px">
-            <button
-              type="button"
-              aria-label="Increase the break threshold by one minute"
-              disabled={thresholdValue >= THRESHOLD_MAX}
-              onClick={() => nudgeThreshold(1)}
-              className={stepBtn}
-            >
-              <CaretUp size={8} weight="bold" />
-            </button>
-            <button
-              type="button"
-              aria-label="Decrease the break threshold by one minute"
-              disabled={thresholdValue <= THRESHOLD_MIN}
-              onClick={() => nudgeThreshold(-1)}
-              className={stepBtn}
-            >
-              <CaretDown size={8} weight="bold" />
-            </button>
-          </span>
+          <Stepper
+            upLabel="Increase the break threshold by one minute"
+            downLabel="Decrease the break threshold by one minute"
+            upDisabled={thresholdValue >= THRESHOLD_MAX}
+            downDisabled={thresholdValue <= THRESHOLD_MIN}
+            onUp={() => nudgeThreshold(1)}
+            onDown={() => nudgeThreshold(-1)}
+          />
         </span>
         <span>min</span>
       </div>
@@ -206,20 +201,20 @@ export default function RundownToolbar({
       <FilterPopover label="Views" icon={FloppyDisk} tone="throughput" badge={savedViews.length || ''} align="right">
         <div className="space-y-1.5 p-2">
           {savedViews.length === 0 ? (
-            <p className="px-2 py-1 text-[11px] text-k-ink-muted">
+            <p className="px-2 py-1 text-meta text-k-ink-muted">
               No saved views yet. Save the filters, columns and date range you use most.
             </p>
           ) : (
             savedViews.map((view) => (
-              <div key={view.id} className="glow-row flex items-center gap-1 rounded-md px-1 py-0.5">
-                <button type="button" className="glow-hover flex-1 truncate rounded-md border border-transparent px-1 py-0.5 text-left text-xs text-k-ink" onClick={() => onApplyFilters(view.filters)}>
+              <div key={view.id} className="row-hover flex items-center gap-1 rounded-md px-1 py-0.5">
+                <button type="button" className="hoverable flex-1 truncate rounded-md border border-transparent px-1 py-0.5 text-left text-xs text-k-ink" onClick={() => onApplyFilters(view.filters)}>
                   {view.name}
                 </button>
-                <span className="num text-[10px] text-k-ink-muted">{view.createdAt}</span>
+                <span className="num text-2xs text-k-ink-muted">{view.createdAt}</span>
                 <button
                   type="button"
                   aria-label={`Overwrite ${view.name} with the current filters`}
-                  className="glow-hover rounded-md p-1 text-k-ink-muted"
+                  className="hoverable rounded-md p-1 text-k-ink-muted"
                   onClick={() => {
                     replaceSavedView(view.id, filters);
                     addToast(`View "${view.name}" overwritten`, 'info');
@@ -248,12 +243,12 @@ export default function RundownToolbar({
               }}
               placeholder="Name this view"
               aria-label="New view name"
-              className="glass-input min-w-0 flex-1 rounded-lg px-2 py-1 text-xs text-k-ink placeholder:text-k-ink-muted focus:border-k-accent focus:outline-none"
+              className="field min-w-0 flex-1 rounded-lg px-2 py-1 text-xs text-k-ink placeholder:text-k-ink-muted focus:border-k-accent focus:outline-none"
             />
             <button
               type="button"
               onClick={saveCurrentView}
-              className="tone-btn rounded-lg px-2.5 py-1 text-[11px] font-semibold active:translate-y-[1px]"
+              className="tone-btn rounded-lg px-2.5 py-1 text-meta font-semibold active:translate-y-[1px]"
             >
               Save
             </button>
@@ -266,7 +261,7 @@ export default function RundownToolbar({
           type="button"
           onClick={() => window.print()}
           style={{ '--tone': 'var(--k-danger)' }}
-          className="glow-hover inline-flex items-center gap-1.5 rounded-lg border border-k-hairline-strong bg-k-surface-hover/60 px-3 py-1.5 text-xs font-medium text-k-ink-muted active:translate-y-[1px]"
+          className="hoverable inline-flex items-center gap-1.5 rounded-lg border border-k-hairline-strong bg-k-surface-hover/60 px-3 py-1.5 text-xs font-medium text-k-ink-muted active:translate-y-[1px]"
         >
           <Printer size={15} className="text-k-danger" />
           Print

@@ -1,186 +1,92 @@
-// Single source of truth for all colour schemes.
+// Single source of truth for the two colour modes.
 // Role keys are kebab-case and map 1:1 to the Tailwind `k` color keys, so a role
 // reads the same in JSX (`bg-k-surface-hover`) and as a CSS variable (`--k-surface-hover`).
-// The active scheme is applied as `--k-<role>` variables on <html> by CdrContext.
+// The active mode is applied as `--k-<role>` variables on <html> by CdrContext.
 //
 // `danger` = a bad call outcome (missed / not answered). `critical` = required-field
 // and destructive-action marking. They must never share a hex, or the two meanings
 // collapse into one colour.
 //
 // `warning` is a metric hue, not an alert: it marks the call rate, which is neither
-// destructive (`critical`) nor a failed call (`danger`). Every scheme paints it a true
+// destructive (`critical`) nor a failed call (`danger`). Both modes paint it a true
 // orange, so it never doubles as either red.
 //
-// `ink-faint` sits below `ink-muted` in luminance. It is for separators and
-// placeholder dashes, not for secondary text.
+// `ink-faint` is the third text level — separators, dashes and the dimmest live
+// figures. It is tuned to clear AA 4.5 against its own mode's card rather than
+// sitting a fixed step below `ink-muted`: two call sites use it for real text, and a
+// value that fails there is a failure no comment can talk the browser out of.
 //
-// `dot` is the backdrop lattice colour. It is normalised by *relative* contrast,
-// not by a fixed mix: each value sits at 2.7x the page's luminance, which is what
-// the Kanagawa edition's `border` produced against its own background. A single
-// alpha cannot do this. Against a page as dark as studio's (#060A12) any shared
-// mix reads loudly, while against evergreen's (#2D353B) the same mix is a
-// difference of 1.24x and disappears. Weber, not delta.
+// Elevation discipline is not symmetric between the modes, and this is deliberate.
+// DARK spaces its surfaces by perceptual lightness (dL* ~5 between page, card and
+// hover) because there is room at the bottom of the ramp. LIGHT cannot do this:
+// #FAFAF8 to #FFFFFF is 1.8 L*, and forcing a 10-point step there means one of the
+// two stops is a grey card on a white page. So in light mode the spacing lives in the
+// *hairline pair* instead (L* 88.0 and 74.6 — the 10-and-20 steps), which matches how
+// the flat surfaces separate plates anyway. Do not "correct" the light ramp back wider.
+//
+// `accent-ink` is the one role whose *value* is mode-dependent, not just its hue. The
+// invariant is that the punch-through on an accent fill clears AA, and the two modes
+// need opposite answers: light's accent must also work as 11-12px *text* on white,
+// which pins it near L*42, and dark ink on an L*42 fill is 3.1:1. Dark keeps a
+// near-black ink, light uses white.
+//
+// `sunken` sits *below* `page` in both modes: it is the recessed chrome (the app bar,
+// fields, the checkbox at rest), not a lighter shade of the surface.
 
-export const DEFAULT_SCHEME = 'studio';
+export const DEFAULT_MODE = 'dark';
 
-export const COLOR_SCHEMES = {
-  studio: {
-    label: 'Studio',
+export const COLOR_MODES = {
+  dark: {
+    label: 'Dark',
     colors: {
-      // Ramp is spaced by perceptual lightness (dL* ~10 per step), not by raw hex
-      // distance. WCAG ratios read badly between two dark surfaces and hide the fact
-      // that a card has no edge at all.
-      page: '#060A12',
-      sunken: '#020509',       // below page: inputs and the header strip read recessed
-      dot: '#101622',
-      surface: '#182234',
-      'surface-hover': '#223046',
-      hairline: '#2E3E57',
-      'hairline-strong': '#46597A',
-      ink: '#F4F7FC',
-      'ink-muted': '#AFBCD2',
-      'ink-faint': '#7A8AA3',
-      accent: '#3b82f6',         // blue-500
-      // Dark ink on the accent fill: white on blue-500 lands at 3.7:1, below AA.
-      'accent-ink': '#060A12',
-      success: '#34d399',        // emerald-400
-      danger: '#f87171',         // red-400
-      critical: '#f43f5e',         // rose-500
-      warning: '#fb923c',          // orange-400
-      talk: '#22d3ee',           // cyan-400
-      throughput: '#fbbf24',     // amber-400
-      'break-time': '#a78bfa',   // violet-400
-      region: '#818cf8'          // indigo-400
+      page: '#0B0E14',
+      sunken: '#020306',
+      surface: '#161A22',
+      'surface-hover': '#1F2632',
+      hairline: '#2B3442',
+      'hairline-strong': '#3E4A5E',
+      ink: '#E8EDF5',
+      'ink-muted': '#9AA6BC',
+      'ink-faint': '#79879E',
+      accent: '#4D8DF5',
+      'accent-ink': '#070B12',
+      success: '#3FD9A0',
+      danger: '#FF7B7B',
+      critical: '#E8590C',
+      warning: '#FF9E40',
+      talk: '#38D6F0',
+      throughput: '#F5C247',
+      'break-time': '#C491FF',
+      region: '#8FA0FF'
     }
   },
-  kanagawa: {
-    label: 'Kanagawa',
+  light: {
+    label: 'Light',
     colors: {
-      page: '#1F1F28',           // SumiInk1
-      sunken: '#16161D',         // SumiInk0
-      dot: '#363646',            // SumiInk3, the original wave-bg lattice
-      surface: '#2A2A37',        // SumiInk3
-      'surface-hover': '#363646',
-      hairline: '#363646',
-      'hairline-strong': '#54546D',
-      ink: '#DCD7BA',            // FujiWhite
-      'ink-muted': '#9D97B8',
-      'ink-faint': '#817B9C',
-      accent: '#7E9CD8',         // WaveBlue
-      'accent-ink': '#16161D',
-      success: '#98BB6C',        // AutumnGreen
-      danger: '#E82424',         // PeachRed
-      critical: '#FF5D57',       // Efflorescence
-      warning: '#D97B4F',          // Kaki persimmon
-      talk: '#7AA89F',           // WaveAqua
-      throughput: '#E6C384',     // CarpYellow
-      'break-time': '#D27E99',   // SakuraPink
-      region: '#76946A'          // SpringGreen
-    }
-  },
-  gruvbox: {
-    label: 'Gruvbox',
-    colors: {
-      page: '#282828',
-      sunken: '#1D2021',
-      dot: '#48433F',
-      surface: '#32302F',
-      'surface-hover': '#3C3836',
-      hairline: '#504945',
-      'hairline-strong': '#665C54',
-      ink: '#EBDBB2',
-      'ink-muted': '#BDAE93',
-      'ink-faint': '#928374',
-      accent: '#83A598',
-      'accent-ink': '#1D2021',
-      success: '#B8BB26',
-      danger: '#FB4934',
-      critical: '#FE8019',
-      warning: '#F28C28',                // tangerine: gruvbox's orange is taken by critical
-      talk: '#8EC07C',
-      throughput: '#FABD2F',
-      'break-time': '#D3869B',
-      region: '#A9B665'
-    }
-  },
-  tokyonight: {
-    label: 'Tokyo Night',
-    colors: {
-      page: '#1A1B26',
-      sunken: '#16161E',
-      dot: '#2D3045',
-      surface: '#24283B',
-      'surface-hover': '#2F334D',
-      hairline: '#2F334D',
-      'hairline-strong': '#565F89',
-      ink: '#C0CAF5',
-      'ink-muted': '#9AA5C8',
-      'ink-faint': '#7982A6',
-      accent: '#7AA2F7',
-      'accent-ink': '#16161E',
-      success: '#9ECE6A',
-      danger: '#F7768E',
-      critical: '#FF9E64',
-      warning: '#F87C3C',
-      talk: '#73DACA',
-      throughput: '#E0AF68',
-      'break-time': '#BB9AF7',
-      region: '#4FD6BE'
-    }
-  },
-  catppuccin: {
-    label: 'Catppuccin',
-    colors: {
-      page: '#1E1E2E',
-      sunken: '#181825',
-      dot: '#343648',
-      surface: '#313244',
-      'surface-hover': '#45475A',
-      hairline: '#45475A',
-      'hairline-strong': '#585B70',
-      ink: '#CDD6F4',
-      'ink-muted': '#A5ADCB',
-      'ink-faint': '#7F849C',
-      accent: '#89B4FA',
-      'accent-ink': '#11111B',
-      success: '#A6E3A1',
-      danger: '#F38BA8',
-      critical: '#E78284',
-      warning: '#FAB387',                // Peach
-      talk: '#94E2D5',
-      throughput: '#F9E2AF',
-      'break-time': '#F5C2E7',
-      region: '#CBA6F7'
-    }
-  },
-  evergreen: {
-    label: 'Evergreen',
-    colors: {
-      page: '#2D353B',
-      sunken: '#232A2E',
-      dot: '#4F575C',
-      surface: '#343F44',
-      'surface-hover': '#3D484D',
-      hairline: '#475258',
-      'hairline-strong': '#5C6569',
-      ink: '#D3C6AA',
-      'ink-muted': '#A9B5AB',
-      'ink-faint': '#828C84',
-      accent: '#7FBBB3',
-      'accent-ink': '#232A2E',
-      success: '#A7C080',
-      danger: '#E67E80',
-      critical: '#E69875',
-      warning: '#E8A34D',                // harvest orange, light enough to clear AA on the surface
-      talk: '#83C092',
-      throughput: '#DBBC7F',
-      'break-time': '#D699B6',
-      region: '#9DA9A0'
+      page: '#FAFAF8',
+      sunken: '#EAEAE2',
+      surface: '#FFFFFF',
+      'surface-hover': '#F2F2EC',
+      hairline: '#DEDDD5',
+      'hairline-strong': '#B9B8AC',
+      ink: '#1C1C1A',
+      'ink-muted': '#5A5A54',
+      'ink-faint': '#71716A',
+      accent: '#1A56C0',
+      'accent-ink': '#FFFFFF',
+      success: '#0A6B45',
+      danger: '#C1121F',
+      critical: '#A2133C',
+      warning: '#C2410C',
+      talk: '#0E7490',
+      throughput: '#8A5A00',
+      'break-time': '#6D28D9',
+      region: '#3730A3'
     }
   }
 };
 
-// Chart series resolve through roles, so no scheme needs a second colour list to drift.
+// Chart series resolve through roles, so neither mode needs a second colour list to drift.
 export const SERIES_ROLES = ['accent', 'talk', 'throughput', 'break-time', 'success', 'danger'];
 
 export function cssVarName(role) {
@@ -197,17 +103,14 @@ export function hexToRgba(hex, alpha) {
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
 
-export function getScheme(id) {
-  return COLOR_SCHEMES[id] || COLOR_SCHEMES[DEFAULT_SCHEME];
-}
-
-export function getSeries(id) {
-  const colors = getScheme(id).colors;
-  return SERIES_ROLES.map((role) => colors[role]);
+// Tolerates an unknown or legacy id: the persisted value is user-controlled state,
+// and a colour lookup that throws takes the whole app down with it.
+export function getMode(id) {
+  return COLOR_MODES[id] || COLOR_MODES[DEFAULT_MODE];
 }
 
 // Canvas fills need concrete colour strings, so charts read the variables the
-// active scheme already wrote on <html>. The scheme object stays out of the
+// active mode already wrote on <html>. The mode object stays out of the
 // render path and the canvas always matches what the DOM shows.
 export function themeColor(role, alpha = 1) {
   const raw = getComputedStyle(document.documentElement)

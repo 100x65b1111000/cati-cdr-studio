@@ -57,9 +57,9 @@ export default function DropzoneOverlay() {
   if (!isDragging) return null;
 
   return (
-    <div className="animate-fade-in pointer-events-none fixed inset-0 z-50 flex items-center justify-center border-4 border-dashed border-k-accent bg-k-page/80 p-6 backdrop-blur-xl">
+    <div className="animate-fade-in pointer-events-none fixed inset-0 z-50 flex items-center justify-center border-4 border-dashed border-k-accent bg-k-page/80 p-6">
       <div className="animate-pop-up space-y-2 text-center">
-        <div className="glow-accent mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-k-accent/15 text-k-accent">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-k-accent/15 text-k-accent">
           <CloudArrowUp size={30} />
         </div>
         <h2 className="text-base font-semibold text-k-ink">Drop the CDR CSV</h2>

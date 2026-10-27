@@ -46,7 +46,7 @@ export default function Modal({ title, subtitle, onClose, children, footer, widt
   return (
     <div
       ref={overlayRef}
-      className="animate-fade-in fixed inset-0 z-50 overflow-y-auto bg-k-page/80 px-4 py-10 backdrop-blur-xl sm:px-6"
+      className="animate-fade-in fixed inset-0 z-50 overflow-y-auto bg-k-page/80 px-4 py-10 sm:px-6"
     >
       <div
         ref={panelRef}

@@ -1,12 +1,14 @@
-import React, { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useCdr } from '../../context/CdrContext';
 import { createShiftDateResolver } from '../../services/shiftCalculator';
 import { inDateRange, rangeDates } from '../../utils/dateRange';
+import { loadFromStorage, saveToStorage } from '../../utils/storage';
 import Pagination from '../common/Pagination';
 import DayScopeSelect from '../ui/DayScopeSelect';
 import SearchInput from '../ui/SearchInput';
 import ExtensionFilter from '../ui/ExtensionFilter';
 import Segmented from '../ui/Segmented';
+import SkeletonRows from '../ui/SkeletonRows';
 import SortHeaderCell from '../ui/SortHeaderCell';
 import EmptyState from '../ui/EmptyState';
 import Chip from '../ui/Chip';
@@ -14,16 +16,12 @@ import Chip from '../ui/Chip';
 const COLUMNS = [
   { id: 'start_time', label: 'Call start', align: 'left', value: (c) => c.start_time.getTime(), cell: (c) => c.start_time.toISOString().replace('T', ' ').slice(0, 19) },
   { id: 'extension', label: 'Ext', align: 'left', value: (c) => c.extension, cell: (c) => c.extension },
-  { id: 'destination', label: 'Destination', align: 'left', cell: (c) => c.raw?.DESTINATION || c.raw?.CLID || '-' },
+  { id: 'destination', label: 'Destination', align: 'left', value: (c) => c.raw?.DESTINATION || c.raw?.CLID || '', cell: (c) => c.raw?.DESTINATION || c.raw?.CLID || '-' },
   { id: 'direction', label: 'Dir', align: 'left', value: (c) => c.direction, cell: (c) => c.direction },
   { id: 'response', label: 'Response', align: 'left', value: (c) => c.response, cell: (c) => (
-    <span
-      className={`rounded px-2 py-0.5 text-[11px] font-semibold ${
-        c.response === 'ANSWERED' ? 'bg-k-success/10 text-k-success' : 'bg-k-danger/10 text-k-danger'
-      }`}
-    >
+    <Chip tone={c.response === 'ANSWERED' ? 'success' : 'danger'} size="md" className="font-semibold">
       {c.response}
-    </span>
+    </Chip>
   ) },
   { id: 'duration', label: 'Duration', align: 'right', value: (c) => c.duration, cell: (c) => `${c.duration}s` },
   { id: 'region', label: 'Region', align: 'left', value: (c) => (c.region || '').toLowerCase(), cell: (c) => c.region || '-' }
@@ -43,16 +41,23 @@ const RESPONSES = [
 ];
 
 export default function RawCDRTable() {
-  const { rawCalls, shiftConfig, dateRange, analysis, extNameMap } = useCdr();
+  const { rawCalls, shiftConfig, dateRange, analysis, extNameMap, isParsing } = useCdr();
 
-  const [search, setSearch] = useState('');
+  const restoredRef = useRef(loadFromStorage('raw_view_state', null));
+  const [search, setSearch] = useState(() => restoredRef.current?.search || '');
   const [selectedExts, setSelectedExts] = useState([]);
-  const [response, setResponse] = useState('ALL');
-  const [dayScope, setDayScope] = useState('');
-  const [sortField, setSortField] = useState('start_time');
-  const [sortAsc, setSortAsc] = useState(false);
+  const [response, setResponse] = useState(() =>
+    RESPONSES.some((r) => r.id === restoredRef.current?.response) ? restoredRef.current.response : 'ALL'
+  );
+  const [dayScope, setDayScope] = useState(() => restoredRef.current?.dayScope || '');
+  const [sortField, setSortField] = useState(() =>
+    COLUMNS.some((c) => c.id === restoredRef.current?.sort?.field) ? restoredRef.current.sort.field : 'start_time'
+  );
+  // Newest call first when nothing was saved — the opposite of the rundown's default,
+  // because 400 rows of raw calls read backwards.
+  const [sortAsc, setSortAsc] = useState(() => restoredRef.current?.sort?.asc ?? false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(() => restoredRef.current?.pageSize || 25);
 
   const resolveShiftDate = useMemo(() => createShiftDateResolver(shiftConfig), [shiftConfig]);
   const dateSet = useMemo(() => new Set(rangeDates(dateRange, analysis)), [dateRange, analysis]);
@@ -64,9 +69,22 @@ export default function RawCDRTable() {
     () => [...new Set(rawCalls.map((c) => c.extension))].sort(collator.compare),
     [rawCalls]
   );
+  const datasetKey = useMemo(() => extensions.join(','), [extensions]);
   useEffect(() => {
     setSelectedExts(extensions);
     setCurrentPage(1);
+  }, [datasetKey]);
+
+  // A genuinely new dataset selects every agent again; a restored subset is applied
+  // once, after the first dataset is known. Same two-effect shape as the rundown.
+  const restoredSelectionRef = useRef(false);
+  useEffect(() => {
+    if (restoredSelectionRef.current || extensions.length === 0) return;
+    restoredSelectionRef.current = true;
+    const saved = restoredRef.current?.extensions;
+    if (!Array.isArray(saved)) return;
+    const valid = saved.filter((e) => extensions.includes(e));
+    if (valid.length > 0) setSelectedExts(valid);
   }, [extensions]);
 
   // A call's shift is not its calendar day: a 01:00 call belongs to the shift that
@@ -144,6 +162,25 @@ export default function RawCDRTable() {
 
   const answered = filtered.filter((c) => c.response === 'ANSWERED').length;
 
+  const viewState = useMemo(
+    () => ({
+      search,
+      extensions: selectedExts,
+      response,
+      // The effective scope, not the raw pick: a resurrected day the saved range no
+      // longer covers would leave the table empty for a reason you cannot see.
+      dayScope: scope,
+      sort: { field: sortField, asc: sortAsc },
+      pageSize
+    }),
+    [search, selectedExts, response, scope, sortField, sortAsc, pageSize]
+  );
+
+  useEffect(() => {
+    const id = setTimeout(() => saveToStorage('raw_view_state', viewState), 400);
+    return () => clearTimeout(id);
+  }, [viewState]);
+
   return (
     <div className="space-y-4">
       <div className="no-print panel relative z-30 flex flex-wrap items-center gap-2 rounded-xl px-3 py-2.5">
@@ -156,6 +193,7 @@ export default function RawCDRTable() {
           label="Extension, number or region"
           placeholder="Extension, number or region"
           className="w-64 flex-none"
+          primary
         />
 
         <ExtensionFilter
@@ -194,9 +232,9 @@ export default function RawCDRTable() {
       />
 
       <div className="panel overflow-hidden rounded-xl">
-        <div className="max-h-[70vh] overflow-auto print:max-h-none">
+        <div aria-busy={isParsing || undefined} className="max-h-[70vh] overflow-auto print:max-h-none">
           <table className="w-full text-left text-xs text-k-ink-muted">
-            <thead className="sticky top-0 z-[25] border-b border-k-hairline glass-head text-[10px] uppercase tracking-wider">
+            <thead className="sticky top-0 z-[25] border-b border-k-hairline thead text-2xs uppercase tracking-wider">
               <tr>
                 {COLUMNS.map((col) => (
                   <SortHeaderCell
@@ -213,7 +251,9 @@ export default function RawCDRTable() {
               </tr>
             </thead>
             <tbody className="divide-y divide-k-hairline/60">
-              {pageRows.length === 0 ? (
+              {isParsing ? (
+                <SkeletonRows cols={COLUMNS.length} />
+              ) : pageRows.length === 0 ? (
                 <tr>
                   <td colSpan={COLUMNS.length}>
                     <EmptyState
@@ -235,16 +275,16 @@ export default function RawCDRTable() {
                       {grouped && firstOfDay && (
                         <tr>
                           <td colSpan={COLUMNS.length} className="bg-k-sunken/70 px-3 py-1.5">
-                            <span className="num text-[10px] font-semibold uppercase tracking-wider text-k-ink-muted">
+                            <span className="num text-2xs font-medium uppercase tracking-wider text-k-ink-muted">
                               {day}
                             </span>
-                            <span className="num ml-2 text-[10px] text-k-ink-faint">
+                            <span className="num ml-2 text-2xs text-k-ink-muted">
                               {` · ${shiftDays.find((d) => d.date === day)?.hint || ''}`}
                             </span>
                           </td>
                         </tr>
                       )}
-                      <tr className="glow-row h-[34px]">
+                      <tr className="row-hover h-[34px]">
                         {COLUMNS.map((col) => (
                           <td
                             key={col.id}
@@ -278,7 +318,6 @@ export default function RawCDRTable() {
           pageSize={pageSize}
           onPageChange={setCurrentPage}
           onPageSizeChange={setPageSize}
-          pageSizeOptions={[25, 50, 100, 200]}
         />
       </div>
     </div>

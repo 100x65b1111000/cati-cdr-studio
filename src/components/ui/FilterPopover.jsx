@@ -48,13 +48,13 @@ export default function FilterPopover({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors active:translate-y-[1px] ${
-          open ? t.open : 'glow-hover border-k-hairline-strong bg-k-surface-hover/50 text-k-ink-muted'
+          open ? t.open : 'hoverable border-k-hairline-strong bg-k-surface-hover/50 text-k-ink-muted'
         }`}
       >
         {Icon && <Icon size={15} className={open ? '' : t.icon} />}
         <span>{label}</span>
         {badge != null && badge !== '' && (
-          <span className={`num rounded-md px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset bg-k-sunken/70 ${t.chip}`}>
+          <span className={`num rounded-md px-1.5 py-0.5 text-2xs font-medium ring-1 ring-inset bg-k-sunken/70 ${t.chip}`}>
             {badge}
           </span>
         )}
@@ -62,7 +62,7 @@ export default function FilterPopover({
       </button>
       {open && (
         <div
-          className={`glass-menu animate-pop-down absolute z-30 mt-1.5 rounded-xl ${width} ${
+          className={`menu animate-pop-down absolute z-30 mt-1.5 rounded-xl ${width} ${
             align === 'right' ? 'right-0 origin-top-right' : 'left-0 origin-top-left'
           }`}
         >

@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect } from 'react';
+import React, { Suspense, useEffect, useRef } from 'react';
 import { useCdr } from './context/CdrContext';
 import AppHeader from './components/layout/AppHeader';
 import AppSidebar from './components/layout/AppSidebar';
@@ -7,6 +7,7 @@ import DateRangeControl from './components/layout/DateRangeControl';
 import ToastContainer from './components/common/ToastContainer';
 import { availableDates, rangeLabel } from './utils/dateRange';
 import ErrorBanner from './components/ui/ErrorBanner';
+import ViewErrorBoundary from './components/ui/ViewErrorBoundary';
 import ShiftSettingsModal from './components/modals/ShiftSettingsModal';
 import AgentDetailModal from './components/modals/AgentDetailModal';
 import CdrPreviewModal from './components/modals/CdrPreviewModal';
@@ -14,14 +15,30 @@ import DropzoneOverlay from './components/modals/DropzoneOverlay';
 
 const VIEW_BY_KEY = Object.fromEntries(NAV.map((n) => [n.hotkey, n.id]));
 
+function focusSearch() {
+  const el = document.querySelector('main [data-search-primary]');
+  if (!el) return false;
+  el.focus();
+  return true;
+}
+
 export default function App() {
   const { activeTab, setActiveTab, parseError, clearParseError, analysis, dateRange } = useCdr();
 
+  const wantsSearchRef = useRef(false);
+
   useEffect(() => {
     function onKeydown(e) {
+      // A dialog owns the keyboard while it is up: Modal traps Tab and marks itself
+      // aria-modal, but nothing stops a bare digit from swapping the view underneath it.
+      if (document.querySelector('[role="dialog"]')) return;
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        document.querySelector('main [data-search-primary]')?.focus();
+        if (focusSearch()) return;
+        // Analytics and Settings have no search field, so the documented shortcut
+        // would swallow the keystroke. Land on the view that does have one instead.
+        setActiveTab('rundown');
+        wantsSearchRef.current = true;
         return;
       }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -34,22 +51,25 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeydown);
   }, [setActiveTab]);
 
+  useEffect(() => {
+    if (wantsSearchRef.current && focusSearch()) wantsSearchRef.current = false;
+  }, [activeTab]);
+
   const view = NAV.find((n) => n.id === activeTab) || NAV[0];
   const View = view.component;
 
   return (
-    <div className="dot-bg relative flex min-h-[100dvh] flex-col bg-k-page text-k-ink antialiased selection:bg-k-accent selection:text-k-accent-ink">
-      <div aria-hidden="true" className="blob animate-pulse-slow left-1/4 top-0 bg-k-accent/35" />
-      <div
-        aria-hidden="true"
-        className="blob animate-pulse-slow bottom-10 right-1/4 bg-k-region/30"
-        style={{ animationDelay: '2s' }}
-      />
-      <div
-        aria-hidden="true"
-        className="blob animate-pulse-slow left-0 top-1/2 bg-k-talk/25"
-        style={{ animationDelay: '1s' }}
-      />
+    <div className="relative flex min-h-[100dvh] flex-col bg-k-page text-k-ink antialiased selection:bg-k-accent selection:text-k-accent-ink">
+      {/* First tab stop, off-screen until it has focus. Without it a keyboard user
+          works through the whole header and rail before reaching the table. The ring
+          is the page ink, not the accent: the base :focus-visible outline would be
+          accent-on-accent. */}
+      <a
+        href="#view"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[70] focus:rounded-lg focus:bg-k-accent focus:px-3.5 focus:py-2 focus:text-xs focus:font-medium focus:text-k-accent-ink focus:outline-2 focus:outline-k-ink focus:outline-offset-2"
+      >
+        Skip to content
+      </a>
 
       <AppHeader />
       <AppSidebar />
@@ -57,18 +77,19 @@ export default function App() {
       <div className="relative flex min-w-0 flex-1 flex-col lg:pl-20">
         <header className="hidden print:block print:pb-2">
           <h2 className="text-sm font-semibold text-k-ink">{view.label}</h2>
-          <p className="num text-[11px] text-k-ink-muted">
+          <p className="num text-meta text-k-ink-muted">
             {rangeLabel(dateRange, availableDates(analysis))}
           </p>
         </header>
 
-        <main className="mx-auto w-full max-w-7xl flex-1 space-y-6 p-4 sm:p-6">
+        <main id="view" tabIndex={-1} className="mx-auto w-full max-w-7xl flex-1 space-y-6 p-4 sm:p-6">
           {/* The rail is 48px of icons and the floating bar stays on the brand, so this
               is the only place a view says what it is. It borrows the tiles' icon plate
               and the header's title ink rather than inventing a third heading style. */}
-          {/* z-40 because the calendar popover opens from here and the table toolbars
-              below are also z-30; equal depth means DOM order, which buries the panel. */}
-          <div className="no-print relative z-40 space-y-2">
+          {/* z-[35]: above the z-30 table toolbars, or the calendar popover this row
+              opens would lose to them on DOM order, but below the z-40 chrome, or this
+              whole heading scrolls up and paints on top of the floating app bar. */}
+          <div className="no-print relative z-[35] space-y-2">
             <div className="flex flex-wrap items-center gap-3">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-k-accent/25 bg-k-accent/10 text-k-accent">
                 <view.Icon size={18} />
@@ -92,9 +113,11 @@ export default function App() {
           {parseError && <ErrorBanner message={parseError} onDismiss={clearParseError} />}
 
           {View && (
-            <Suspense fallback={<div className="py-16 text-center text-xs text-k-ink-muted">Loading view</div>}>
-              <View />
-            </Suspense>
+            <ViewErrorBoundary resetKey={activeTab}>
+              <Suspense fallback={<div className="py-16 text-center text-xs text-k-ink-muted">Loading view</div>}>
+                <View />
+              </Suspense>
+            </ViewErrorBoundary>
           )}
         </main>
       </div>

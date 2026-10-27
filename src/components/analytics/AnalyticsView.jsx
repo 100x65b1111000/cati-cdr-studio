@@ -46,7 +46,7 @@ function Chart({ icon: Icon, title, note, empty, children }) {
           <Icon size={16} className="text-k-accent" />
           {title}
         </h3>
-        <span className="num text-[11px] text-k-ink-muted">{note}</span>
+        <span className="num text-meta text-k-ink-muted">{note}</span>
       </header>
       <div className="h-72 p-5">
         {empty ? (

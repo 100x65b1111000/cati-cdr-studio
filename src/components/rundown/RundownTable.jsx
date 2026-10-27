@@ -245,9 +245,9 @@ export default function RundownTable({ preview = false }) {
       />
 
       <div className="panel overflow-hidden rounded-xl">
-        <div className="overflow-x-auto">
+        <div aria-busy={isParsing || undefined} className="overflow-x-auto">
           <table className="w-full text-left text-xs text-k-ink-muted">
-            <thead className="sticky top-0 z-[25] border-b border-k-hairline glass-head text-[10px] uppercase tracking-wider">
+            <thead className="sticky top-0 z-[25] border-b border-k-hairline thead text-2xs uppercase tracking-wider">
               <tr>
                 {shownColumns.map((col) =>
                   col.value ? (
@@ -265,7 +265,7 @@ export default function RundownTable({ preview = false }) {
                     <th
                       key={col.id}
                       scope="col"
-                      className={`px-3 py-3.5 text-[10px] font-semibold uppercase tracking-wider text-k-ink-muted ${colWidth(
+                      className={`px-3 py-3.5 text-2xs font-semibold uppercase tracking-wider text-k-ink-muted ${colWidth(
                         col.id
                       )} ${
                         col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
@@ -317,16 +317,16 @@ export default function RundownTable({ preview = false }) {
                     {grouped && (i === 0 || pageRows[i - 1].date !== row.date) && (
                       <tr>
                         <td colSpan={shownColumns.length} className="bg-k-sunken/70 px-3 py-1.5">
-                          <span className="num text-[10px] font-semibold uppercase tracking-wider text-k-ink-muted">
+                          <span className="num text-2xs font-medium uppercase tracking-wider text-k-ink-muted">
                             {row.date}
                           </span>
-                          <span className="num ml-2 text-[10px] text-k-ink-faint">
+                          <span className="num ml-2 text-2xs text-k-ink-muted">
                             {` · ${agentCount(shiftDays.find((d) => d.date === row.date)?.agents || 0)}`}
                           </span>
                         </td>
                       </tr>
                     )}
-                    <tr className="glow-row h-[38px]">
+                    <tr className="row-hover h-[38px]">
                       {shownColumns.map((col) => (
                         <td
                           key={col.id}
@@ -351,7 +351,6 @@ export default function RundownTable({ preview = false }) {
           pageSize={pageSize}
           onPageChange={setCurrentPage}
           onPageSizeChange={setPageSize}
-          pageSizeOptions={[10, 25, 50, 100]}
         />
       </div>
     </div>

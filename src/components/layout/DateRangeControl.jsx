@@ -36,7 +36,7 @@ export default function DateRangeControl() {
       {dateRange.preset === 'custom' && (
         <div className="flex items-center gap-1.5">
           <FilterPopover
-            label={`${dateRange.from || 'start'} – ${dateRange.to || 'end'}`}
+            label={`${dateRange.from || 'start'} to ${dateRange.to || 'end'}`}
             icon={Calendar}
             width="w-[16.5rem]"
           >

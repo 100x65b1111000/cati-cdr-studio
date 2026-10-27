@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useCdr } from '../../context/CdrContext';
 import Modal from '../ui/Modal';
 
-const field = 'glass-input w-full rounded-lg px-3 py-2 text-xs text-k-ink focus:border-k-accent focus:outline-none';
+const field = 'field w-full rounded-lg px-3 py-2 text-xs text-k-ink focus:border-k-accent focus:outline-none';
 
 export default function AddAgentModal() {
   const { isAddAgentOpen, setIsAddAgentOpen, extNameMap, updateExtMapping, addToast } = useCdr();
@@ -41,7 +41,11 @@ export default function AddAgentModal() {
 
   return (
     <Modal title="Extension mapping" subtitle="Name an extension so it reads as a person" onClose={close} width="max-w-sm">
-      <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+      {/* `noValidate` because `required` alone lets the browser answer an empty submit
+          with its own bubble and `handleSubmit` never runs — so the duplicate-extension
+          message appeared for one mistake and a native popup for the other. Now every
+          rejection is this form's words, in this form's place. */}
+      <form onSubmit={handleSubmit} noValidate className="space-y-3 text-xs">
         <div>
           <label htmlFor="agent-ext" className="mb-1 block text-k-ink-muted">
             Extension ID <span className="text-k-critical">*</span>
@@ -50,12 +54,21 @@ export default function AddAgentModal() {
             id="agent-ext"
             type="text"
             required
+            aria-invalid={error ? 'true' : undefined}
+            aria-describedby={error ? 'agent-ext-error' : undefined}
             placeholder="1040421"
             value={extension}
             onChange={(e) => setExtension(e.target.value)}
-            className={`${field} num`}
+            className={`${field} num${error ? ' border-k-danger' : ''}`}
             autoFocus
           />
+          {/* Inside the field's own block, not under both inputs: an error that lands
+              below the field it is *not* about gets read as advice about the next one. */}
+          {error && (
+            <p id="agent-ext-error" role="alert" className="mt-1 text-meta text-k-danger">
+              {error}
+            </p>
+          )}
         </div>
         <div>
           <label htmlFor="agent-name" className="mb-1 block text-k-ink-muted">
@@ -70,18 +83,17 @@ export default function AddAgentModal() {
             className={field}
           />
         </div>
-        {error && <p className="text-[11px] text-k-critical">{error}</p>}
         <div className="flex justify-end gap-2 pt-1">
           <button
             type="button"
             onClick={close}
-            className="glow-hover rounded-lg border border-k-hairline-strong bg-k-surface-hover/60 px-3.5 py-2 text-xs font-medium text-k-ink active:translate-y-[1px]"
+            className="hoverable rounded-lg border border-k-hairline-strong bg-k-surface-hover/60 px-3.5 py-2 text-xs font-medium text-k-ink active:translate-y-[1px]"
           >
             Cancel
           </button>
           <button
             type="submit"
-            className="glow-accent rounded-lg bg-k-accent px-3.5 py-2 text-xs font-semibold text-k-accent-ink transition-opacity hover:opacity-90 active:translate-y-[1px]"
+            className="rounded-lg bg-k-accent px-3.5 py-2 text-xs font-semibold text-k-accent-ink transition-opacity hover:opacity-90 active:translate-y-[1px]"
           >
             Add mapping
           </button>

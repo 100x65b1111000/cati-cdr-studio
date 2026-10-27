@@ -1,21 +1,24 @@
 import React from 'react';
 import { Trash, Sliders, Check } from '@phosphor-icons/react';
 import { useCdr } from '../../context/CdrContext';
-import { COLOR_SCHEMES } from '../../theme/colorSchemes';
+import { COLOR_MODES } from '../../theme/colorSchemes';
 import { availableDates } from '../../utils/dateRange';
 
 function Swatches({ colors }) {
   const roles = ['accent', 'success', 'danger', 'talk', 'throughput', 'break-time'];
   return (
-    <div className="flex gap-1">
+    // The swatches are the only thing that says what a scheme actually changes, so
+    // they need a name — but one label for the strip, not six inside the card's own
+    // accessible name. role=img makes the children presentational for free.
+    <span
+      role="img"
+      aria-label="accent, success, danger, talk, throughput and break-time colours"
+      className="flex gap-1"
+    >
       {roles.map(role => (
-        <span
-          key={role}
-          className="h-4 w-4 rounded-md border border-k-hairline"
-          style={{ backgroundColor: colors[role] }}
-        />
+        <span key={role} className="h-4 w-4 rounded-md border border-k-hairline" style={{ backgroundColor: colors[role] }} />
       ))}
-    </div>
+    </span>
   );
 }
 
@@ -39,33 +42,33 @@ export default function SettingsView() {
       <section className="panel rounded-2xl p-5 lg:col-span-2">
         <h2 className="flex items-center gap-2 border-b border-k-hairline pb-3 text-sm font-bold text-k-ink">
           <Sliders size={16} className="text-k-accent" />
-          Colour scheme
+          Colour mode
         </h2>
         <p className="mt-3 text-xs text-k-ink-muted">
           Applies everywhere, including charts. Stored locally.
         </p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          {Object.entries(COLOR_SCHEMES).map(([id, scheme]) => (
+          {Object.entries(COLOR_MODES).map(([id, mode]) => (
             <button
               key={id}
               type="button"
               onClick={() => setColorScheme(id)}
               aria-pressed={colorScheme === id}
-              className={`glass-card card-hover rounded-xl p-4 text-left ${
+              className={`panel lift rounded-xl p-4 text-left ${
                 colorScheme === id ? 'card-active' : ''
               }`}
             >
               <span className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-k-ink">{scheme.label}</span>
+                <span className="text-xs font-semibold text-k-ink">{mode.label}</span>
                 {colorScheme === id && (
-                  <span className="flex items-center gap-1 rounded-md bg-k-accent px-1.5 py-0.5 text-[10px] font-bold text-k-accent-ink">
+                  <span className="flex items-center gap-1 rounded-md bg-k-accent px-1.5 py-0.5 text-2xs font-bold text-k-accent-ink">
                     <Check size={10} weight="bold" />
                     Active
                   </span>
                 )}
               </span>
               <span className="mt-2 block">
-                <Swatches colors={scheme.colors} />
+                <Swatches colors={mode.colors} />
               </span>
             </button>
           ))}
@@ -116,10 +119,10 @@ export default function SettingsView() {
         ) : (
           <ul className="mt-3 max-h-72 divide-y divide-k-hairline/60 overflow-y-auto rounded-xl border border-k-hairline">
             {savedViews.map(view => (
-              <li key={view.id} className="glow-row flex items-center justify-between gap-4 px-4 py-2.5">
+              <li key={view.id} className="row-hover flex items-center justify-between gap-4 px-4 py-2.5">
                 <span className="min-w-0">
                   <span className="block truncate text-xs font-semibold text-k-ink">{view.name}</span>
-                  <span className="num block text-[11px] text-k-ink-muted">
+                  <span className="num block text-meta text-k-ink-muted">
                     saved {view.createdAt}
                   </span>
                 </span>

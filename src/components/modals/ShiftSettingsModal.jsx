@@ -4,7 +4,7 @@ import { useCdr } from '../../context/CdrContext';
 import { SHIFT_PRESETS, DEFAULT_SHIFT_CONFIG } from '../../constants/defaultData';
 import Modal from '../ui/Modal';
 
-const field = 'glass-input w-full rounded-xl px-3 py-2 text-xs text-k-ink focus:border-k-accent focus:outline-none';
+const field = 'field w-full rounded-xl px-3 py-2 text-xs text-k-ink focus:border-k-accent focus:outline-none';
 
 const D = DEFAULT_SHIFT_CONFIG;
 
@@ -64,14 +64,14 @@ export default function ShiftSettingsModal() {
       <button
         type="button"
         onClick={close}
-        className="glow-hover rounded-lg border border-k-hairline-strong bg-k-surface-hover/60 px-3.5 py-2 text-xs font-medium text-k-ink active:translate-y-[1px]"
+        className="hoverable rounded-lg border border-k-hairline-strong bg-k-surface-hover/60 px-3.5 py-2 text-xs font-medium text-k-ink active:translate-y-[1px]"
       >
         Cancel
       </button>
       <button
         type="button"
         onClick={handleSave}
-        className="glow-accent rounded-lg bg-k-accent px-3.5 py-2 text-xs font-semibold text-k-accent-ink transition-opacity hover:opacity-90 active:translate-y-[1px]"
+        className="rounded-lg bg-k-accent px-3.5 py-2 text-xs font-semibold text-k-accent-ink transition-opacity hover:opacity-90 active:translate-y-[1px]"
       >
         Apply and recalculate
       </button>
@@ -91,14 +91,14 @@ export default function ShiftSettingsModal() {
           <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-k-ink-muted">Presets</h3>
           {['Same Day', 'Multi Day'].map((group) => (
             <div key={group} className="mb-2">
-              <p className="mb-1 text-[10px] uppercase tracking-wide text-k-ink-muted">{group}</p>
+              <p className="mb-1 text-2xs uppercase tracking-wide text-k-ink-muted">{group}</p>
               <div className="grid grid-cols-4 gap-1.5">
                 {SHIFT_PRESETS.filter((p) => p.group === group).map((preset) => (
                   <button
                     key={preset.name}
                     type="button"
                     onClick={() => applyPreset(preset)}
-                    className="num rounded-lg border border-k-hairline-strong bg-k-surface/60 px-2 py-1.5 text-[11px] text-k-ink transition-colors hover:border-k-accent hover:text-k-accent active:translate-y-[1px]"
+                    className="num rounded-lg border border-k-hairline-strong bg-k-surface/60 px-2 py-1.5 text-meta text-k-ink transition-colors hover:border-k-accent hover:text-k-accent active:translate-y-[1px]"
                   >
                     {preset.name}
                   </button>
@@ -110,7 +110,7 @@ export default function ShiftSettingsModal() {
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label htmlFor="shift-start-day" className="mb-1 block text-[11px] text-k-ink-muted">
+            <label htmlFor="shift-start-day" className="mb-1 block text-meta text-k-ink-muted">
               Start day
             </label>
             <select
@@ -123,7 +123,7 @@ export default function ShiftSettingsModal() {
             </select>
           </div>
           <div>
-            <label htmlFor="shift-start-time" className="mb-1 block text-[11px] text-k-ink-muted">
+            <label htmlFor="shift-start-time" className="mb-1 block text-meta text-k-ink-muted">
               Start time
             </label>
             <input
@@ -135,7 +135,7 @@ export default function ShiftSettingsModal() {
             />
           </div>
           <div>
-            <label htmlFor="shift-end-day" className="mb-1 block text-[11px] text-k-ink-muted">
+            <label htmlFor="shift-end-day" className="mb-1 block text-meta text-k-ink-muted">
               End day
             </label>
             <select
@@ -150,7 +150,7 @@ export default function ShiftSettingsModal() {
             </select>
           </div>
           <div>
-            <label htmlFor="shift-end-time" className="mb-1 block text-[11px] text-k-ink-muted">
+            <label htmlFor="shift-end-time" className="mb-1 block text-meta text-k-ink-muted">
               End time
             </label>
             <input
@@ -163,7 +163,7 @@ export default function ShiftSettingsModal() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between rounded-xl border border-k-hairline bg-k-sunken/60 px-4 py-3 text-[11px]">
+        <div className="flex items-center justify-between rounded-xl border border-k-hairline bg-k-sunken/60 px-4 py-3 text-meta">
           <span className="inline-flex items-center gap-1.5 text-k-ink">
             <ClockCounterClockwise size={14} className="text-k-accent" />
             Shift duration <b className="num text-k-accent">{durHours}h {durMins}m</b>
@@ -173,7 +173,7 @@ export default function ShiftSettingsModal() {
           </span>
         </div>
 
-        <p className="text-[11px] text-k-ink-muted">
+        <p className="text-meta text-k-ink-muted">
           Calls inside this window group to the shift start date. The idle break threshold stays in the
           rundown toolbar.
         </p>

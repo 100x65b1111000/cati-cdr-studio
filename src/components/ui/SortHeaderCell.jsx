@@ -16,12 +16,15 @@ export default function SortHeaderCell({
     <th
       scope="col"
       aria-sort={active ? (sortAsc ? 'ascending' : 'descending') : 'none'}
-      className={`px-3 py-3.5 font-semibold ${alignClass} ${className}`}
+      className={`font-semibold ${alignClass} ${className}`}
     >
+      {/* The cell's padding lives on the button, not on the th, so the whole header
+          cell is the sort target rather than a two-word glyph floating in the middle
+          of it. Same pixels, same height, 32x16 becomes a full-cell hit area. */}
       <button
         type="button"
         onClick={() => onSort(field)}
-        className={`inline-flex items-center gap-1 whitespace-nowrap uppercase tracking-wider transition-colors ${
+        className={`inline-flex items-center gap-1 whitespace-nowrap px-3 py-3.5 uppercase tracking-wider transition-colors ${
           active ? 'text-k-accent' : 'text-k-ink-muted hover:text-k-ink'
         }`}
       >

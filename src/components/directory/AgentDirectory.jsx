@@ -5,6 +5,7 @@ import AddAgentModal from './AddAgentModal';
 import EmptyState from '../ui/EmptyState';
 import SearchInput from '../ui/SearchInput';
 import Segmented from '../ui/Segmented';
+import Chip from '../ui/Chip';
 
 const numeric = new Intl.Collator(undefined, { numeric: true });
 
@@ -30,8 +31,8 @@ function AgentCard({ ext, name, onRename, onDelete }) {
   };
 
   return (
-    <div className="glass-card card-hover flex items-center gap-2 rounded-lg px-2 py-1.5">
-      <span className="num w-14 flex-none rounded-md bg-k-accent/15 py-1 text-center text-[11px] font-semibold text-k-accent">
+    <div className="panel lift flex items-center gap-2 rounded-lg px-2 py-1.5">
+      <span className="num w-14 flex-none rounded-md bg-k-accent/15 py-1 text-center text-meta font-medium text-k-accent">
         {ext}
       </span>
       <input
@@ -45,7 +46,7 @@ function AgentCard({ ext, name, onRename, onDelete }) {
           if (e.key === 'Enter') e.currentTarget.blur();
           if (e.key === 'Escape') setDraft(name);
         }}
-        className={`glass-input min-w-0 flex-1 rounded-lg px-2.5 py-1.5 text-xs text-k-ink placeholder:text-k-ink-muted focus:border-k-accent focus:outline-none ${
+        className={`field min-w-0 flex-1 rounded-lg px-2.5 py-1.5 text-xs text-k-ink placeholder:text-k-ink-muted focus:border-k-accent focus:outline-none ${
           dirty ? 'border-k-accent' : 'hover:border-k-accent/50'
         }`}
       />
@@ -53,7 +54,6 @@ function AgentCard({ ext, name, onRename, onDelete }) {
         type="button"
         onClick={() => onDelete(ext)}
         aria-label={`Remove the mapping for ${ext}`}
-        title="Remove this mapping"
         className="flex-none rounded-lg p-1.5 text-k-ink-muted transition-colors hover:bg-k-critical/15 hover:text-k-critical"
       >
         <Trash size={14} />
@@ -90,9 +90,7 @@ export default function AgentDirectory() {
         <h3 className="mr-1 flex items-center gap-2 text-xs font-semibold text-k-ink">
           <UsersThree size={16} className="text-k-talk" />
           Extension mapping
-          <span className="num rounded-full bg-k-talk/10 px-2.5 py-0.5 text-[10px] font-normal text-k-talk">
-            {mapped}
-          </span>
+          <Chip tone="talk">{mapped}</Chip>
         </h3>
         <SearchInput
           value={search}
@@ -100,6 +98,7 @@ export default function AgentDirectory() {
           label="Extension or name"
           placeholder="Extension or name"
           className="w-56 flex-none"
+          primary
         />
         <div className="ml-auto flex items-center gap-1.5">
           <Segmented
@@ -115,15 +114,14 @@ export default function AgentDirectory() {
             type="button"
             onClick={() => setSortAsc((v) => !v)}
             aria-label={sortAsc ? 'Sort descending' : 'Sort ascending'}
-            title={sortAsc ? 'Ascending' : 'Descending'}
-            className="glow-hover flex-none rounded-lg border border-k-hairline-strong p-1.5 text-k-ink-muted"
+            className="hoverable flex h-[30px] w-[30px] flex-none items-center justify-center rounded-lg border border-k-hairline-strong text-k-ink-muted"
           >
             {sortAsc ? <CaretUp size={14} /> : <CaretDown size={14} />}
           </button>
           <button
             type="button"
             onClick={() => setIsAddAgentOpen(true)}
-            className="glow-accent rounded-lg bg-k-accent px-3.5 py-2 text-xs font-medium text-k-accent-ink transition-colors hover:bg-k-accent/90 active:translate-y-[1px]"
+            className="inline-flex h-[30px] items-center rounded-lg bg-k-accent px-3.5 text-xs font-medium text-k-accent-ink transition-colors hover:bg-k-accent/90 active:translate-y-[1px]"
           >
             Add mapping
           </button>

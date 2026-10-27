@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { CaretDown, CaretUp } from '@phosphor-icons/react';
+import Stepper from '../ui/Stepper';
 
-const stepBtn =
-  'glow-hover flex h-[9px] w-[11px] items-center justify-center rounded-[3px] leading-none text-k-ink-muted disabled:cursor-not-allowed disabled:opacity-35';
+/* The edge is `current` — the value's own hue, throughput amber on one cell and
+   success green on the other. A neutral hairline would make an editable number look
+   like any other read-only stat, and the app accent would light a blue edge on a green
+   value. Same reasoning as the break-threshold pill. */
 
 export default function EditCell({ value, onCommit, label, tone = 'text-k-ink' }) {
   const [draft, setDraft] = useState(String(value ?? 0));
@@ -58,29 +60,15 @@ export default function EditCell({ value, onCommit, label, tone = 'text-k-ink' }
             ref.current?.blur();
           }
         }}
-        className={`num h-7 w-12 rounded-md border border-transparent bg-transparent py-0 pl-0 pr-[14px] text-center ${tone} hover:border-k-accent/70 hover:bg-k-accent/10 focus:border-k-accent focus:bg-k-sunken focus:outline-none`}
+        className={`num h-7 w-12 rounded-md border border-current/25 bg-transparent py-0 pl-0 pr-[14px] text-center ${tone} hover:border-current/70 hover:bg-current/10 focus:border-current focus:bg-k-sunken focus:outline-none`}
       />
-      <span className="absolute inset-y-0 right-0 flex w-[13px] flex-col items-center justify-center gap-px pr-px">
-        <button
-          type="button"
-          aria-label={`Increase ${label}`}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => nudge(1)}
-          className={stepBtn}
-        >
-          <CaretUp size={8} weight="bold" />
-        </button>
-        <button
-          type="button"
-          aria-label={`Decrease ${label}`}
-          disabled={atFloor}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => nudge(-1)}
-          className={stepBtn}
-        >
-          <CaretDown size={8} weight="bold" />
-        </button>
-      </span>
+      <Stepper
+        upLabel={`Increase ${label}`}
+        downLabel={`Decrease ${label}`}
+        downDisabled={atFloor}
+        onUp={() => nudge(1)}
+        onDown={() => nudge(-1)}
+      />
     </span>
   );
 }

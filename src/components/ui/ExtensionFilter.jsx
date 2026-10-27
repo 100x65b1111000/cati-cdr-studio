@@ -3,9 +3,12 @@ import { UserFocus } from '@phosphor-icons/react';
 import FilterPopover from './FilterPopover';
 import SearchInput from './SearchInput';
 
-const menuItem = 'glow-hover flex cursor-pointer items-center gap-2 rounded-md border border-transparent px-2 py-1 text-xs text-k-ink';
+const menuItem = 'hoverable flex cursor-pointer items-center gap-2 rounded-md border border-transparent px-2 py-1 text-xs text-k-ink';
 
 export function Checkbox({ checked, onChange, children }) {
+  // The visible box is 18px; the target is the whole row, because a label wrapping the
+  // input forwards every click inside it. 26px tall and full-width, so the row clears
+  // 2.5.8 on its own and the box never has to grow into the text.
   return (
     <label className={`${menuItem} w-full`}>
       <input type="checkbox" checked={checked} onChange={onChange} className="cbox" />
@@ -29,17 +32,28 @@ export default function ExtensionFilter({ extensions, names = {}, selected, onCh
     <FilterPopover label="Agents" icon={UserFocus} badge={`${selected.length}/${extensions.length}`}>
       <div className="space-y-1.5 p-2">
         <SearchInput value={query} onChange={setQuery} label="Filter agents" placeholder="Filter agents" />
-        <div className="flex items-center justify-between border-b border-k-hairline px-2 pb-1.5 text-[11px] text-k-ink-muted">
-          <button type="button" className="hover:text-k-accent" onClick={() => onChange([...extensions])}>
+        <div className="flex items-center justify-between border-b border-k-hairline px-2 pb-1.5 text-meta text-k-ink-muted">
+          {/* Bare text at 11px is a ~20x14 target. Padding to 24px tall costs the popover
+              nothing, and `--tone` keeps All/None in their own hues instead of flattening
+              both to the accent hover. */}
+          <button
+            type="button"
+            className="hoverable min-h-6 rounded-md px-2 py-1 font-medium [--tone:var(--k-accent)]"
+            onClick={() => onChange([...extensions])}
+          >
             All
           </button>
-          <button type="button" className="hover:text-k-danger" onClick={() => onChange([])}>
+          <button
+            type="button"
+            className="hoverable min-h-6 rounded-md px-2 py-1 font-medium [--tone:var(--k-danger)]"
+            onClick={() => onChange([])}
+          >
             None
           </button>
         </div>
         <div className="max-h-56 space-y-0.5 overflow-y-auto pr-1">
           {matches.length === 0 ? (
-            <p className="px-2 py-2 text-[11px] text-k-ink-muted">No agent matches that.</p>
+            <p className="px-2 py-2 text-meta text-k-ink-muted">No agent matches that.</p>
           ) : (
             matches.map((ext) => (
               <Checkbox key={ext} checked={selected.includes(ext)} onChange={() => toggle(ext)}>

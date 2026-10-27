@@ -32,7 +32,7 @@ export default function DateRangePicker({ dates, from, to, onPick }) {
 
   const pick = (iso) => onPick(...pickRange(from, to, iso));
 
-  const nav = 'glow-hover rounded-md border border-k-hairline-strong p-1 text-k-ink-muted disabled:cursor-not-allowed disabled:opacity-30 active:translate-y-[1px]';
+  const nav = 'hoverable rounded-md border border-k-hairline-strong p-1 text-k-ink-muted disabled:cursor-not-allowed disabled:opacity-30 active:translate-y-[1px]';
 
   return (
     <div className="p-2">
@@ -50,7 +50,7 @@ export default function DateRangePicker({ dates, from, to, onPick }) {
 
       <div className="grid grid-cols-7 gap-px">
         {WEEKDAYS.map((d) => (
-          <span key={d} className="pb-1 text-center text-[10px] uppercase tracking-wider text-k-ink-muted">
+          <span key={d} className="pb-1 text-center text-2xs uppercase tracking-wider text-k-ink-muted">
             {d}
           </span>
         ))}
@@ -69,7 +69,7 @@ export default function DateRangePicker({ dates, from, to, onPick }) {
               onClick={() => pick(iso)}
               aria-label={iso}
               aria-pressed={endpoint || undefined}
-              className={`num h-7 rounded-md text-[11px] leading-none ${
+              className={`num h-7 rounded-md text-meta leading-none ${
                 off
                   ? 'cursor-not-allowed text-k-ink-muted opacity-25'
                   : endpoint
@@ -85,7 +85,7 @@ export default function DateRangePicker({ dates, from, to, onPick }) {
         })}
       </div>
 
-      <p className="num pt-1.5 text-center text-[10px] text-k-ink-muted">
+      <p className="num pt-1.5 text-center text-2xs text-k-ink-muted">
         {have.size ? `${have.size} day${have.size === 1 ? '' : 's'} with data` : 'No dates in the loaded file'}
       </p>
     </div>

@@ -22,7 +22,7 @@ export default function DayScopeSelect({ days, value, onChange }) {
           ))}
         </div>
       </FilterPopover>
-      <p className="text-[11px] text-k-ink-muted">{value ? 'One shift only.' : `${days.length} shifts in range.`}</p>
+      <p className="text-meta text-k-ink-muted">{value ? 'One shift only.' : `${days.length} shifts in range.`}</p>
     </div>
   );
 }
@@ -35,13 +35,13 @@ function Option({ active, onClick, label, hint }) {
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      aria-label={`${label} — ${hint}`}
+      aria-label={`${label}, ${hint}`}
       className={`flex w-full items-center justify-between gap-3 rounded-md border px-2.5 py-1.5 text-left text-xs transition-colors active:translate-y-[1px] ${
-        active ? 'border-k-accent/70 bg-k-accent/10 text-k-accent' : 'glow-hover border-transparent text-k-ink'
+        active ? 'border-k-accent/70 bg-k-accent/10 text-k-accent' : 'hoverable border-transparent text-k-ink'
       }`}
     >
       <span className="num">{label}</span>
-      <span className="num text-[10px] text-k-ink-muted">{hint}</span>
+      <span className="num text-2xs text-k-ink-muted">{hint}</span>
     </button>
   );
 }

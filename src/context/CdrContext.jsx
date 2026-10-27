@@ -1,11 +1,11 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
 import Papa from 'papaparse';
 import { DEFAULT_EXT_MAP, DEFAULT_SHIFT_CONFIG } from '../constants/defaultData';
 import { DEFAULT_DATE_RANGE } from '../utils/dateRange';
-import { loadFromStorage, saveToStorage } from '../utils/storage';
+import { loadFromStorage, saveToStorage, removeFromStorage } from '../utils/storage';
 import { parseRawCallRecords, calculateShiftAnalysis } from '../services/shiftCalculator';
 import { generateDemoCDRData } from '../services/demoDataGenerator';
-import { COLOR_SCHEMES, DEFAULT_SCHEME, cssVarName, hexToRgbTriplet } from '../theme/colorSchemes';
+import { COLOR_MODES, DEFAULT_MODE, cssVarName, getMode, hexToRgbTriplet } from '../theme/colorSchemes';
 
 const CdrContext = createContext(null);
 
@@ -15,10 +15,25 @@ export function CdrProvider({ children }) {
     loadFromStorage('ext_map', DEFAULT_EXT_MAP)
   );
 
+  // Named `colorScheme` rather than `colorMode` because AnalyticsView lists it in a
+  // useMemo dependency, and that dependency is what repaints the chart canvases when
+  // the mode changes. The value it holds is a mode id.
   const [colorScheme, setColorScheme] = useState(() => {
-    const saved = loadFromStorage('color_scheme', DEFAULT_SCHEME);
-    return COLOR_SCHEMES[saved] ? saved : DEFAULT_SCHEME;
+    const saved = loadFromStorage('color_mode', null);
+    if (COLOR_MODES[saved]) return saved;
+    // `color_scheme` is the retired key, and it only ever held one of five ids whose
+    // surfaces were all dark, so mapping any value to `dark` loses nothing.
+    if (loadFromStorage('color_scheme', null) !== null) {
+      removeFromStorage('color_scheme');
+      return 'dark';
+    }
+    // Nothing stored: a phone floor runs in daylight, so the OS decides.
+    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : DEFAULT_MODE;
   });
+
+  // The mode to hand back when the print dialog closes. A ref, not state: it must
+  // outlive the re-render that the print flip itself causes.
+  const printRestore = useRef(null);
 
   const [shiftConfig, setShiftConfig] = useState(() => 
     loadFromStorage('shift_config', DEFAULT_SHIFT_CONFIG)
@@ -69,21 +84,55 @@ export function CdrProvider({ children }) {
     saveToStorage('shift_config', shiftConfig);
   }, [shiftConfig]);
 
-  // Apply the active color scheme as CSS variables on <html> and persist it
-  useEffect(() => {
+  // Apply the active mode as CSS variables on <html> and persist it. Layout effect, not
+  // effect: a deferred write means the first paint of the whole UI resolves every k-*
+  // token against Tailwind's dark fallbacks, and a light-mode user watches a dark frame
+  // flip. The write stays inline on the element rather than moving into a CSS rule —
+  // that is what lets the print overrides win with !important, and what ui-check mutates.
+  useLayoutEffect(() => {
     const root = document.documentElement;
-    const colors = COLOR_SCHEMES[colorScheme].colors;
+    const colors = getMode(colorScheme).colors;
     for (const [role, hex] of Object.entries(colors)) {
       root.style.setProperty(cssVarName(role), hexToRgbTriplet(hex));
     }
-    saveToStorage('color_scheme', colorScheme);
+    root.setAttribute('data-mode', colorScheme);
+    saveToStorage('color_mode', colorScheme);
+  }, [colorScheme]);
+
+  // A <canvas> is a bitmap: themeColor() bakes the on-screen palette into its pixels at
+  // render time, so no print stylesheet can reach it — printing from dark mode put dark
+  // chart plates on white paper. Flipping the mode is the only lever that repaints them,
+  // because AnalyticsView's useMemo lists colorScheme as a dependency.
+  // beforeprint/afterprint is the standard path; the matchMedia listener is what a
+  // headless print emulation drives, and the guard keeps the two from overwriting the
+  // stored mode with 'light' when both fire.
+  useEffect(() => {
+    const mq = window.matchMedia('print');
+    const set = (printing) => {
+      if (printing) {
+        if (printRestore.current === null) printRestore.current = colorScheme;
+        setColorScheme('light');
+      } else if (printRestore.current !== null) {
+        setColorScheme(printRestore.current);
+        printRestore.current = null;
+      }
+    };
+    const onBefore = () => set(true);
+    const onAfter = () => set(false);
+    const onChange = (e) => set(e.matches);
+    window.addEventListener('beforeprint', onBefore);
+    window.addEventListener('afterprint', onAfter);
+    mq.addEventListener('change', onChange);
+    return () => {
+      window.removeEventListener('beforeprint', onBefore);
+      window.removeEventListener('afterprint', onAfter);
+      mq.removeEventListener('change', onChange);
+    };
   }, [colorScheme]);
 
   useEffect(() => {
     saveToStorage('manual_overrides', manualOverrides);
-  }, [manualOverrides]);
-
-  useEffect(() => {
+  }, [manualOverrides]);  useEffect(() => {
     saveToStorage('date_range', dateRange);
   }, [dateRange]);
 

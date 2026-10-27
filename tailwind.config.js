@@ -1,4 +1,4 @@
-import { COLOR_SCHEMES, cssVarName, hexToRgbTriplet, DEFAULT_SCHEME } from './src/theme/colorSchemes.js';
+import { COLOR_MODES, cssVarName, hexToRgbTriplet, DEFAULT_MODE } from './src/theme/colorSchemes.js';
 
 /** @type {import('tailwindcss').Config} */
 export default {
@@ -9,21 +9,22 @@ export default {
   theme: {
     extend: {
       colors: {
-        // `k-*` utilities resolve to CSS vars applied by the active color scheme
-        // (see src/theme/colorSchemes.js). The Kanagawa values act as fallbacks so
-        // the page renders correctly before React mounts. Tailwind v4 applies the
-        // `/alpha` modifiers with color-mix() on top of this value, so the var()
-        // reference survives re-theming; v3's `<alpha-value>` placeholder is gone.
+        // `k-*` utilities resolve to CSS vars applied by the active color mode
+        // (see src/theme/colorSchemes.js). The default mode's values act as
+        // fallbacks so the page renders correctly before React mounts. Tailwind v4
+        // applies the `/alpha` modifiers with color-mix() on top of this value, so
+        // the var() reference survives re-theming; v3's `<alpha-value>` placeholder
+        // is gone.
         k: Object.fromEntries(
-          Object.entries(COLOR_SCHEMES[DEFAULT_SCHEME].colors).map(([role, hex]) => [
+          Object.entries(COLOR_MODES[DEFAULT_MODE].colors).map(([role, hex]) => [
             role,
             `rgb(var(${cssVarName(role)}, ${hexToRgbTriplet(hex)}))`
           ])
         )
       },
       fontFamily: {
-        sans: ['Geist Variable', 'Inter', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace']
+        sans: ['Fira Sans', 'Segoe UI', 'sans-serif'],
+        mono: ['Fira Mono', 'monospace']
       },
       // Tighter than the defaults everywhere at once. This is a dense data tool;
       // 12-16px corners on every plate made the tables read as a marketing page.

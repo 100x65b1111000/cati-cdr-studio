@@ -17,7 +17,7 @@ export default function MetricStrip({ items }) {
       {items.map(({ label, value, chips = [], Icon, role = 'accent' }) => (
         <div
           key={label}
-          className="glass-card card-hover relative flex flex-col overflow-hidden rounded-2xl border border-k-hairline p-5"
+          className="panel lift relative flex flex-col overflow-hidden rounded-2xl border border-k-hairline p-5"
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">

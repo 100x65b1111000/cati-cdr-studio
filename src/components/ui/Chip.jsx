@@ -1,19 +1,30 @@
 import React from 'react';
 
-// Dark pill with the hue carried by ring + text only. A role-tinted fill lifted the
-// surface enough to drop the accent and region labels under AA at 10px.
-const CHIP = 'num whitespace-nowrap rounded-md px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset';
+// The one pill primitive. Neutral fill with the hue carried by ring + text only — a
+// role-tinted fill lifts the surface enough to drop the label under AA at 10px, and
+// it is the fill, not the text, that has to stay neutral. `tone` picks the hue; the
+// text is never alpha-diluted, because `/70` on a 10px label measured 2.6:1.
+const SIZE = { sm: 'text-2xs', md: 'text-meta' };
 
 const TONE = {
   accent: 'ring-k-accent/35 text-k-accent',
   success: 'ring-k-success/35 text-k-success',
+  danger: 'ring-k-danger/35 text-k-danger',
+  warning: 'ring-k-warning/35 text-k-warning',
   talk: 'ring-k-talk/35 text-k-talk',
-  'break-time': 'ring-k-break-time/35 text-k-break-time',
   throughput: 'ring-k-throughput/35 text-k-throughput',
+  'break-time': 'ring-k-break-time/35 text-k-break-time',
   region: 'ring-k-region/35 text-k-region',
-  danger: 'ring-k-danger/35 text-k-danger'
+  neutral: 'ring-k-hairline-strong/50 text-k-ink-muted'
 };
 
-export default function Chip({ tone = 'accent', children }) {
-  return <span className={`bg-k-sunken/70 ${CHIP} ${TONE[tone]}`}>{children}</span>;
+export default function Chip({ tone = 'accent', size = 'sm', className = '', children, ...rest }) {
+  return (
+    <span
+      {...rest}
+      className={`num whitespace-nowrap rounded-md bg-k-sunken/70 px-2 py-0.5 font-medium ring-1 ring-inset ${SIZE[size]} ${TONE[tone]} ${className}`}
+    >
+      {children}
+    </span>
+  );
 }

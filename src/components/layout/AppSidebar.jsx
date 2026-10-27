@@ -3,14 +3,14 @@ import { useCdr } from '../../context/CdrContext';
 import { NAV } from './navConfig';
 import { availableDates } from '../../utils/dateRange';
 import { COLUMNS } from '../rundown/columns';
-import { COLOR_SCHEMES } from '../../theme/colorSchemes';
+import { COLOR_MODES } from '../../theme/colorSchemes';
 
 const CHIPS = {
   rundown: (s) => [[s.agents, 'agents'], [s.calls, 'calls'], [s.columns, 'columns']],
   rawCdr: (s) => [[s.calls, 'rows'], [s.fields, 'fields']],
   analytics: (s) => [[s.agentDays, 'agent-days'], [s.dates, 'dates']],
   directory: (s) => [[s.agents, 'extensions'], [s.overrides, 'overrides']],
-  settings: (s) => [[s.schemes, 'schemes'], [s.views, 'views']]
+  settings: (s) => [[s.modes, 'modes'], [s.views, 'views']]
 };
 
 // The real view, mounted, cropped to its top-left and scaled into the card.
@@ -23,7 +23,7 @@ function Thumb({ item }) {
   return (
     <div
       data-thumb
-      className="dot-bg overflow-hidden rounded-lg border border-k-hairline bg-k-page"
+      className="overflow-hidden rounded-lg border border-k-hairline bg-k-page"
       style={{ width: THUMB.w * THUMB.scale, height: THUMB.h * THUMB.scale }}
     >
       <div style={{ width: THUMB.w, transform: `scale(${THUMB.scale})`, transformOrigin: 'top left' }}>
@@ -48,7 +48,7 @@ function useStats() {
       dates: availableDates(analysis).length,
       overrides: Object.keys(manualOverrides).length,
       views: savedViews.length,
-      schemes: Object.keys(COLOR_SCHEMES).length
+      modes: Object.keys(COLOR_MODES).length
     };
   }, [rawCalls, rawRecords, analysis, extNameMap, manualOverrides, savedViews]);
 }
@@ -59,24 +59,24 @@ function Preview({ item, stats, top }) {
     <div
       aria-hidden="true"
       style={{ top }}
-      className="glass-menu animate-pop-down pointer-events-none absolute left-full z-10 ml-3 w-72 rounded-xl p-3"
+      className="menu animate-pop-down pointer-events-none absolute left-full z-10 ml-3 w-72 rounded-xl p-3"
     >
       <div className="flex items-center gap-1.5">
         <Icon size={14} className="text-k-accent" />
         <span className="text-xs font-semibold text-k-ink">{item.label}</span>
-        <kbd className="num ml-auto rounded-[4px] border border-k-hairline px-1.5 text-[10px] text-k-ink-muted">
+        <kbd className="num ml-auto rounded-[4px] border border-k-hairline px-1.5 text-2xs text-k-ink-muted">
           {item.hotkey}
         </kbd>
       </div>
       <div className="mt-2">
         <Thumb item={item} />
       </div>
-      <p className="mt-2 text-[11px] leading-snug text-k-ink-muted">{item.desc}</p>
+      <p className="mt-2 text-meta text-k-ink-muted">{item.desc}</p>
       <div className="mt-2 flex flex-wrap gap-1">
         {CHIPS[item.id](stats).map(([n, l]) => (
           <span
             key={l}
-            className="num rounded-md bg-k-sunken/70 px-1.5 py-0.5 text-[10px] text-k-ink-muted ring-1 ring-inset ring-k-hairline"
+            className="num rounded-md bg-k-sunken/70 px-1.5 py-0.5 text-2xs text-k-ink-muted ring-1 ring-inset ring-k-hairline"
           >
             <span className="font-semibold text-k-ink">{n}</span> {l}
           </span>
@@ -137,8 +137,8 @@ export default function AppSidebar() {
                   aria-label={`${item.label} (${item.hotkey})`}
                   className={`relative flex w-full items-center justify-center rounded-xl px-1 py-2 text-xs font-medium transition-colors ${
                     active
-                      ? 'glow-accent bg-k-accent text-k-accent-ink'
-                      : 'glow-hover text-k-ink-muted'
+                      ? 'bg-k-accent text-k-accent-ink'
+                      : 'hoverable text-k-ink-muted'
                   }`}
                 >
                   <item.Icon size={17} className="shrink-0" />
@@ -146,7 +146,7 @@ export default function AppSidebar() {
                       card: the view list has to be readable without the pointer ever
                       finding the rail. It carries its own plate so the badge reads the
                       same on the accent fill as it does on the idle surface. */}
-                  <span className="num absolute right-0.5 top-0.5 rounded-[3px] bg-k-sunken/85 px-[2px] text-[9px] font-semibold leading-[10px] text-k-ink-muted ring-1 ring-inset ring-k-hairline">
+                  <span className="num absolute right-0.5 top-0.5 rounded-[3px] bg-k-sunken/85 px-[2px] text-2xs font-medium text-k-ink-muted ring-1 ring-inset ring-k-hairline">
                     {item.hotkey}
                   </span>
                 </button>

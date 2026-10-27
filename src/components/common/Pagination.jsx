@@ -2,7 +2,7 @@ import React from 'react';
 import { CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight } from '@phosphor-icons/react';
 
 const btn =
-  'glow-hover rounded-lg border border-k-hairline px-2 py-1 text-k-ink-muted active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-40';
+  'hoverable rounded-lg border border-k-hairline px-2 py-1 text-k-ink-muted active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-40';
 
 export default function Pagination({
   currentPage,
@@ -36,7 +36,7 @@ export default function Pagination({
                 onPageSizeChange(Number(e.target.value));
                 onPageChange(1);
               }}
-              className="num glass-input rounded-lg px-2 py-1 text-k-ink focus:border-k-accent focus:outline-none"
+              className="num field rounded-lg px-2 py-1 text-k-ink focus:border-k-accent focus:outline-none"
             >
               {pageSizeOptions.map((opt) => (
                 <option key={opt} value={opt}>

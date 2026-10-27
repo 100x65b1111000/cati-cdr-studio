@@ -11,11 +11,17 @@ const BY_TYPE = {
 export default function ToastContainer() {
   const { toasts, removeToast } = useCdr();
 
-  if (!toasts || toasts.length === 0) return null;
-
+  // The live region has to be in the DOM *before* the message lands in it. Returning
+  // null while idle meant every toast was a brand new node rather than a change to an
+  // announced one, which is the case screen readers are least reliable at. An empty
+  // fixed box costs nothing: it has no size and `pointer-events-none`.
   return (
-    <div className="no-print pointer-events-none fixed bottom-4 right-4 z-[60] flex flex-col gap-2">
-      {toasts.map(toast => {
+    <div
+      role="status"
+      aria-live="polite"
+      className="no-print pointer-events-none fixed bottom-4 right-4 z-[60] flex flex-col gap-2"
+    >
+      {(toasts || []).map((toast) => {
         const { Icon, tone } = BY_TYPE[toast.type] || BY_TYPE.info;
         return (
           <button

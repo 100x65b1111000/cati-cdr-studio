@@ -2,8 +2,8 @@
 //   node ui-check.mjs
 // Screenshots land in _ui/. Exit 1 when something is buried, clipped or throwing.
 import { chromium } from 'playwright';
-import { mkdirSync } from 'node:fs';
-import { COLOR_SCHEMES, DEFAULT_SCHEME, cssVarName, hexToRgbTriplet } from './src/theme/colorSchemes.js';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { COLOR_MODES, SERIES_ROLES, DEFAULT_MODE, cssVarName, hexToRgbTriplet } from './src/theme/colorSchemes.js';
 import { pickRange } from './src/utils/dateRange.js';
 
 const BASE = process.env.UI_URL || 'http://localhost:3000';
@@ -47,7 +47,257 @@ async function shot(page, path, opts) {
 }
 
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: VIEWPORT });
+// Pin the emulated preference, or the app boots into whichever mode Playwright's
+// default happens to match and every measurement below silently changes meaning.
+// The mode loop inside checkChrome paints the other palette on the same page.
+const page = await browser.newPage({ viewport: VIEWPORT, colorScheme: DEFAULT_MODE });
+
+// Tailwind v4 mixes an alpha variant of a colour into oklab while the solid token
+// computes to plain rgb, so the computed strings are not comparable. Paint each value
+// into a 1px buffer with copy compositing and read the sRGB channels back — un-
+// premultiplied, so the hue survives the tint and the fourth channel is its alpha.
+const paint = (vals) =>
+  page.evaluate((list) => {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 1;
+    const g = cv.getContext('2d', { willReadFrequently: true });
+    return list.map((v) => {
+      g.globalCompositeOperation = 'copy';
+      g.fillStyle = v;
+      g.fillRect(0, 0, 1, 1);
+      return [...g.getImageData(0, 0, 1, 1).data];
+    });
+  }, vals);
+const chans = (vals) => paint(vals).then((list) => list.map((c) => c.slice(0, 3)));
+const near = (a, b) => a.every((n, i) => Math.abs(n - b[i]) <= 3);
+const rgb = (a) => `rgb(${a.join(' ')})`;
+
+const lum = (c) => {
+  const f = (v) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]);
+};
+const between = (a, b) => {
+  const [hi, lo] = [lum(a), lum(b)].sort((m, n) => n - m);
+  return (hi + 0.05) / (lo + 0.05);
+};
+
+// An /alpha surface on a token computes to an oklab() string, and reading its numbers
+// as channels yields something like [0.65, 0.03, 0.17] — a near-black that never
+// exists on screen. Every layer therefore goes through the same 1px canvas the rest of
+// this file uses, so the stack being composited is the colour the pixel actually has.
+const read = async (spec) => {
+  const q = typeof spec === 'string' ? { sel: spec } : spec;
+  const raw = await page.evaluate((s) => {
+    const cands = [...document.querySelectorAll(s.sel)];
+    const el = s.all
+      ? cands
+      : [s.text ? cands.find((e) => (e.textContent || '').includes(s.text)) : cands[0]].filter(Boolean);
+    if (!el.length) return null;
+    return el.map((node) => {
+      const layers = [];
+      for (let n = node; n; n = n.parentElement) layers.push(getComputedStyle(n).backgroundColor);
+      const span = node.querySelector('span') ?? node;
+      return { layers, text: getComputedStyle(span).color, label: (span.textContent || span.value || '').trim() };
+    });
+  }, q);
+  if (!raw) return null;
+  return Promise.all(
+    raw.map(async (one) => {
+      const painted = await paint(one.layers.concat(one.text));
+      const text = painted.pop().slice(0, 3);
+      // getImageData hands back alpha as 0-255; fillOf composites in 0-1.
+      const stack = painted.map((c) => [c[0], c[1], c[2], c[3] / 255]);
+      const stop = stack.findIndex((c) => c[3] >= 1);
+      return { layers: stack.slice(0, stop < 0 ? stack.length : stop + 1), text, label: one.label };
+    })
+  ).then((list) => (q.all ? list : list[0]));
+};
+
+// Composite the ancestor fills top down over the first opaque one. Only the fills are
+// compared, so an accent wash carried in `background-image` is not counted: the
+// separation this asserts is the conservative floor of what the eye sees.
+const fillOf = (r) => {
+  let bg = r.layers[r.layers.length - 1].slice(0, 3);
+  for (let i = r.layers.length - 2; i >= 0; i--) {
+    const [cr, cg, cb, ca] = r.layers[i];
+    bg = [cr * ca + bg[0] * (1 - ca), cg * ca + bg[1] * (1 - ca), cb * ca + bg[2] * (1 - ca)];
+  }
+  return bg;
+};
+
+// The palette is a set of claims, not a list of tastes: two series hues that a
+// colour-blind reviewer cannot tell apart, or a role that fails AA on its own card, are
+// both invisible to every other check in this file because they only show up when two
+// specific colours sit next to each other. Pure arithmetic on the hexes, so it runs even
+// when the page never loaded.
+const toRgbArr = (hex) => hexToRgbTriplet(hex).split(' ').map(Number);
+const toLab = (c) => {
+  const f = (v) => (v / 255 <= 0.04045 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4);
+  const [R, G, B] = c.map(f);
+  const t = (v) => (v > 0.008856 ? Math.cbrt(v) : 7.787 * v + 16 / 116);
+  const [fx, fy, fz] = [
+    t((0.4124 * R + 0.3576 * G + 0.1805 * B) / 0.95047),
+    t(0.2126 * R + 0.7152 * G + 0.0722 * B),
+    t((0.0193 * R + 0.1192 * G + 0.9505 * B) / 1.08883)
+  ];
+  return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+};
+const dE76 = (a, b) => {
+  const [x, y, z] = toLab(a);
+  const [p, q, r] = toLab(b);
+  return Math.hypot(x - p, y - q, z - r);
+};
+
+function checkPalette() {
+  // Every role that carries text, against the card it actually sits on. `page` and the
+  // hairlines are excluded: they are surfaces and separators, never glyphs, and holding
+  // them to 4.5 would just force the ramp apart.
+  const TEXT = ['ink', 'ink-muted', 'ink-faint', 'accent', 'success', 'danger', 'critical', 'warning', 'talk', 'throughput', 'break-time', 'region'];
+  for (const [id, mode] of Object.entries(COLOR_MODES)) {
+    const c = mode.colors;
+    for (const role of TEXT) {
+      const ratio = between(toRgbArr(c[role]), toRgbArr(c.surface));
+      if (ratio < 4.5) failures.push(`palette [${id}]: ${role} is ${ratio.toFixed(2)}:1 on ${id}'s surface, under AA's 4.5`);
+    }
+    const punch = between(toRgbArr(c.accent), toRgbArr(c['accent-ink']));
+    if (punch < 4.5) failures.push(`palette [${id}]: accent-ink on an accent fill is ${punch.toFixed(2)}:1, so the active tab is unreadable`);
+    // The pairs that share a word in the UI, and the six series hues that share a chart.
+    for (const [a, b, floor, why] of [
+      ['danger', 'critical', 20, 'a bad call and a blocked action must not be one colour'],
+      ['warning', 'throughput', 20, 'the rate metric and its column header must not be one colour']
+    ]) {
+      const d = dE76(toRgbArr(c[a]), toRgbArr(c[b]));
+      if (d < floor) failures.push(`palette [${id}]: ${a} and ${b} are ΔE ${d.toFixed(1)} apart, under ${floor} — ${why}`);
+    }
+    for (let i = 0; i < SERIES_ROLES.length; i++) {
+      for (let j = i + 1; j < SERIES_ROLES.length; j++) {
+        const [a, b] = [SERIES_ROLES[i], SERIES_ROLES[j]];
+        const d = dE76(toRgbArr(c[a]), toRgbArr(c[b]));
+        if (d < 25) failures.push(`palette [${id}]: chart series ${a}/${b} are ΔE ${d.toFixed(1)} apart, under 25 — one legend swatch will read as the other`);
+      }
+    }
+  }
+  const ids = Object.keys(COLOR_MODES);
+  for (const role of Object.keys(COLOR_MODES[DEFAULT_MODE].colors)) {
+    for (const id of ids) {
+      if (!COLOR_MODES[id].colors[role]) failures.push(`palette: ${id} has no ${role}, so switching modes leaves it on the previous value`);
+    }
+  }
+  console.log(`palette      ${ids.length} modes x ${Object.keys(COLOR_MODES[DEFAULT_MODE].colors).length} roles · AA + ΔE floors hold`);
+}
+
+// The frosted model was deleted, not restyled, and nothing about a flat repaint fails
+// loudly enough to show up in a screenshot. `backdrop-filter` in particular survives as a
+// single utility class on one element and silently drags the whole translucency model back
+// in, so the floor is asserted both in the sheet that defines the primitives and in the
+// computed style of every element the app actually renders.
+async function checkFlat() {
+  // Comments stripped first: the sheet explains at length why `backdrop-filter` is gone,
+  // and prose about a deleted property must not read as the property being declared.
+  const css = readFileSync('src/index.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const gone of ['backdrop-filter', 'pulseSlow', '.dot-layer', '.dot-bg', '.blob', '.glass-', '.glow-']) {
+    if (css.includes(gone)) failures.push(`flat: src/index.css still contains "${gone}", which the repaint deleted`);
+  }
+  await page.keyboard.press('1');
+  await page.waitForTimeout(350);
+  const live = await page.evaluate(() => {
+    const all = [...document.querySelectorAll('body *')];
+    return {
+      blur: all.filter((el) => {
+        const b = getComputedStyle(el).backdropFilter;
+        return b && b !== 'none';
+      }).length,
+      classes: all.filter((el) => /backdrop-|glass|glow|dot-layer|dot-bg|\bblob\b/.test(el.getAttribute('class') || '')).length
+    };
+  });
+  console.log(`flat         blur=${live.blur} legacy-classes=${live.classes}`);
+  if (live.blur) failures.push(`flat: ${live.blur} rendered element(s) still apply a backdrop blur`);
+  if (live.classes) failures.push(`flat: ${live.classes} rendered element(s) still carry a glass/glow/dot class`);
+}
+
+// Switching modes is the one interaction that reaches every surface in the app *and* the
+// chart bitmaps, and the bitmap half has no other proof: a canvas holds pixels, so a
+// stylesheet can be perfectly re-themed while the chart stays painted in the old palette.
+async function checkModeSwitch() {
+  const other = Object.keys(COLOR_MODES).find((id) => id !== DEFAULT_MODE);
+  const read = () =>
+    page.evaluate((k) => ({
+      mode: document.documentElement.getAttribute('data-mode'),
+      surface: getComputedStyle(document.documentElement).getPropertyValue('--k-surface').trim(),
+      stored: localStorage.getItem(k)
+    }), 'cati_cdr_studio_color_mode');
+
+  await page.keyboard.press('5');
+  await page.waitForTimeout(350);
+  const before = await read();
+  // Unanchored on purpose: an active card's name grows an "Active" badge, and a locator
+  // pinned to the bare label would stop resolving the moment the click it is proving
+  // succeeded.
+  const card = page.getByRole('button', { name: new RegExp(COLOR_MODES[other].label, 'i') }).first();
+  if (!(await card.count())) {
+    failures.push(`mode: settings has no "${COLOR_MODES[other].label}" button, so the toggle cannot be reached`);
+    return;
+  }
+  if (await card.getAttribute('aria-pressed') !== 'false') {
+    failures.push(`mode: the ${COLOR_MODES[other].label} card reports aria-pressed while ${before.mode} is active`);
+  }
+  await card.click();
+  await page.waitForTimeout(300);
+  const after = await read();
+  if (after.mode !== other) failures.push(`mode: clicking ${COLOR_MODES[other].label} left data-mode at "${after.mode}"`);
+  if (after.surface === before.surface) failures.push('mode: the --k-* variables did not change, so the toggle repaints nothing');
+  if (after.stored !== JSON.stringify(other)) failures.push(`mode: localStorage holds ${after.stored}, not "${other}" — the choice will not survive a reload`);
+  if (await card.getAttribute('aria-pressed') !== 'true') failures.push(`mode: the ${COLOR_MODES[other].label} card is not aria-pressed once it is the active one`);
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('main', { timeout: 20000 });
+  await page.waitForTimeout(400);
+  const kept = await read();
+  if (kept.mode !== other) failures.push(`mode: after a reload the app is back in "${kept.mode}", the stored choice was ignored`);
+
+  await page.keyboard.press('3');
+  await page.waitForTimeout(1200);
+  const litLum = await bitmapLum();
+  await page.keyboard.press('5');
+  await page.waitForTimeout(350);
+  await page.getByRole('button', { name: new RegExp(COLOR_MODES[DEFAULT_MODE].label, 'i') }).first().click();
+  await page.waitForTimeout(300);
+  await page.keyboard.press('3');
+  await page.waitForTimeout(1200);
+  const darkLum = await bitmapLum();
+  console.log(`mode         ${before.mode}->${after.mode} stored=${JSON.stringify(after.stored)} reload=${kept.mode} chartL ${litLum?.toFixed(3)} vs ${darkLum?.toFixed(3)}`);
+  if (litLum === null || darkLum === null) {
+    failures.push('mode: no analytics canvas to measure, so the bitmap half of the toggle is unproven');
+  } else if (Math.abs(litLum - darkLum) < 0.1) {
+    // Measured: dark mode paints its chart ink at mean L 0.34, light mode at 0.20. The
+    // floor is a third of that gap — enough to prove the bitmap followed the mode, tight
+    // enough that a chart which ignored it would still fail.
+    failures.push(`mode: the chart ink barely changed between modes (${darkLum.toFixed(3)} vs ${litLum.toFixed(3)}), so themeColor() is not reaching the bitmap`);
+  }
+}
+
+// Mean luminance of the *opaque* pixels, on a stride: a full read of a 900x280 canvas is
+// 100k points and the mean of a few hundred is the same number to three decimals.
+// Transparent pixels are skipped rather than counted as black — Chart.js paints no
+// background, so a plain average would measure ink coverage and read a light-mode chart
+// (dark ink, low luminance) as the darker of the two. Over white paper it is the ink
+// colour that has to be dark.
+const bitmapLum = () =>
+  page.evaluate(() => {
+    const cv = document.querySelector('main canvas');
+    if (!cv) return null;
+    const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+    const f = (v) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4);
+    let sum = 0;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4 * 97) {
+      if (d[i + 3] < 128) continue;
+      sum += 0.2126 * f(d[i]) + 0.7152 * f(d[i + 1]) + 0.0722 * f(d[i + 2]);
+      n++;
+    }
+    return n ? sum / n : null;
+  });
+
 page.on('console', (m) => {
   if (m.type() === 'error') failures.push(`console: ${m.text()}`);
 });
@@ -56,11 +306,11 @@ page.on('pageerror', (e) => failures.push(`pageerror: ${e.message}`));
 await page.goto(BASE, { waitUntil: 'domcontentloaded' });
 await page.getByRole('button', { name: /sample data/i }).click();
 await page.waitForSelector('main tbody tr', { timeout: 20000 });
-await checkBackdrop();
-await checkDots();
-await checkFrost();
+await checkLayers();
+checkPalette();
+await checkFlat();
 await checkChrome();
-await checkSchemeCard();
+await checkModeCard();
 await checkInteractions();
 await checkTone();
 await checkThreshold();
@@ -68,7 +318,9 @@ await checkDetail();
 await checkCellSteppers();
 await checkFieldHover();
 await checkToolbarFits();
+await checkControlHeights();
 await checkPrintTone();
+await checkPrint();
 await checkCalendar();
 await checkRawCdrFilter();
 await checkInk();
@@ -76,6 +328,9 @@ await checkAlign();
 await checkDirectory();
 await checkViewTitles();
 await checkDayGroups();
+await checkA11y();
+// Last: it reloads, and it leaves the app in a different mode than it found it.
+await checkModeSwitch();
 
 // The mapping list burned a full page of width on two short values. The grid is the
 // fix, so measure the packing rather than trusting the class names.
@@ -83,7 +338,7 @@ async function checkDirectory() {
   await page.keyboard.press('4');
   await page.waitForTimeout(400);
   const r = await page.evaluate(() => {
-    const cards = [...document.querySelectorAll('main .glass-card')];
+    const cards = [...document.querySelectorAll('main .panel.lift')];
     if (!cards.length) return null;
     const grid = cards[0].parentElement;
     const cs = getComputedStyle(grid);
@@ -117,7 +372,7 @@ async function checkDirectory() {
 
 
 // The brief: a popover is the colour of the button that owns it. Measured against
-// the trigger's own icon rather than a restated hex, so it survives a scheme switch
+// the trigger's own icon rather than a restated hex, so it survives a mode switch
 // and it fails if the hue is wired to the menu but not to the button.
 async function checkTone() {
   await page.keyboard.press('1');
@@ -139,9 +394,9 @@ async function checkTone() {
     await trigger.click();
     await page.waitForTimeout(260);
     // The menu lives inside the trigger's own wrapper, and the wrapper is what
-    // declares --tone. Measuring `.glass-menu` globally picks up whatever panel a
+    // declares --tone. Measuring `.menu` globally picks up whatever panel a
     // previous check left open, so scope the read to the popover actually probed.
-    const menu = trigger.locator('xpath=ancestor::div[1]').locator('.glass-menu');
+    const menu = trigger.locator('xpath=ancestor::div[1]').locator('.menu');
     if (!(await menu.count())) {
       failures.push(`tone: "${label}" never opened a menu`);
       return null;
@@ -153,7 +408,7 @@ async function checkTone() {
       const tone = getComputedStyle(p).color;
       p.remove();
       const on = el.querySelector('.cbox:checked');
-      const field = el.querySelector('.glass-input');
+      const field = el.querySelector('.field');
       let fieldBorder = null;
       if (field) {
         field.focus();
@@ -173,7 +428,7 @@ async function checkTone() {
     // The hover step, in the tone too: a border that repaints to some other hue is
     // the half-finished version of the same bug. A panel that has saved nothing yet
     // has no hoverable rows, so absence is skipped rather than hunted.
-    const item = menu.locator('.glow-hover').first();
+    const item = menu.locator('.hoverable').first();
     let hoverBorder = null;
     if (await item.count()) {
       await item.hover();
@@ -229,8 +484,8 @@ async function checkTone() {
   if (!views.btn) failures.push('tone [views]: the Save button lost its .tone-btn class, it is accent again');
 }
 
-// The break threshold control: a bordered, centred number with a stepper that
-// commits rather than leaving a draft behind.
+// The break threshold control: one outlined pill holding a centred number and a
+// stepper that commits rather than leaving a draft behind.
 async function checkThreshold() {
   await page.keyboard.press('1');
   await page.waitForTimeout(350);
@@ -239,14 +494,64 @@ async function checkThreshold() {
     failures.push('threshold: no break threshold field to measure');
     return;
   }
+  const pill = field.locator('xpath=ancestor::div[1]');
   const rest = await field.evaluate((el) => {
     const cs = getComputedStyle(el);
-    return { value: el.value, border: parseFloat(cs.borderTopWidth), color: cs.borderTopColor, align: cs.textAlign };
+    const p = el.closest('.field');
+    const pcs = getComputedStyle(p);
+    return {
+      value: el.value,
+      align: cs.textAlign,
+      wellBg: cs.backgroundColor,
+      wellEdge: cs.borderTopColor,
+      pillBg: pcs.backgroundColor,
+      wash: pcs.backgroundImage,
+      border: parseFloat(pcs.borderTopWidth),
+      color: pcs.borderTopColor,
+      shadow: pcs.boxShadow,
+      icon: getComputedStyle(p.querySelector('svg')).color
+    };
   });
   console.log(`threshold ${rest.value}min border=${rest.border}px ${rest.color} align=${rest.align}`);
-  if (rest.border < 1) failures.push('threshold: the field has no border, it is still a bare box in the pill');
-  if (/rgba\(0, 0, 0, 0\)|transparent/.test(rest.color)) failures.push('threshold: the field border is transparent');
+  if (rest.border < 1) failures.push('threshold: the pill has no edge, it is a bare box in the toolbar');
+  if (/rgba\(0, 0, 0, 0\)|transparent/.test(rest.color)) failures.push('threshold: the pill border is transparent');
   if (rest.align !== 'center') failures.push(`threshold: the value is "${rest.align}"-aligned in a fixed box`);
+  // The number has to read as the typeable part of the control, so it separates from
+  // the pill by fill rather than by a second outline.
+  if (rest.wellBg === rest.pillBg) failures.push('threshold: the number shares the pill fill, so the editable box is invisible');
+
+  // Every other field in this toolbar lights up under the pointer. This one used to
+  // sit dead, because its outline was a `ring-*` utility outside the hover contract.
+  const pillBox = await pill.boundingBox();
+  const clip = {
+    x: Math.max(0, pillBox.x - 12),
+    y: Math.max(0, pillBox.y - 12),
+    width: Math.min(pillBox.width + 24, VIEWPORT.width - 4),
+    height: Math.min(pillBox.height + 24, VIEWPORT.height - 4)
+  };
+  await shot(page, `${OUT}/threshold-idle.png`, { clip });
+  await page.mouse.move(pillBox.x + 6, pillBox.y + pillBox.height / 2);
+  await page.waitForTimeout(80);
+  const hov = await pill.evaluate((el) => {
+    const cs = getComputedStyle(el);
+    return { color: cs.borderTopColor, shadow: cs.boxShadow, wash: cs.backgroundImage };
+  });
+  await shot(page, `${OUT}/threshold-hover.png`, { clip });
+  console.log(`hover threshold  ${rest.color} ${rest.shadow} -> ${hov.color} ${hov.shadow}`);
+  if (hov.color === rest.color) failures.push('threshold: hovering the pill never moved its edge, the control is dead to the pointer');
+  // The flat model answers the pointer with an edge and a wash, not a cast, so the
+  // wash is what has to move — a rule that only recoloured the border would still
+  // pass a borderTopColor check.
+  if (hov.wash === rest.wash) failures.push('threshold: hovering the pill leaves its fill alone, unlike the fields beside it');
+  // One control, one hue.
+  const [glyph, well, hovEdge] = await chans([rest.icon, rest.wellEdge, hov.color]);
+  console.log(`hue threshold    glyph=${rgb(glyph)} well=${rgb(well)} hover=${rgb(hovEdge)}`);
+  if (!near(well, glyph))
+    failures.push(`threshold: the well edge is ${rgb(well)} while the control's glyph is ${rgb(glyph)}, so one control paints two colours`);
+  if (!near(hovEdge, glyph))
+    failures.push(`threshold: hovering lights ${rgb(hovEdge)} while this control's own hue is ${rgb(glyph)}`);
+  await page.mouse.move(0, 0);
+  await page.waitForTimeout(80);
 
   // The toolbar is a single flex-wrap row with no room to spare. Anything that
   // widens a control can push Print/Export onto a second line, so measure the row.
@@ -267,28 +572,12 @@ async function checkThreshold() {
   });
   if (!nest) failures.push('threshold: the stepper sits outside the field, it is costing the toolbar width again');
 
-  // The pill gained two stepper buttons, so the crop is here to catch it overflowing
-  // its own container rather than wrapping cleanly.
-  const pill = await field.locator('xpath=ancestor::div[1]').boundingBox();
-  if (pill) {
-    await shot(page, `${OUT}/threshold-idle.png`, {
-      clip: {
-        x: Math.max(0, pill.x - 12),
-        y: Math.max(0, pill.y - 12),
-        width: Math.min(pill.width + 24, VIEWPORT.width - 4),
-        height: Math.min(pill.height + 24, VIEWPORT.height - 4)
-      }
-    });
+  // The pill gained two stepper buttons, so the crops above are here to catch it
+  // overflowing its own container rather than wrapping cleanly.
+  if (pillBox) {
     await field.focus();
     await page.waitForTimeout(180);
-    await shot(page, `${OUT}/threshold-focus.png`, {
-      clip: {
-        x: Math.max(0, pill.x - 12),
-        y: Math.max(0, pill.y - 12),
-        width: Math.min(pill.width + 24, VIEWPORT.width - 4),
-        height: Math.min(pill.height + 24, VIEWPORT.height - 4)
-      }
-    });
+    await shot(page, `${OUT}/threshold-focus.png`, { clip });
     await field.blur();
   }
 
@@ -386,6 +675,65 @@ async function checkDetail() {
 async function checkCellSteppers() {
   await page.keyboard.press('1');
   await page.waitForTimeout(300);
+
+  // Half dones and surveys are the only editable cells in the grid. An outline is what
+  // says "you can type here" without the number looking like a button, and it has to be
+  // the value's own hue — a blue edge on a green survey count is the same flaw the
+  // threshold pill had.
+  const cells = await page.evaluate(() => {
+    const probe = document.createElement('span');
+    probe.style.color = 'rgb(var(--k-accent))';
+    document.body.appendChild(probe);
+    const accent = getComputedStyle(probe).color;
+    probe.remove();
+    return [...document.querySelectorAll('main tbody tr:first-child input')].map((el) => {
+      const cs = getComputedStyle(el);
+      return {
+        label: (el.getAttribute('aria-label') || '').split(' for ')[0],
+        width: parseFloat(cs.borderTopWidth),
+        text: cs.color,
+        edge: cs.borderTopColor,
+        accent
+      };
+    });
+  });
+  console.log(`outline ${cells.map((c) => `${c.label}=${c.width}px`).join(' ')}`);
+  if (cells.length < 2) failures.push(`outline: found ${cells.length} editable cells in the first row, expected half dones and surveys`);
+  const painted = await paint(cells.map((c) => [c.text, c.edge, c.accent]).flat());
+  cells.forEach((c, i) => {
+    const [text, edge, accent] = [0, 1, 2].map((k) => painted[i * 3 + k]);
+    const a = edge[3] / 255;
+    if (c.width < 1) failures.push(`outline: ${c.label} has a ${c.width}px edge, the field is unmarked`);
+    if (a <= 0.02) failures.push(`outline: ${c.label}'s edge paints at ${a.toFixed(2)}, it is invisible`);
+    if (a > 0.6) failures.push(`outline: ${c.label}'s edge paints at ${a.toFixed(2)}, that is a slab not a hint`);
+    if (!near(edge.slice(0, 3), text.slice(0, 3)))
+      failures.push(`outline: ${c.label}'s edge is ${rgb(edge.slice(0, 3))} while its value is ${rgb(text.slice(0, 3))}`);
+    if (!near(text.slice(0, 3), accent.slice(0, 3)) && near(edge.slice(0, 3), accent.slice(0, 3)))
+      failures.push(`outline: ${c.label}'s edge is the app accent ${rgb(accent.slice(0, 3))}, not the value's own hue`);
+  });
+  const box = await page.locator('main tbody tr').first().locator('input').evaluateAll((els) =>
+    els.map((el) => {
+      const td = el.closest('td').getBoundingClientRect();
+      return { x: td.x, y: td.y, right: td.right, h: td.height };
+    })
+  );
+  await shot(page, `${OUT}/cell-outline.png`, {
+    clip: { x: box[0].x - 8, y: box[0].y - 34, width: box.at(-1).right - box[0].x + 16, height: box[0].h + 42 }
+  });
+  // Hovering has to strengthen the same edge, not swap in the accent.
+  const field = page.locator('main tbody tr').first().locator('input').first();
+  await field.hover();
+  await page.waitForTimeout(120);
+  const hov = await field.evaluate((el) => getComputedStyle(el).borderTopColor);
+  await page.mouse.move(0, 0);
+  await page.waitForTimeout(120);
+  const [restEdge, hovEdge] = await paint([cells[0].edge, hov]);
+  console.log(`outline hover    ${cells[0].label} a=${restEdge[3] / 255} -> ${hovEdge[3] / 255} ${rgb(hovEdge.slice(0, 3))}`);
+  if (near(restEdge, hovEdge))
+    failures.push(`outline: hovering ${cells[0].label} leaves the edge at ${rgb(hovEdge.slice(0, 3))} a=${(hovEdge[3] / 255).toFixed(2)}, the field ignores the pointer`);
+  if (!near(hovEdge.slice(0, 3), restEdge.slice(0, 3)))
+    failures.push(`outline: hovering ${cells[0].label} changes hue to ${rgb(hovEdge.slice(0, 3))}, the edge is not its own`);
+
   const input = page.locator('main tbody tr').first().locator('input').first();
   const label = await input.getAttribute('aria-label');
   const before = await input.inputValue();
@@ -479,7 +827,7 @@ async function checkInteractions() {
     });
 
   // A state that repaints one property out of four is still a hover you cannot see.
-  async function glow(name, loc) {
+  async function hoverStep(name, loc) {
     const target = loc.first();
     if (!(await target.count())) {
       failures.push(`hover: no "${name}" element to measure`);
@@ -506,19 +854,19 @@ async function checkInteractions() {
   }
 
   const columns = page.getByRole('button', { name: /Columns/ });
-  await glow('toolbar trigger', columns);
+  await hoverStep('toolbar trigger', columns);
   await columns.click();
   await page.waitForTimeout(300);
-  const menu = page.locator('.glass-menu').last();
+  const menu = page.locator('.menu').last();
   if (!(await menu.count())) {
     failures.push('columns: the Columns popover never opened');
     return;
   }
 
-  await glow('menu item', menu.locator('.glow-hover'));
+  await hoverStep('menu item', menu.locator('.hoverable'));
 
   const labels = await page.evaluate(() =>
-    [...document.querySelectorAll('.glass-menu label > span')].map((s) => s.innerText.trim())
+    [...document.querySelectorAll('.menu label > span')].map((s) => s.innerText.trim())
   );
   // innerText honours the head's `text-transform: uppercase`, so compare lowercase.
   const headTxt = await page.evaluate(() =>
@@ -534,7 +882,7 @@ async function checkInteractions() {
   // The Columns menu always holds both states (some columns on, some off), so read
   // them side by side instead of clicking and mutating the view.
   const box = await page.evaluate(() => {
-    const all = [...document.querySelectorAll('.glass-menu .cbox')];
+    const all = [...document.querySelectorAll('.menu .cbox')];
     if (!all.length) return null;
     const on = all.find((el) => el.checked);
     const off = all.find((el) => !el.checked);
@@ -569,7 +917,7 @@ async function checkInteractions() {
   await page.waitForTimeout(150);
 
   // Rows are wide and stacked twenty deep, so they take a fill step rather than a
-  // glow. Still has to be a step the eye can find. Measured with the popover closed:
+  // wash. Still has to be a step the eye can find. Measured with the popover closed:
   // the menu overlaps the first rows and would swallow the hover.
   const row = page.locator('main tbody tr').nth(1);
   const r0 = await row.evaluate((el) => getComputedStyle(el).backgroundColor);
@@ -581,7 +929,7 @@ async function checkInteractions() {
 
   // The cascade contract. A resting surface is @layer components and a state is
   // unlayered, which is the only reason the call-site utilities below work at all:
-  // written outside a layer, .glass-input silently outranked `focus:border-k-accent`
+  // written outside a layer, .field silently outranked `focus:border-k-accent`
   // and `focus:outline-none` and every focused field looked unfocused.
   const search = page.locator('main input').first();
   const b0 = await search.evaluate((el) => getComputedStyle(el).borderTopColor);
@@ -591,8 +939,8 @@ async function checkInteractions() {
     border: getComputedStyle(el).borderTopColor,
     outline: getComputedStyle(el).outlineStyle
   }));
-  console.log(`focus  glass-input ${b0} -> ${focused.border} outline=${focused.outline}`);
-  if (b0 === focused.border) failures.push('cascade: focusing a .glass-input leaves its border alone, a surface class is beating the utility again');
+  console.log(`focus  field      ${b0} -> ${focused.border} outline=${focused.outline}`);
+  if (b0 === focused.border) failures.push('cascade: focusing a .field leaves its border alone, a surface class is beating the utility again');
   if (focused.outline !== 'none') failures.push(`cascade: the focused input still draws an "${focused.outline}" outline, :focus-visible is beating outline-none`);
   const rb = await row.boundingBox();
   if (rb) {
@@ -688,7 +1036,7 @@ async function checkInteractions() {
 // back to the raw 2px accent ring the base layer puts on the page, and nothing may
 // switch that ring off without putting its own paint in its place. The break
 // threshold box is the field that failed the first half — a bare input, so it took
-// the ring while every .glass-input next to it repaints its border.
+// the ring while every .field next to it repaints its border.
 async function checkRings(view) {
   const r = await page.evaluate(() => {
     const snap = (n) => {
@@ -729,25 +1077,25 @@ async function checkRings(view) {
 }
 
 // The selected scheme card has to look selected. It is the one place a state class
-// can silently do nothing: .glass-card paints border/shadow outside any cascade
+// can silently do nothing: .panel paints border/shadow outside any cascade
 // layer, so a utility on the element loses to it and the card renders identical to
 // its unselected siblings.
-async function checkSchemeCard() {
+async function checkModeCard() {
   await page.keyboard.press('5');
   try {
-    await page.waitForSelector('main .glass-card', { timeout: 8000 });
+    await page.waitForSelector('main .panel.lift', { timeout: 8000 });
   } catch {
-    failures.push('schemes: the settings view never rendered its cards');
+    failures.push('mode: the settings view never rendered its cards');
     return;
   }
-  const cards = page.locator('main .glass-card');
+  const cards = page.locator('main .panel.lift');
   if ((await cards.count()) < 2) {
-    failures.push(`schemes: found ${await cards.count()} cards, expected one per colour scheme`);
+    failures.push(`mode: found ${await cards.count()} cards, expected one per colour mode`);
     return;
   }
   const read = () =>
     page.evaluate(() =>
-      [...document.querySelectorAll('main .glass-card')].map((el) => {
+      [...document.querySelectorAll('main .panel.lift')].map((el) => {
         const cs = getComputedStyle(el);
         return {
           active: el.classList.contains('card-active'),
@@ -768,16 +1116,16 @@ async function checkSchemeCard() {
   const all = await read();
   const on = all.filter((c) => c.active);
   const off = all.filter((c) => !c.active);
-  console.log(`schemes  cards=${all.length} active=${on.length} idleBorder=${off[0]?.border} activeBorder=${on[0]?.border}`);
+  console.log(`mode     cards=${all.length} active=${on.length} idleBorder=${off[0]?.border} activeBorder=${on[0]?.border}`);
   if (on.length !== 1) {
-    failures.push(`schemes: ${on.length} cards claim to be active, exactly one should`);
+    failures.push(`mode: ${on.length} cards claim to be active, exactly one should`);
     return;
   }
   const a = on[0];
-  if (a.border === off[0].border) failures.push(`schemes: "${a.label}" has the same border as "${off[0].label}", the active state is not painting`);
-  if (a.shadow === off[0].shadow) failures.push(`schemes: "${a.label}" has the same shadow as "${off[0].label}", no ring is painting`);
-  if (a.fill === off[0].fill) failures.push(`schemes: "${a.label}" has the same fill as "${off[0].label}", no accent wash is painting`);
-  if (!a.chip || a.chip === 'rgba(0, 0, 0, 0)') failures.push(`schemes: "${a.label}" has no filled Active marker`);
+  if (a.border === off[0].border) failures.push(`mode: "${a.label}" has the same border as "${off[0].label}", the active state is not painting`);
+  if (a.shadow === off[0].shadow) failures.push(`mode: "${a.label}" has the same shadow as "${off[0].label}", no ring is painting`);
+  if (a.fill === off[0].fill) failures.push(`mode: "${a.label}" has the same fill as "${off[0].label}", no accent wash is painting`);
+  if (!a.chip || a.chip === 'rgba(0, 0, 0, 0)') failures.push(`mode: "${a.label}" has no filled Active marker`);
 
   // Negative control on the same node: strip the class and the paint must fall back.
   // Without this, an inert .card-active still passes by comparing against siblings.
@@ -790,14 +1138,14 @@ async function checkSchemeCard() {
     return out;
   });
   if (bare.border === a.border && bare.shadow === a.shadow && bare.fill === a.fill) {
-    failures.push(`schemes: .card-active changes nothing on "${a.label}", the class is inert`);
+    failures.push(`mode: .card-active changes nothing on "${a.label}", the class is inert`);
   }
 
   // The lift on hover must not repaint the accent away.
   await cards.nth(all.findIndex((c) => c.active)).hover();
   await page.waitForTimeout(220);
   const hov = (await read())[all.findIndex((c) => c.active)];
-  if (hov.border !== a.border) failures.push(`schemes: hovering "${a.label}" reverts its border to ${hov.border}`);
+  if (hov.border !== a.border) failures.push(`mode: hovering "${a.label}" reverts its border to ${hov.border}`);
   await shot(page, `${OUT}/scheme-active.png`, { clip: { x: 0, y: 0, width: VIEWPORT.width, height: 620 } });
 }
 
@@ -805,32 +1153,6 @@ async function checkSchemeCard() {
 // viewport and hold its offset while the page scrolls; the buttons carry colour from
 // the active scheme, so their text has to clear AA in all six, not just the default.
 async function checkChrome() {
-  const rgba = (s) => {
-    const n = s.match(/[\d.]+/g).map(Number);
-    return [n[0], n[1], n[2], n.length > 3 ? n[3] : 1];
-  };
-  const lum = (c) => {
-    const f = (v) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4);
-    return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]);
-  };
-  const read = (sel) =>
-    page.evaluate((s) => {
-      const el = document.querySelector(s);
-      if (!el) return null;
-      const toRgba = (str) => {
-        const m = str.match(/[\d.]+/g).map(Number);
-        return [m[0], m[1], m[2], m.length > 3 ? m[3] : 1];
-      };
-      const layers = [];
-      for (let n = el; n; n = n.parentElement) {
-        const c = toRgba(getComputedStyle(n).backgroundColor);
-        layers.push(c);
-        if (c[3] >= 1) break;
-      }
-      const span = el.querySelector('span') ?? el;
-      return { layers, text: getComputedStyle(span).color, label: (span.textContent || span.value || '').trim() };
-    }, sel);
-
   const bar = page.locator('header.no-print');
   const box = await bar.boundingBox();
   const gaps = await bar.evaluate((el) => ({
@@ -857,21 +1179,12 @@ async function checkChrome() {
   await page.evaluate(() => window.scrollTo(0, 0));
 
   const inline = await page.evaluate(() => document.documentElement.getAttribute('style'));
-  const buttons = { upload: 'header.no-print label', sample: 'header.no-print button[title]' };
-  // Stack the translucent ancestors over the first opaque one, top down. Only the
-  // fills are compared, so the accent wash in `background-image` is not counted:
-  // the separation this asserts is the conservative floor of what the eye sees.
-  const fillOf = (r) => {
-    let bg = r.layers[r.layers.length - 1].slice(0, 3);
-    for (let i = r.layers.length - 2; i >= 0; i--) {
-      const [cr, cg, cb, ca] = r.layers[i];
-      bg = [cr * ca + bg[0] * (1 - ca), cg * ca + bg[1] * (1 - ca), cb * ca + bg[2] * (1 - ca)];
-    }
-    return bg;
-  };
-  const between = (a, b) => {
-    const [hi, lo] = [lum(a), lum(b)].sort((m, n) => n - m);
-    return (hi + 0.05) / (lo + 0.05);
+  // Located by the words on the control, not by a `title=` it no longer carries —
+  // the native tooltip became a real one, and a selector that leaned on it would
+  // have silently started measuring the view-switcher buttons instead.
+  const buttons = {
+    upload: { sel: 'header.no-print label' },
+    sample: { sel: 'header.no-print button', text: 'Sample data' }
   };
   await page.keyboard.press('1');
   await page.waitForTimeout(250);
@@ -887,11 +1200,14 @@ async function checkChrome() {
     if (h.col < 1) failures.push(`hue: no "${h.head}" column on the rundown, nothing to measure`);
     else buttons[h.key] = h.cell(h.col);
   }
-  for (const [id, scheme] of Object.entries(COLOR_SCHEMES)) {
+  for (const [id, mode] of Object.entries(COLOR_MODES)) {
     await page.evaluate(
       (vars) => vars.forEach(([name, triplet]) => document.documentElement.style.setProperty(name, triplet)),
-      Object.entries(scheme.colors).map(([role, hex]) => [cssVarName(role), hexToRgbTriplet(hex)])
+      Object.entries(mode.colors).map(([role, hex]) => [cssVarName(role), hexToRgbTriplet(hex)])
     );
+    // The header's action buttons carry `transition-colors`, so a read taken on the
+    // paint's own tick returns the colour they are leaving, not the one they reached.
+    await page.waitForTimeout(260);
     const parts = [];
     for (const [key, sel] of Object.entries(buttons)) {
       const r = await read(sel);
@@ -900,7 +1216,7 @@ async function checkChrome() {
         failures.push(`contrast: ${id} has no "${key}" button to measure`);
         continue;
       }
-      const cr = between(rgba(r.text), fillOf(r));
+      const cr = between(r.text, fillOf(r));
       parts.push(`${key}=${cr.toFixed(1)}:1`);
       if (cr < 4.5) failures.push(`contrast: ${id}/${key} label "${r.label}" is ${cr.toFixed(2)}:1, below AA 4.5`);
     }
@@ -925,7 +1241,7 @@ async function checkChrome() {
       else if (h.got !== h.want) failures.push(`hue: in ${id} ${h.key} reads ${h.got}, not its role's ${h.want}`);
     }
     const bar = await read('header.no-print');
-    const card = await read('main .panel, main .glass-card');
+    const card = await read('main .panel, main .panel.lift');
     let level = 'no-card';
     if (bar && card) {
       const sep = between(fillOf(bar), fillOf(card));
@@ -985,9 +1301,9 @@ async function checkPopovers(view) {
       failures.push(`${view}: "${label}" did not open`);
       continue;
     }
-    const menu = page.locator('.glass-menu');
+    const menu = page.locator('.menu');
     if ((await menu.count()) === 0) {
-      failures.push(`${view}: "${label}" opened with no .glass-menu in the DOM`);
+      failures.push(`${view}: "${label}" opened with no .menu in the DOM`);
       continue;
     }
     await probe(menu.last(), view, label);
@@ -997,234 +1313,43 @@ async function checkPopovers(view) {
   }
 }
 
-// The backdrop glow is composited from tokens plus an animated opacity, so nothing
-// in the CSS states whether a plate actually stands out. Measure the worst case at
-// the peak of the pulse: a patch brighter than the plate on top of it is invisible.
-async function checkBackdrop() {
-  const m = await page.evaluate(() => {
-    const rgbOf = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim().split(/[\s,/]+/).filter(Boolean).map(Number);
-    const L = ([r, g, b]) => {
-      const f = (v) => (v /= 255) <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-      const y = 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
-      return y > 0.008856 ? 116 * Math.cbrt(y) - 16 : 903.3 * y;
-    };
-    const over = (fg, bg, a) => fg.map((c, i) => c * a + bg[i] * (1 - a));
-    let peak = 0;
-    for (const sheet of document.styleSheets) {
-      let rules;
-      try { rules = sheet.cssRules; } catch { continue; }
-      for (const r of rules) {
-        if (r.type === CSSRule.KEYFRAMES_RULE && r.name === 'pulseSlow') {
-          for (const k of r.cssRules) peak = Math.max(peak, Number(k.style.opacity) || 0);
-        }
-      }
-    }
-    const pageC = rgbOf('--k-page');
-    const surface = rgbOf('--k-surface');
-    let worst = 99;
-    for (const b of document.querySelectorAll('.blob')) {
-      const parts = getComputedStyle(b).backgroundColor.match(/[\d.]+/g).map(Number);
-      const patch = over(parts.slice(0, 3), pageC, (parts[3] ?? 1) * peak);
-      worst = Math.min(worst, L(over(surface, patch, 0.9)) - L(patch));
-    }
-    // The dot lattice is checked across every scheme, not here. See checkDots().
-    return { peak, worst, flat: L(surface) - L(pageC) };
-  });
-  if (m.peak === 0) return;
-  if (m.worst < 3) failures.push(`backdrop: glow patch at pulse peak (opacity ${m.peak}) is only ${m.worst.toFixed(1)} L* below the plates`);
-  if (m.flat < 4) failures.push(`backdrop: surface sits only ${m.flat.toFixed(1)} L* above the page`);
-  console.log(`backdrop   peak-opacity=${m.peak} plate-vs-glow dL*=${m.worst.toFixed(1)} plate-vs-page dL*=${m.flat.toFixed(1)}`);
-}
-
-// A 24px dot lattice is only perceptible relative to the page it sits on, which is
-// why `dot` is a per-scheme token instead of one alpha over `hairline`. Measuring
-// only the default scheme is exactly how "barely visible on the softer themes"
-// passed a check that reported green.
-async function checkDots() {
-  const vars = Object.entries(COLOR_SCHEMES[DEFAULT_SCHEME].colors).map(([role]) => cssVarName(role));
-  const restore = await page.evaluate(
-    (names) => names.map((n) => [n, document.documentElement.style.getPropertyValue(n)]),
-    vars
-  );
-  const schemeLists = Object.entries(COLOR_SCHEMES).map(([id, s]) => [
-    id,
-    Object.entries(s.colors).map(([role, hex]) => [cssVarName(role), hexToRgbTriplet(hex)])
-  ]);
-
-  const out = await page.evaluate((lists) => {
-    const rgbOf = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim().split(/[\s,/]+/).filter(Boolean).map(Number);
-    const Y = ([r, g, b]) => {
-      const f = (v) => (v /= 255) <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-      return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
-    };
-    const over = (fg, bg, a) => fg.map((c, i) => c * a + bg[i] * (1 - a));
-    const rows = [];
-    for (const [id, vars] of lists) {
-      for (const [n, v] of vars) document.documentElement.style.setProperty(n, v);
-      const pageC = rgbOf('--k-page');
-      // Read the fills out of the live CSS instead of restating them here, so this
-      // cannot drift from index.css the way the original glass did.
-      const fills = ['.panel', '.glass-card']
-        .map((sel) => {
-          const el = document.querySelector(sel);
-          if (!el) return null;
-          const n = getComputedStyle(el).backgroundColor.match(/rgba?\(([^)]+)\)/)?.[1]
-            .split(/[\s,/]+/).filter(Boolean).map(Number);
-          return n && { rgb: n.slice(0, 3), a: n[3] ?? 1 };
-        })
-        .filter(Boolean);
-      let lift = 99, leak = 0;
-      for (const el of document.querySelectorAll('.dot-bg')) {
-        // Read the colour out of the rendered gradient, so this also proves the
-        // token is actually wired through to the rule.
-        const fn = getComputedStyle(el).backgroundImage.match(/rgba?\(([^)]+)\)/);
-        if (!fn) continue;
-        const n = fn[1].split(/[\s,/]+/).filter(Boolean).map(Number);
-        const dot = over(n.slice(0, 3), pageC, n[3] ?? 1);
-        lift = Math.min(lift, Y(dot) / Y(pageC));
-        for (const f of fills) {
-          const plate = over(f.rgb, pageC, f.a);
-          leak = Math.max(leak, Y(over(dot, plate, 1 - f.a)) / Math.max(Y(plate), 1e-6));
-        }
-      }
-      rows.push({ id, lift, leak });
-    }
-    return rows;
-  }, schemeLists);
-
-  await page.evaluate((pairs) => {
-    for (const [n, v] of pairs) {
-      if (v) document.documentElement.style.setProperty(n, v);
-      else document.documentElement.style.removeProperty(n);
-    }
-  }, restore);
-
-  for (const r of out) {
-    // 1.10x plate luminance is about 1 L* at these levels: enough to see the card
-    // edges, not enough to read dots inside it.
-    if (r.lift < 2) failures.push(`backdrop [${r.id}]: lattice only ${r.lift.toFixed(2)}x the page, too faint to read`);
-    if (r.leak > 1.1) failures.push(`backdrop [${r.id}]: lattice leaks to ${r.leak.toFixed(2)}x plate luminance through the fills, cards look speckled`);
-    console.log(`dots ${r.id.padEnd(11)} ${r.lift.toFixed(2)}x-page leak=${r.leak.toFixed(2)}x-plate`);
-  }
-}
-
-// Frosted glass needs two things, and a `backdrop-filter` declaration only
-// guarantees one of them: the backdrop has to show through the fill, and it has
-// to have enough structure that softening it is visible. Both are measurable by
-// re-shooting the same crop twice with one property neutered, and letting
-// Chromium decode the PNGs. `show` is how much of the backdrop gets through at
-// all; `smear` is how much removing the blur changes it. A plate that is merely
-// translucent scores high on show and zero on smear.
-async function checkFrost() {
-  const meanAbsDiff = ([a, b]) => {
-    const grab = async (d) => {
-      const img = new Image();
-      img.src = `data:image/png;base64,${d}`;
-      await img.decode();
-      const c = document.createElement('canvas');
-      c.width = img.width;
-      c.height = img.height;
-      c.getContext('2d').drawImage(img, 0, 0);
-      return c.getContext('2d').getImageData(0, 0, img.width, img.height).data;
-    };
-    return Promise.all([grab(a), grab(b)]).then(([p, q]) => {
-      let s = 0;
-      for (let i = 0; i < p.length; i += 4) {
-        s += Math.abs(p[i] - q[i]) + Math.abs(p[i + 1] - q[i + 1]) + Math.abs(p[i + 2] - q[i + 2]);
-      }
-      return s / (p.length / 4) / 3;
-    });
+// Elevation has to come from somewhere, and the two modes buy it in different currency.
+// DARK has room at the bottom of the scale: page -> card is a real lightness step, so a
+// plate separates before its edge is even drawn. LIGHT has none — #FAFAF8 under a #FFFFFF
+// card is 1.8 L*, and that pair is the design, not an accident; widening it means a grey
+// page. So light is policed on its hairline instead, which is what actually draws a plate
+// there. Both floors are asserted, and the live document is read back so a palette edit
+// that never reached the DOM cannot pass.
+async function checkLayers() {
+  const L = (hex) => {
+    const f = (v) => (v / 255 <= 0.04045 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4);
+    const n = parseInt(hex.slice(1), 16);
+    const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(f);
+    const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    return y > 0.008856 ? 116 * Math.cbrt(y) - 16 : 903.3 * y;
   };
-
-  async function gap(clip, css) {
-    const base = (await page.screenshot({ clip })).toString('base64');
-    const tag = await page.addStyleTag({ content: css });
-    const alt = (await page.screenshot({ clip })).toString('base64');
-    await tag.evaluate((el) => el.remove());
-    return page.evaluate(meanAbsDiff, [base, alt]);
+  for (const [id, mode] of Object.entries(COLOR_MODES)) {
+    const c = mode.colors;
+    const plate = L(c.surface) - L(c.page);
+    const edge = Math.abs(L(c.surface) - L(c.hairline));
+    const floor = id === 'light' ? 1 : 4;
+    console.log(`layers ${id.padEnd(6)} plate-vs-page dL*=${plate.toFixed(1)} (floor ${floor}) hairline-vs-plate dL*=${edge.toFixed(1)}`);
+    if (plate < floor) failures.push(`layers [${id}]: a card sits only ${plate.toFixed(1)} L* above the page, below the ${floor} this mode has to earn its elevation from`);
+    if (edge < 8) failures.push(`layers [${id}]: the hairline is only ${edge.toFixed(1)} L* from the card, so a plate edge barely paints`);
   }
-
-  async function measure(name, sel, fill, clip) {
-    const slug = name.replace(/[^\w-]+/g, '-').toLowerCase();
-    // The eyeball shot, taken before the veil and the neuters below.
-    await shot(page, `${OUT}/frost-${slug}.png`, { clip });
-    // Tag the one node under test. Everything else scopes through [data-frost], so
-    // a nested glass (the rail preview is a .glass-menu too) cannot confound it.
-    await page.evaluate((s) => document.querySelector(s)?.setAttribute('data-frost', ''), sel);
-    // Freeze the pulse and any entrance animation so the two shots differ only by
-    // the property under test, and hide the surface's own children: a popover is
-    // mostly covered by its options, which are not the glass.
-    await page.evaluate(() => document.getAnimations().forEach((a) => a.pause()));
-    const veil = await page.addStyleTag({ content: `[data-frost]>*{visibility:hidden!important}` });
-    // Same hue at full alpha, so the delta measures transmission, not a colour swap.
-    const show = await gap(clip, `[data-frost]{background-image:none!important;background-color:rgb(var(${fill})/1)!important}`);
-    const smear = await gap(clip, `[data-frost]{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}`);
-    await page.evaluate(() => document.querySelector('[data-frost]')?.removeAttribute('data-frost'));
-    await veil.evaluate((el) => el.remove());
-    await page.evaluate(() => document.getAnimations().forEach((a) => a.play()));
-    // Two dark-on-dark surfaces, so absolute channel deltas are small by nature.
-    // `show` only has to prove something gets through; `smear` is the one that
-    // answers the complaint, and it is what a merely-translucent fill fails.
-    if (show < 1.5) failures.push(`frost [${name}]: only ${show.toFixed(1)}/255 of the backdrop shows through, the fill is opaque`);
-    if (smear < 2) failures.push(`frost [${name}]: dropping the blur changes ${smear.toFixed(1)}/255, so the blur is doing nothing`);
-    console.log(`frost ${name.padEnd(14)} show=${show.toFixed(1)} smear=${smear.toFixed(1)}`);
-  }
-
-  // Frost needs a real backdrop. A crop that happens to sit over the flat page
-  // measures nothing and reads as a pass, so aim it at a point where the paint stack
-  // behind the glass actually contains a table row. `closest` because thead is not in
-  // the hit stack at all: over the head, elementsFromPoint reports the TH.
-  async function backdropHasCell(x, y) {
-    return page.evaluate(
-      ([px, py]) => {
-        const stack = document.elementsFromPoint(px, py);
-        const i = stack.findIndex((el) => el.closest('.glass-head, .glass-menu, .panel'));
-        if (i < 0) return false;
-        return stack.slice(i + 1).some((el) => el.tagName === 'TD');
-      },
-      [x, y]
-    );
-  }
-
-  // Not the app header: every table has its own scroll container, so the page only
-  // moves 19px and nothing ever slides under the plate. The sticky table head is the
-  // surface that has live rows passing under it all day, which is where frost either
-  // shows or does not. Raw CDR, so the scrollback is long enough to be worth reading.
-  await page.keyboard.press('2');
-  await page.waitForTimeout(400);
-  await page.evaluate(() => {
-    const box = document.querySelector('main .overflow-auto');
-    if (box) box.scrollTop = 240;
+  const live = await page.evaluate(() => {
+    const g = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+    return { mode: document.documentElement.dataset.mode, page: g('--k-page'), surface: g('--k-surface') };
   });
-  await page.waitForTimeout(300);
-  const head = await page.locator('main thead.glass-head').first().boundingBox();
-  if (!head) {
-    failures.push('frost: no thead.glass-head to measure, the sticky head lost its class');
-    return;
+  const want = COLOR_MODES[live.mode];
+  if (!want) failures.push(`layers: <html data-mode="${live.mode}"> is not a mode`);
+  else {
+    for (const role of ['page', 'surface']) {
+      const got = live[role];
+      const exp = hexToRgbTriplet(want.colors[role]);
+      if (got !== exp) failures.push(`layers: --k-${role} reads "${got}", the active ${live.mode} palette says "${exp}"`);
+    }
   }
-  const hClip = { x: head.x + head.width / 2 - 210, y: head.y + 4, width: 420, height: Math.min(head.height - 8, 40) };
-  if (!(await backdropHasCell(hClip.x + 210, hClip.y + 20))) {
-    failures.push('frost: no row behind the head crop, it is measuring the plate rather than a backdrop');
-  }
-  await measure('head over rows', 'main thead.glass-head', '--k-sunken', hClip);
-
-  await page.keyboard.press('1');
-  await page.waitForTimeout(400);
-  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-  await page.waitForTimeout(300);
-  await page.locator('main button[aria-expanded]').first().click();
-  await page.waitForTimeout(400);
-  const menu = await page.locator('main .glass-menu').first().boundingBox();
-  if (!menu) {
-    failures.push('frost: no .glass-menu open to measure');
-    return;
-  }
-  const mClip = { x: menu.x + 20, y: menu.y + 20, width: Math.min(menu.width - 40, 240), height: Math.min(menu.height - 40, 120) };
-  if (!(await backdropHasCell(mClip.x + mClip.width / 2, mClip.y + mClip.height / 2))) {
-    failures.push('frost: no table cell behind the menu crop, it is measuring the page rather than a backdrop');
-  }
-  await measure('menu over table', 'main .glass-menu', '--k-surface', mClip);
-  await page.keyboard.press('Escape');
 }
 
 // The complaint was that a search bar never answered the pointer. Hover only has
@@ -1241,12 +1366,13 @@ async function checkFieldHover() {
       failures.push(`hover [${view}]: the toolbar has no search field to measure`);
       continue;
     }
-    // The glow is the ask, so measure the shadow and not just the edge: a rule that
-    // only recoloured the border would still pass a borderTopColor check.
+    // One recoloured property is still a hover you cannot see, so count the moves
+    // rather than assert a cast. The wash lands in `background-image` by design: a
+    // field that swaps its opaque sunken fill for a translucent tint reads inverted.
     const read = () =>
       field.evaluate((el) => {
         const s = getComputedStyle(el);
-        return { edge: s.borderTopColor, glow: s.boxShadow === 'none' ? 'none' : 'glow' };
+        return { edge: s.borderTopColor, wash: s.backgroundImage, shadow: s.boxShadow, color: s.color };
       });
     const rest = await read();
     await field.hover();
@@ -1254,12 +1380,11 @@ async function checkFieldHover() {
     const over = await read();
     await page.mouse.move(4, 4);
     await page.waitForTimeout(120);
-    console.log(
-      `hover ${view.padEnd(8)} ${rest.edge} ${rest.glow} -> ${over.edge} ${over.glow}`
-    );
-    if (rest.edge === over.edge || over.glow === 'none') {
+    const changed = Object.keys(rest).filter((k) => rest[k] !== over[k]);
+    console.log(`hover ${view.padEnd(8)} ${changed.length ? changed.join(',') : 'NOTHING'} (${rest.edge} -> ${over.edge})`);
+    if (changed.length < 2) {
       failures.push(
-        `hover [${view}]: the search bar keeps its ${over.edge} border and ${over.glow} shadow, the pointer gets no answer`
+        `hover [${view}]: the search bar repaints only ${changed.join(',') || 'nothing'}, the pointer gets no answer`
       );
     }
   }
@@ -1280,7 +1405,8 @@ async function checkToolbarFits() {
     const pad = (side) => parseFloat(cs[`padding${side}`]);
     const inner = bar.clientWidth - pad('Left') - pad('Right');
     const used = kids.reduce((n, k) => n + k.getBoundingClientRect().width, 0) + (kids.length - 1) * parseFloat(cs.gap);
-    const tallest = Math.max(...kids.map((k) => k.getBoundingClientRect().height));
+    const heights = kids.map((k) => k.getBoundingClientRect().height);
+    const tallest = Math.max(...heights);
     const gap = parseFloat(cs.gap);
     const contentH = bar.clientHeight - pad('Top') - pad('Bottom');
     const textWidth = (el, text) => {
@@ -1299,9 +1425,20 @@ async function checkToolbarFits() {
     };
     const search = bar.querySelector('input[type="search"]');
     const thresh = bar.querySelector('input[inputmode="numeric"]');
+    // Every control in this row is one height, so a mismatch reads as a typo in the
+    // markup rather than as design. Nothing enforces it: each control derives its box
+    // from its own padding, and one of them derived it from a nested number input
+    // instead, which made it 5px taller than its neighbours.
+    const name = (el) => (el.textContent || '').trim().slice(0, 12) || el.getAttribute('aria-label') || '?';
     return {
       rows: Math.round((contentH + gap) / (tallest + gap)),
       slack: Math.round(inner - used),
+      h: {
+        min: Math.round(Math.min(...heights)),
+        max: Math.round(Math.max(...heights)),
+        tall: name(kids[heights.indexOf(Math.max(...heights))]),
+        short: name(kids[heights.indexOf(Math.min(...heights))])
+      },
       search: { need: textWidth(search, search.placeholder), room: room(search) },
       // The stepper overlay sits on top of the field's right edge, so its width comes
       // off the room the digits actually have.
@@ -1309,16 +1446,48 @@ async function checkToolbarFits() {
     };
   });
   console.log(
-    `fit rundown  rows=${m.rows} slack=${m.slack}px search=${m.search.need}/${m.search.room} thresh=${m.thresh.need}/${m.thresh.room}`
+    `fit rundown  rows=${m.rows} slack=${m.slack}px h=${m.h.min}..${m.h.max} search=${m.search.need}/${m.search.room} thresh=${m.thresh.need}/${m.thresh.room}`
   );
   if (m.rows > 1) failures.push(`fit [rundown]: the toolbar wrapped to ${m.rows} rows, so Print/Export sit below the panel`);
   if (m.slack < 36) failures.push(`fit [rundown]: only ${m.slack}px of slack; the next badge that grows wraps the row`);
+  if (m.h.max - m.h.min > 1) {
+    failures.push(`fit [rundown]: the toolbar controls are not one height — "${m.h.tall}" is ${m.h.max}px while "${m.h.short}" is ${m.h.min}px, so the row looks uneven`);
+  }
   for (const [name, box] of [['search', m.search], ['threshold', m.thresh]]) {
     if (box.need > box.room) failures.push(`fit [rundown]: the ${name} field clips its value, needs ${box.need}px in ${box.room}px`);
   }
 }
 
-// A `glow-hover` control takes its edge, wash and cast from --tone, which falls back
+// The segmented control is the one widget in these rows whose box is not its own: the
+// track adds padding around a thumb, so the group's height comes from a number nobody
+// reads as a height, and it silently grew 2px shorter than every control beside it on
+// all four toolbars at once. Chips and captions are text, not controls, so they are
+// excluded by the 24px floor.
+async function checkControlHeights() {
+  for (const [key, name] of VIEWS) {
+    await page.keyboard.press(key);
+    await page.waitForTimeout(300);
+    const rows = await page.evaluate(() =>
+      [...document.querySelectorAll('main [role="group"], header [role="group"]')].map((g) => {
+        const sibs = [...g.parentElement.children].filter((c) => c.getBoundingClientRect().height >= 24);
+        return {
+          label: g.getAttribute('aria-label'),
+          got: Math.round(g.getBoundingClientRect().height),
+          want: Math.round(Math.max(...sibs.map((c) => c.getBoundingClientRect().height)))
+        };
+      })
+    );
+    for (const r of rows) {
+      if (Math.abs(r.got - r.want) > 1) {
+        failures.push(`sizes [${name}]: the ${r.label} switch is ${r.got}px tall while the tallest control in its row is ${r.want}px`);
+      }
+    }
+  }
+  await page.keyboard.press('1');
+  await page.waitForTimeout(300);
+}
+
+// A `hoverable` control takes its edge and wash from --tone, which falls back
 // to the accent. So a control with a coloured icon has to declare the same tone or
 // hovering it lights the wrong hue — the popovers get this from FilterPopover, and
 // Print is the one control that sets it by hand.
@@ -1342,7 +1511,71 @@ async function checkPrintTone() {
   }
 }
 
-// The range used to be two native <input type="date">: system chrome the six schemes
+// Print is a third palette, hand-maintained, and an undeclared role does not fall back
+// to paper white — it falls back to whatever the *screen* mode painted. That is how
+// `warning` went missing: calls/hr printed dark amber on white at ~1.9:1, in both modes,
+// and no screenshot of the app on screen could ever have shown it. So half of this check
+// is static, and the other half reaches the one thing a stylesheet cannot: the canvas
+// bitmaps, which bake their colours at render time.
+async function checkPrint() {
+  const block = readFileSync('src/index.css', 'utf8').split('@media print')[1]?.match(/:root\s*\{([^}]*)\}/)?.[1];
+  if (!block) {
+    failures.push('print: src/index.css has no `@media print { :root { … } }` block');
+    return;
+  }
+  const declared = new Set([...block.matchAll(/--k-([a-z-]+)\s*:/g)].map((m) => m[1]));
+  for (const role of Object.keys(COLOR_MODES[DEFAULT_MODE].colors)) {
+    if (!declared.has(role)) {
+      failures.push(`print: --k-${role} is not set on paper, so it prints in its screen colour`);
+    }
+  }
+  for (const role of declared) {
+    if (!Object.keys(COLOR_MODES[DEFAULT_MODE].colors).includes(role)) {
+      failures.push(`print: --k-${role} is overridden on paper but no mode declares it any more`);
+    }
+  }
+
+  await page.keyboard.press('3');
+  await page.waitForTimeout(1200);
+  const screen = await bitmapLum();
+  if (screen === null) failures.push('print: the analytics view rendered no canvas to measure');
+
+  await page.emulateMedia({ media: 'print' });
+  await page.waitForTimeout(500);
+  const printed = await bitmapLum();
+  // The table-only assertions run on the rundown view, because analytics has no
+  // <thead> or scroll-capped container to measure and a null here would read as a pass.
+  await page.keyboard.press('1');
+  await page.waitForTimeout(350);
+  const paper = await page.evaluate(() => ({
+    mode: document.documentElement.getAttribute('data-mode'),
+    warning: getComputedStyle(document.documentElement).getPropertyValue('--k-warning').trim(),
+    hidden: getComputedStyle(document.querySelector('header.no-print')).display === 'none',
+    clipped: [...document.querySelectorAll('main [class*="max-h"]')].some((el) => getComputedStyle(el).maxHeight !== 'none'),
+    head: getComputedStyle(document.querySelector('thead')).display
+  }));
+
+  await page.emulateMedia({ media: null });
+  await page.waitForTimeout(500);
+  const restored = await page.evaluate(() => document.documentElement.getAttribute('data-mode'));
+
+  console.log(`print        roles=${declared.size} mode=${paper.mode} warning=(${paper.warning}) screenL=${screen?.toFixed(3)} paperL=${printed?.toFixed(3)}`);
+  if (paper.mode !== 'light') failures.push(`print: the mode did not flip to light for paper, it is "${paper.mode}" — the chart canvases print their screen palette`);
+  if (!/^\d+\s+\d+\s+\d+$/.test(paper.warning)) failures.push(`print: --k-warning does not resolve on paper, got "${paper.warning}"`);
+  if (!paper.hidden) failures.push('print: a .no-print control is still on the page');
+  if (paper.clipped) failures.push('print: a scroll container still caps its height, so rows past the fold are lost');
+  if (paper.head !== 'table-header-group') failures.push(`print: thead computes to ${paper.head}, so the column labels do not repeat across pages`);
+  if (screen !== null && printed !== null) {
+    if (printed > 0.2) {
+      failures.push(`print: the chart ink is still rgb-light on paper (mean L ${printed.toFixed(3)}) — it was painted for a dark screen and will vanish on white`);
+    } else if (printed >= screen) {
+      failures.push(`print: the analytics bitmap did not darken for paper (${screen.toFixed(3)} -> ${printed.toFixed(3)})`);
+    }
+  }
+  if (restored !== DEFAULT_MODE) failures.push(`print: after the dialog closed the mode stayed "${restored}" instead of returning to ${DEFAULT_MODE}`);
+}
+
+// The range used to be two native <input type="date">: system chrome the two modes
 // cannot reach, and free to land on a date the file has no rows for. So assert the
 // browser picker is gone, the panel that replaced it clears the toolbar under it, and
 // the grid offers exactly the dates the data carries.
@@ -1354,14 +1587,19 @@ async function checkCalendar() {
   const native = await page.locator('input[type="date"]').count();
   if (native) failures.push(`calendar: ${native} native date input(s) left in the page`);
 
-  const trigger = page.locator('main button[aria-expanded]').filter({ hasText: '–' }).first();
+  // Found by where it sits, not by what it reads: the label is a range that the
+  // picker rewrites mid-assertion, and the separator between its halves is copy,
+  // not structure. The custom-range group is the only one with a "reset" beside it.
+  const trigger = page
+    .locator('main div:has(> button:text-is("reset")) button[aria-expanded]')
+    .first();
   if (!(await trigger.count())) {
     failures.push('calendar: the title row has no range trigger');
     return;
   }
   await trigger.click();
   await page.waitForTimeout(250);
-  const menu = trigger.locator('xpath=ancestor::div[1]').locator('.glass-menu');
+  const menu = trigger.locator('xpath=ancestor::div[1]').locator('.menu');
   const box = await menu.boundingBox();
   if (!box) {
     failures.push('calendar: the range trigger never opened a panel');
@@ -1370,7 +1608,7 @@ async function checkCalendar() {
   const onTop = await page.evaluate(
     ([x, y]) => {
       const hit = document.elementFromPoint(x, y);
-      return !!hit && !!hit.closest('.glass-menu');
+      return !!hit && !!hit.closest('.menu');
     },
     [box.x + box.width / 2, box.y + box.height / 2]
   );
@@ -1451,7 +1689,7 @@ async function checkRawCdrFilter() {
   const before = await shown();
   await trigger.click();
   await page.waitForTimeout(280);
-  const menu = trigger.locator('xpath=ancestor::div[1]').locator('.glass-menu');
+  const menu = trigger.locator('xpath=ancestor::div[1]').locator('.menu');
   const agents = await menu.locator('input[type="checkbox"]').count();
   const pick = (name) => menu.getByRole('button', { name, exact: true });
   let emptied = -1;
@@ -1560,7 +1798,7 @@ async function checkDayGroups() {
   await shot(p, `${OUT}/rundown-days.png`, { fullPage: true });
   await trigger.click();
   await p.waitForTimeout(250);
-  const menu = trigger.locator('xpath=ancestor::div[1]').locator('.glass-menu');
+  const menu = trigger.locator('xpath=ancestor::div[1]').locator('.menu');
   const options = await menu.locator('button').evaluateAll((els) =>
     els.map((e) => ({ text: (e.textContent || '').replace(/\s+/g, ' ').trim(), pressed: e.getAttribute('aria-pressed') }))
   );
@@ -1596,7 +1834,7 @@ async function checkDayGroups() {
     const trig = p.locator('main button[aria-expanded]').filter({ hasText: /All dates|2026-10/ }).first();
     await trig.click();
     await p.waitForTimeout(250);
-    const m = trig.locator('xpath=ancestor::div[1]').locator('.glass-menu');
+    const m = trig.locator('xpath=ancestor::div[1]').locator('.menu');
     await m.locator('button', { hasText: text }).click();
     await p.waitForTimeout(350);
     await p.keyboard.press('Escape');
@@ -1627,7 +1865,7 @@ async function checkDayGroups() {
   await p.waitForTimeout(1000);
   const tile = (label) =>
     p.evaluate((text) => {
-      const card = [...document.querySelectorAll('main .glass-card')].find(
+      const card = [...document.querySelectorAll('main .panel.lift')].find(
         (c) => (c.querySelector('.text-xs')?.textContent || '').trim() === text
       );
       return card ? (card.querySelector('.num')?.textContent || '').trim() : null;
@@ -1664,6 +1902,8 @@ async function checkViewTitles() {
     failures.push(`titles: the rail lists ${rail.length} views, expected 5`);
     return;
   }
+  let overlapped = 0;
+  let shotBar = false;
   for (const label of rail) {
     const key = (label.match(/ \(([^)]+)\)$/) || [])[1];
     const name = key ? label.slice(0, -(key.length + 3)) : label;
@@ -1687,7 +1927,41 @@ async function checkViewTitles() {
     if (t.text !== name) failures.push(`titles [${name}]: the page is titled "${t.text}", the rail calls it "${name}"`);
     if (!t.painted) failures.push(`titles [${name}]: the heading has no box, so it is not on screen`);
     if (t.desc.split(' ').length < 5) failures.push(`titles [${name}]: the subtitle is "${t.desc}", it explains nothing`);
+
+    // The heading row and the floating app bar are both positioned, so if they sit at
+    // the same depth DOM order decides it — and the heading comes later, which paints
+    // "Rundown" straight through the brand text as you scroll.
+    const stack = await page.evaluate(() => {
+      const bar = document.querySelector('header.app-bar');
+      const h = document.querySelector('main h2');
+      if (!bar || !h) return null;
+      const before = window.scrollY;
+      const b = bar.getBoundingClientRect();
+      window.scrollTo(0, before + (h.getBoundingClientRect().top - (b.top + b.height / 2)));
+      const hb = h.getBoundingClientRect();
+      const hit = document.elementFromPoint(hb.left + hb.width / 2, hb.top + hb.height / 2);
+      return {
+        overlap: hb.bottom > b.top && hb.top < b.bottom,
+        inBar: !!hit && !!hit.closest('header.app-bar'),
+        tag: hit ? hit.tagName.toLowerCase() : 'none'
+      };
+    });
+    console.log(`stack ${key}    ${stack ? `${stack.overlap ? 'overlaps bar' : 'page too short'} · top=${stack.tag}` : 'n/a'}`);
+    if (stack?.overlap && !shotBar) {
+      shotBar = true;
+      await shot(page, `${OUT}/title-under-bar.png`, { clip: { x: 0, y: 0, width: VIEWPORT.width, height: 110 } });
+    }
+    await page.evaluate(() => window.scrollTo(0, 0));
+    if (!stack) failures.push(`titles [${name}]: no floating bar or heading to stack-test`);
+    else if (stack.overlap) {
+      overlapped += 1;
+      if (!stack.inBar)
+        failures.push(`titles [${name}]: "${stack.tag}" paints over the floating app bar, so the heading collides with the brand text on scroll`);
+    }
   }
+  // Two of the five views are short enough that their heading never reaches the bar.
+  // That is fine, but if none of them ever did the check above would be vacuous.
+  if (!overlapped) failures.push('titles: no view heading ever slides behind the app bar, so the stacking check has nothing to test');
 }
 
 // The sidebar previews float over live table text, which is the exact shape the
@@ -1754,7 +2028,7 @@ async function checkPreviews() {
     // re-triggering the hover, but elementFromPoint then skips it entirely and
     // reports the table behind. Flip it on for the hit test only; paint order is
     // unaffected by the property.
-    const card = page.locator('aside .glass-menu');
+    const card = page.locator('aside .menu');
     if ((await card.count()) === 0) {
       failures.push(`sidebar: hovering "${label}" produced no preview`);
       continue;
@@ -1765,7 +2039,7 @@ async function checkPreviews() {
     try {
       await page.waitForFunction(
         () => {
-          const t = document.querySelector('aside .glass-menu [data-thumb]');
+          const t = document.querySelector('aside .menu [data-thumb]');
           return t && t.querySelectorAll('*').length > 40;
         },
         null,
@@ -1796,18 +2070,33 @@ async function checkPreviews() {
   }
 }
 
-for (const width of [VIEWPORT.width, 1280, 820]) {
+// 1024 is the lg breakpoint that hands the view switcher from the header to the rail;
+// 768 is md, where the switcher drops onto its own row; 375 is a real phone.
+for (const width of [VIEWPORT.width, 1280, 1024, 768, 375]) {
   await page.setViewportSize({ width, height: VIEWPORT.height });
   for (const [key, view] of VIEWS) {
     await page.keyboard.press(key);
     await page.waitForTimeout(view === 'analytics' ? 1200 : 350);
     const scroll = await page.evaluate(() => ({
       overflow: document.documentElement.scrollWidth - window.innerWidth,
-      rows: document.querySelectorAll('main tbody tr').length
+      rows: document.querySelectorAll('main tbody tr').length,
+      rail: getComputedStyle(document.querySelector('aside')).display !== 'none',
+      switcher: getComputedStyle(document.querySelector('header nav[aria-label="Views"]')).display !== 'none'
     }));
     if (scroll.overflow > 1) failures.push(`${width}px ${view}: page is ${scroll.overflow}px wider than the viewport`);
+    // Exactly one of them may own the switcher at any width. Both showing duplicates
+    // the control (and the current-page marker); neither hiding it strands the user
+    // on a view they cannot leave. Either way the failure names the width, not the
+    // component, because the bug is the two breakpoints disagreeing.
+    if (scroll.rail === scroll.switcher) {
+      failures.push(`${width}px ${view}: the view switcher is ${scroll.rail ? 'shown by both the rail and the header' : 'shown by neither'}`);
+    }
     if (width !== VIEWPORT.width) {
-      console.log(`${String(width).padStart(4)}px ${view.padEnd(10)} overflow=${scroll.overflow}px`);
+      console.log(`${String(width).padStart(4)}px ${view.padEnd(10)} overflow=${scroll.overflow}px nav=${scroll.rail ? 'rail' : 'header'}`);
+      // The phone layout is the one a reviewer cannot check from a desktop run, so
+      // the artefact has to exist. Only the narrowest width gets one; 1024 and 768
+      // are the same markup with a different number of columns fitting.
+      if (width === 375) await shot(page, `${OUT}/${view}-375.png`, { fullPage: true });
       continue;
     }
     await shot(page, `${OUT}/${view}.png`, { fullPage: true });
@@ -1816,6 +2105,171 @@ for (const width of [VIEWPORT.width, 1280, 820]) {
     await checkPopovers(view);
   }
   if (width === VIEWPORT.width) await checkPreviews();
+}
+
+// Step 4's accessibility bundle, one assertion per defect it closed. Without these the
+// repaint stays honest and the a11y fixes quietly rot back, because every one of them
+// was invisible to a screenshot.
+async function checkA11y() {
+  await page.keyboard.press('1');
+  await page.waitForTimeout(350);
+
+  // A native title= answers the mouse and nothing else: no keyboard, no touchscreen,
+  // no way to dismiss it, and it fires on the browser's schedule rather than yours.
+  const natives = await page.evaluate(() =>
+    [...document.querySelectorAll('[title]')]
+      .filter((el) => el.closest('main, header'))
+      .map((el) => `${el.tagName.toLowerCase()} "${(el.getAttribute('title') || '').slice(0, 18)}"`)
+  );
+  console.log(`titles   native=${natives.length}`);
+  if (natives.length) failures.push(`tooltips: ${natives.length} native title= left in the page (${natives.slice(0, 3).join(', ')})`);
+
+  // Focus is what a keyboard *and* a tap both produce, so this one path covers two.
+  const sample = page.locator('header.no-print button', { hasText: 'Sample data' });
+  await sample.focus();
+  await page.waitForTimeout(140);
+  const byFocus = await page.evaluate(() => {
+    const t = document.querySelector('[role="tooltip"]');
+    if (!t) return null;
+    return { text: t.textContent.trim().slice(0, 26), wired: !!document.querySelector(`[aria-describedby="${t.id}"]`) };
+  });
+  console.log(`tip focus   ${byFocus ? `"${byFocus.text}" described=${byFocus.wired}` : 'NOTHING'}`);
+  if (!byFocus) failures.push('tooltips: focusing Sample data paints no tooltip, the keyboard gets nothing the mouse gets');
+  else if (!byFocus.wired) failures.push('tooltips: the panel on screen is not the node aria-describedby points at');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(140);
+  if (await page.locator('[role="tooltip"]').count())
+    failures.push('tooltips: Escape leaves the panel up, it is not dismissible (WCAG 1.4.13)');
+
+  // Two hover paths, because they place differently: a mid-table stamp puts the panel
+  // above itself, the header button is too close to the top edge and flips below.
+  for (const [what, trigger] of [['stamp', page.locator('main tbody td > .flex-col > span').first()], ['sample', sample]]) {
+    // Count panel *mounts* inside the page rather than sampling from outside: a fast
+    // strobe can slip between two polls 60ms apart, and it cannot slip past a
+    // MutationObserver. One observer at a time — two live observers both see the same
+    // mount and the count doubles, which reads exactly like the thing being detected.
+    await page.evaluate(() => {
+      window.__tipObs?.disconnect();
+      window.__tipAdds = 0;
+      window.__tipObs = new MutationObserver((rs) => {
+        for (const r of rs) for (const n of r.addedNodes) if (n.nodeType === 1 && n.getAttribute?.('role') === 'tooltip') window.__tipAdds++;
+      });
+      window.__tipObs.observe(document.body, { childList: true });
+    });
+    const box = await trigger.boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.waitForTimeout(200);
+    const panel = await page.evaluate(() => {
+      const t = document.querySelector('[role="tooltip"]');
+      if (!t) return null;
+      const r = t.getBoundingClientRect();
+      // elementFromPoint at the panel's own centre is the pointer-steal test: a panel
+      // that answers the pointer is what you hit there, and travelling onto the tooltip
+      // to read it would then dismiss it. `pointer-events: none` makes it invisible to
+      // hit-testing, so whatever is behind it answers instead.
+      const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      return {
+        text: t.textContent.trim().slice(0, 26),
+        inside: r.top >= 0 && r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight,
+        steals: hit === t
+      };
+    });
+    const adds = await page.evaluate(() => window.__tipAdds);
+    console.log(`tip ${what.padEnd(6)} ${panel ? `"${panel.text}" inside=${panel.inside} mounts=${adds}` : 'NOTHING'}`);
+    if (!panel) failures.push(`tooltips: hovering the ${what} paints nothing, the hover path went with the native title`);
+    else {
+      if (!panel.inside) failures.push(`tooltips: the ${what} tooltip is cut off by the viewport (${panel.text})`);
+      if (panel.steals) failures.push(`tooltips: the ${what} panel answers the pointer at its own centre, so moving onto it to read it dismisses it (WCAG 1.4.13)`);
+    }
+    if (adds !== 1) failures.push(`tooltips: the ${what} panel mounted ${adds} times under a still cursor — it is flickering`);
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(140);
+  }
+
+  const idle = await page.evaluate(() => {
+    const r = document.querySelector('[aria-live]');
+    return r ? { kids: r.children.length, text: r.textContent.trim() } : null;
+  });
+  console.log(`live        region=${idle ? 'mounted' : 'MISSING'} idle-kids=${idle ? idle.kids : '-'}`);
+  if (!idle) failures.push('toasts: no [aria-live] region exists while idle, so a toast arrives as a new node, not a change');
+  else if (idle.kids) failures.push(`toasts: the live region is not empty at rest (${idle.kids} left over), it will read stale text on load`);
+  await sample.click();
+  await page.waitForTimeout(300);
+  const announced = await page.evaluate(() => document.querySelector('[aria-live]')?.textContent.trim() ?? '');
+  console.log(`announced   "${announced.slice(0, 34)}"`);
+  if (!announced) failures.push('toasts: loading the sample put no message inside the live region');
+  await page.waitForTimeout(1500);
+
+  // Every figure in the first row, composited over its own tint and the row behind it.
+  // The three contrast defects the audit found were all of this shape: a role colour at
+  // 70% alpha over a role tint at 10%, which no single computed value betrays.
+  const cells = await read({ sel: 'main tbody tr:first-child td > *', all: true });
+  const weak = [];
+  let floors = 0;
+  for (const c of cells || []) {
+    // An icon plate carries a glyph, not text, so it answers to 3:1 (SC 1.4.11) and a
+    // label answers to 4.5. Empty cells are a dash rendered by another column's probe.
+    const cr = between(c.text, fillOf(c));
+    const floor = c.label ? 4.5 : 3;
+    floors++;
+    if (cr < floor) weak.push(`"${c.label.slice(0, 12) || '[glyph]'}" ${cr.toFixed(2)}:1 needs ${floor}`);
+  }
+  console.log(`cells       ${floors} composited · below floor=${weak.length}`);
+  if (weak.length) failures.push(`contrast: ${weak.join(' | ')}`);
+
+  // SC 2.5.8: 24x24. A control may be smaller only when something bigger takes the same
+  // input, so the exemption is proven by measuring that something, not by asserting it.
+  const small = await page.evaluate(() => {
+    const SEL =
+      'main button, main input, main select, main [role="button"], main a[href], main label:has(input), header.no-print button, header.no-print input, header.no-print label:has(input)';
+    const box = (el) => {
+      const r = el.getBoundingClientRect();
+      return r.width * r.height;
+    };
+    const out = [];
+    let total = 0;
+    for (const el of document.querySelectorAll(SEL)) {
+      const cs = getComputedStyle(el);
+      if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) continue;
+      total++;
+      if (r.width * r.height >= 576) continue;
+      const label = (el.getAttribute('aria-label') || el.textContent || el.type || '').trim().slice(0, 22);
+      const host = el.closest('label') || el.closest('.relative') || el.parentElement;
+      const partner = host ? [...host.querySelectorAll('input, button, label')].find((n) => n !== el && box(n) >= 576) : null;
+      out.push({ label, w: Math.round(r.width), h: Math.round(r.height), partner: partner ? Math.round(box(partner)) : 0 });
+    }
+    return { total, out };
+  });
+  const unjust = small.out.filter((t) => !t.partner);
+  console.log(`targets     ${small.total} measured · under 24x24=${small.out.length} unjustified=${unjust.length}`);
+  if (small.out.length)
+    console.log(`            ${small.out.map((t) => `"${t.label}" ${t.w}x${t.h}${t.partner ? ` via ${t.partner}px2` : ' NO FALLBACK'}`).join(', ')}`);
+  if (unjust.length)
+    failures.push(`targets: ${unjust.map((t) => `"${t.label}" ${t.w}x${t.h}`).join(', ')} sit under 576px2 with no larger control taking the same input`);
+
+  await page.keyboard.press('4');
+  await page.waitForTimeout(400);
+  await page.locator('button', { hasText: 'Add mapping' }).first().click();
+  await page.waitForTimeout(300);
+  await page.locator('[role="dialog"] button[type="submit"]').click();
+  await page.waitForTimeout(250);
+  const form = await page.evaluate(() => {
+    const input = document.querySelector('[role="dialog"] #agent-ext');
+    const msg = document.querySelector('[role="dialog"] [role="alert"]');
+    return {
+      invalid: input ? input.getAttribute('aria-invalid') : null,
+      same: !!(input && msg && document.getElementById(input.getAttribute('aria-describedby') || '') === msg),
+      text: msg ? msg.textContent.trim() : null
+    };
+  });
+  console.log(`form error  invalid=${form.invalid} described=${form.same} "${(form.text || '').slice(0, 26)}"`);
+  if (!form.text) failures.push('forms: an empty submit produces no error message in the dialog');
+  else if (form.invalid !== 'true') failures.push('forms: the rejected field does not say so with aria-invalid');
+  else if (!form.same) failures.push('forms: the error is not the node the field points at with aria-describedby');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(250);
 }
 
 await browser.close();

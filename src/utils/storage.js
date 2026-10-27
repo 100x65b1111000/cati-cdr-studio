@@ -9,6 +9,13 @@ export function saveToStorage(key, value) {
   }
 }
 
+export function removeFromStorage(key) {
+  try {
+    localStorage.removeItem(STORAGE_PREFIX + key);
+  } catch (err) {
+    console.warn(`[storage] Failed to remove key "${key}" from localStorage:`, err);
+  }
+}
 export function loadFromStorage(key, defaultValue) {
   try {
     const item = localStorage.getItem(STORAGE_PREFIX + key);
