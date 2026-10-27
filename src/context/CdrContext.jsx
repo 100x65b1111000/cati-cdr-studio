@@ -4,10 +4,25 @@ import { DEFAULT_EXT_MAP, DEFAULT_SHIFT_CONFIG } from '../constants/defaultData'
 import { DEFAULT_DATE_RANGE } from '../utils/dateRange';
 import { loadFromStorage, saveToStorage, removeFromStorage } from '../utils/storage';
 import { parseRawCallRecords, calculateShiftAnalysis } from '../services/shiftCalculator';
-import { generateDemoCDRData } from '../services/demoDataGenerator';
 import { COLOR_MODES, DEFAULT_MODE, cssVarName, getMode, hexToRgbTriplet } from '../theme/colorSchemes';
 
 const CdrContext = createContext(null);
+
+// Records live on the server now. Every route that changes them answers with the new
+// dataset, so one helper covers fetch, upload, sample data and restore.
+async function api(url, init) {
+  const res = await fetch(url, init);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `The server replied ${res.status}.`);
+  return data;
+}
+
+const demoRequest = (extensions) =>
+  api('/api/calls/demo', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ extensions })
+  });
 
 export function CdrProvider({ children }) {
   // 1. Persistent State
@@ -51,6 +66,8 @@ export function CdrProvider({ children }) {
 
   // 2. Runtime State
   const [rawRecords, setRawRecords] = useState([]);
+  const [activeUpload, setActiveUpload] = useState(null);
+  const [uploadHistory, setUploadHistory] = useState([]);
   const [activeTab, setActiveTab] = useState('rundown');
   const [toasts, setToasts] = useState([]);
   const [isParsing, setIsParsing] = useState(false);
@@ -140,12 +157,6 @@ export function CdrProvider({ children }) {
     saveToStorage('saved_views', savedViews);
   }, [savedViews]);
 
-  useEffect(() => {
-    if (rawRecords && rawRecords.length > 0) {
-      saveToStorage('raw_records', rawRecords);
-    }
-  }, [rawRecords]);
-
   // 5. Parse calls whenever rawRecords change (derived, avoids an extra render cycle)
   const rawCalls = useMemo(() => {
     if (!rawRecords || rawRecords.length === 0) return [];
@@ -158,25 +169,49 @@ export function CdrProvider({ children }) {
     return calculateShiftAnalysis(rawCalls, extNameMap, shiftConfig, manualOverrides);
   }, [rawCalls, extNameMap, shiftConfig, manualOverrides]);
 
-  // 7. Initial startup: load saved records or generate demo data
+  // 7. Dataset from the server
+  const applyDataset = useCallback((dataset) => {
+    setRawRecords(dataset.rows || []);
+    setActiveUpload(dataset.upload || null);
+    setUploadHistory(dataset.history || []);
+  }, []);
+
   useEffect(() => {
-    const saved = loadFromStorage('raw_records', null);
-    if (saved && saved.length > 0) {
-      setRawRecords(saved);
-    } else {
-      const demo = generateDemoCDRData(extNameMap);
-      setRawRecords(demo);
-    }
+    let cancelled = false;
+    // Retired key: the records are shared now, so a browser copy is stale by definition.
+    removeFromStorage('raw_records');
+    setIsParsing(true);
+    (async () => {
+      try {
+        let dataset = await api('/api/calls');
+        // An empty server seeds the sample, so a first run still shows something. The
+        // roster read here is this browser's stored one, which is who the sample is for.
+        if (dataset.rows.length === 0) dataset = await demoRequest(Object.keys(extNameMap));
+        if (!cancelled) applyDataset(dataset);
+      } catch (err) {
+        if (!cancelled) setParseError(err.message);
+      } finally {
+        if (!cancelled) setIsParsing(false);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- boot only
   }, []);
 
   // 8. Actions
-  const loadDemoData = useCallback(() => {
-    const demo = generateDemoCDRData(extNameMap);
-    setRawRecords(demo);
-    // A new dataset replaces the old one, so a saved range preset would hide it.
-    setDateRange(DEFAULT_DATE_RANGE);
-    addToast("Demo CDR dataset loaded!", "success");
-  }, [extNameMap, addToast]);
+  const loadDemoData = useCallback(async () => {
+    setIsParsing(true);
+    try {
+      applyDataset(await demoRequest(Object.keys(extNameMap)));
+      // A new dataset replaces the old one, so a saved range preset would hide it.
+      setDateRange(DEFAULT_DATE_RANGE);
+      addToast('Demo CDR dataset loaded!', 'success');
+    } catch (err) {
+      setParseError(err.message);
+    } finally {
+      setIsParsing(false);
+    }
+  }, [extNameMap, applyDataset, addToast]);
 
   const handleFileDropOrSelect = useCallback((file) => {
     if (!file) return;
@@ -193,7 +228,10 @@ export function CdrProvider({ children }) {
       complete: function(results) {
         setIsParsing(false);
         if (results.data && results.data.length > 0) {
+          // The File is kept for the confirm step: the server does the storing, and
+          // re-parsing here is only so the preview can show the count first.
           setPendingUpload({
+            file,
             fileName: file.name,
             rows: results.data
           });
@@ -208,14 +246,39 @@ export function CdrProvider({ children }) {
     });
   }, []);
 
-  const confirmPendingUpload = useCallback(() => {
-    if (pendingUpload && pendingUpload.rows.length > 0) {
-      setRawRecords(pendingUpload.rows);
+  const confirmPendingUpload = useCallback(async () => {
+    if (!pendingUpload?.file) return;
+    const form = new FormData();
+    form.append('file', pendingUpload.file);
+    setIsParsing(true);
+    try {
+      applyDataset(await api('/api/calls', { method: 'POST', body: form }));
       setDateRange(DEFAULT_DATE_RANGE);
-      addToast(`Generated Rundown Report for ${pendingUpload.rows.length} CDR records!`, "success");
+      addToast(`Generated Rundown Report for ${pendingUpload.rows.length} CDR records!`, 'success');
       setPendingUpload(null);
+    } catch (err) {
+      setParseError(err.message);
+    } finally {
+      setIsParsing(false);
     }
-  }, [pendingUpload, addToast]);
+  }, [pendingUpload, applyDataset, addToast]);
+
+  const restoreUpload = useCallback(async (id) => {
+    setIsParsing(true);
+    try {
+      applyDataset(await api('/api/calls/restore', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id })
+      }));
+      setDateRange(DEFAULT_DATE_RANGE);
+      addToast('Previous upload restored.', 'success');
+    } catch (err) {
+      setParseError(err.message);
+    } finally {
+      setIsParsing(false);
+    }
+  }, [applyDataset, addToast]);
 
   const cancelPendingUpload = useCallback(() => {
     setPendingUpload(null);
@@ -304,6 +367,9 @@ export function CdrProvider({ children }) {
     rawRecords,
     rawCalls,
     analysis,
+    activeUpload,
+    uploadHistory,
+    restoreUpload,
     dateRange,
     setDateRange,
     savedViews,

@@ -32,7 +32,11 @@ export default function SettingsView() {
     deleteSavedView,
     rawCalls,
     extNameMap,
-    analysis
+    analysis,
+    activeUpload,
+    uploadHistory,
+    restoreUpload,
+    isParsing
   } = useCdr();
 
   const dates = availableDates(analysis);
@@ -80,6 +84,11 @@ export default function SettingsView() {
         <p className="num text-xs text-k-ink-muted">
           {rawCalls.length} calls across {dates.length} {dates.length === 1 ? 'date' : 'dates'}
           {dates.length > 1 && ` (${dates[0]} to ${dates[dates.length - 1]})`}
+        </p>
+        <p className="num text-xs text-k-ink-muted">
+          {activeUpload
+            ? `${activeUpload.filename} · ${activeUpload.source} · ${new Date(activeUpload.uploadedAt).toLocaleString()}`
+            : 'No upload stored'}
         </p>
         <h2 className="pt-2 text-sm font-bold text-k-ink">Shift rules</h2>
         <dl className="num grid gap-x-6 gap-y-1 text-xs">
@@ -139,6 +148,37 @@ export default function SettingsView() {
           </ul>
         )}
       </section>
+
+      {uploadHistory.length > 0 && (
+        <section className="panel rounded-2xl p-5 lg:col-span-3">
+          <h2 className="border-b border-k-hairline pb-3 text-sm font-bold text-k-ink">Earlier uploads</h2>
+          <p className="mt-3 text-xs text-k-ink-muted">
+            Every browser shares this dataset, so a wrong upload is fixed here rather than by
+            re-dropping the file. The five most recent uploads are kept.
+          </p>
+          <ul className="mt-3 max-h-72 divide-y divide-k-hairline/60 overflow-y-auto rounded-xl border border-k-hairline">
+            {uploadHistory.map(upload => (
+              <li key={upload.id} className="row-hover flex items-center justify-between gap-4 px-4 py-2.5">
+                <span className="min-w-0">
+                  <span className="block truncate text-xs font-semibold text-k-ink">{upload.filename}</span>
+                  <span className="num block text-meta text-k-ink-muted">
+                    {upload.source} · {upload.rowCount} rows · {new Date(upload.uploadedAt).toLocaleString()}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => restoreUpload(upload.id)}
+                  disabled={isParsing}
+                  aria-label={`Restore ${upload.filename}`}
+                  className="hoverable shrink-0 rounded-lg border border-k-hairline-strong px-3 py-1.5 text-xs font-medium text-k-ink disabled:opacity-50"
+                >
+                  Restore
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="panel rounded-2xl p-5 lg:col-span-3">
         <h2 className="border-b border-k-hairline pb-3 text-sm font-bold text-k-ink">Session</h2>

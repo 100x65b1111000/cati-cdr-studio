@@ -1,7 +1,11 @@
-// Layering + overflow sweep for every view. Start the dev server, then:
+// Layering + overflow sweep for every view. The app is behind the team password, so this
+// signs in with APP_PASSWORD from .env.local, and it uploads fixtures, so run it against a
+// scratch database:
+//   DB_PATH=data/test.sqlite npm run dev      # then:
 //   node ui-check.mjs
 // Screenshots land in _ui/. Exit 1 when something is buried, clipped or throwing.
 import { chromium } from 'playwright';
+import Papa from 'papaparse';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { COLOR_MODES, SERIES_ROLES, DEFAULT_MODE, cssVarName, hexToRgbTriplet } from './src/theme/colorSchemes.js';
 import { pickRange } from './src/utils/dateRange.js';
@@ -1779,9 +1783,18 @@ async function checkDayGroups() {
 
   const ctx = await browser.newContext({ viewport: VIEWPORT });
   await signIn(ctx);
-  await ctx.addInitScript((rows) => {
-    localStorage.setItem('cati_cdr_studio_raw_records', JSON.stringify(rows));
-  }, records);
+  // Records are server-side now, so the fixture is uploaded the way a person's export is
+  // rather than seeded into this browser. Point the server at a scratch database first:
+  //   DB_PATH=data/test.sqlite npm run dev
+  // ctx.request carries the sign-in cookie; a bare fetch would not.
+  const uploaded = await ctx.request.post(`${BASE}/api/calls`, {
+    multipart: { file: { name: 'ui-check-days.csv', mimeType: 'text/csv', buffer: Buffer.from(Papa.unparse(records)) } }
+  });
+  if (!uploaded.ok()) {
+    failures.push(`days: uploading the 3-day fixture failed with ${uploaded.status()} — ${await uploaded.text()}`);
+    await ctx.close();
+    return;
+  }
   const p = await ctx.newPage();
   p.on('console', (m) => {
     if (m.type() === 'error') failures.push(`console [days]: ${m.text()}`);

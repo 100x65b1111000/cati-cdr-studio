@@ -12,7 +12,7 @@ const cell = (row, keys, fallback) => {
 };
 
 export default function CdrPreviewModal() {
-  const { pendingUpload, confirmPendingUpload, cancelPendingUpload, shiftConfig } = useCdr();
+  const { pendingUpload, confirmPendingUpload, cancelPendingUpload, shiftConfig, isParsing } = useCdr();
 
   const preview = useMemo(() => {
     if (!pendingUpload || !pendingUpload.rows) return null;
@@ -41,7 +41,8 @@ export default function CdrPreviewModal() {
       <button
         type="button"
         onClick={confirmPendingUpload}
-        className="inline-flex items-center gap-1.5 rounded-lg bg-k-accent px-3.5 py-2 text-xs font-semibold text-k-accent-ink transition-opacity hover:opacity-90 active:translate-y-[1px]"
+        disabled={isParsing}
+        className="inline-flex items-center gap-1.5 rounded-lg bg-k-accent px-3.5 py-2 text-xs font-semibold text-k-accent-ink transition-opacity hover:opacity-90 active:translate-y-[1px] disabled:opacity-50"
       >
         <Play size={14} weight="fill" />
         Generate rundown
