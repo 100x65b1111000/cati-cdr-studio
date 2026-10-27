@@ -1,4 +1,5 @@
 import '../index.css';
+import { COLOR_MODES, cssVarName, hexToRgbTriplet } from '../theme/colorSchemes';
 import '@fontsource/fira-sans/400.css';
 import '@fontsource/fira-sans/500.css';
 import '@fontsource/fira-sans/600.css';
@@ -29,10 +30,27 @@ const THEME_SCRIPT = `(function () {
   document.documentElement.dataset.mode = mode;
 })();`;
 
+// The --k-* tokens normally arrive from CdrContext's layout effect. A server-rendered
+// screen outside the provider — the login page — has no effect to wait for, and
+// Tailwind's inline fallbacks in tailwind.config.js are all dark-mode hexes, so a
+// light-mode login would paint dark ink on a light canvas. Emit both palettes here from
+// the same COLOR_MODES map, keyed on the data-mode the head script sets pre-paint.
+// CdrContext's inline writes still win, and the print block wins over both with
+// !important, so neither the app's theming path or ui-check's live-document
+// assertions change.
+const TOKEN_SHEET = Object.entries(COLOR_MODES)
+  .map(([id, mode]) =>
+    `html[data-mode='${id}']{${Object.entries(mode.colors)
+      .map(([role, hex]) => `${cssVarName(role)}:${hexToRgbTriplet(hex)}`)
+      .join(';')}}`
+  )
+  .join('');
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className="h-full" data-mode="dark" suppressHydrationWarning>
       <head>
+        <style dangerouslySetInnerHTML={{ __html: TOKEN_SHEET }} />
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
       <body className="h-full font-sans antialiased">

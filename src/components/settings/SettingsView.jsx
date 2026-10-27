@@ -139,6 +139,24 @@ export default function SettingsView() {
           </ul>
         )}
       </section>
+
+      <section className="panel rounded-2xl p-5 lg:col-span-3">
+        <h2 className="border-b border-k-hairline pb-3 text-sm font-bold text-k-ink">Session</h2>
+        <p className="mt-3 text-xs text-k-ink-muted">
+          The team password signs every browser in on a 12-hour session. Sign out here if this
+          machine is shared.
+        </p>
+        {/* A plain form post, not a fetch: the redirect is the server's, so there is no
+            client-side routing to keep in step with a cookie that no longer exists. */}
+        <form method="post" action="/api/auth/logout" className="mt-3">
+          <button
+            type="submit"
+            className="rounded-lg border border-k-hairline-strong px-4 py-2 text-xs font-medium text-k-ink-muted transition-colors hover:bg-k-danger/10 hover:text-k-critical active:translate-y-[1px]"
+          >
+            Sign out
+          </button>
+        </form>
+      </section>
     </div>
   );
 }
