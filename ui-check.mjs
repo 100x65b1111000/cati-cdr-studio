@@ -5,11 +5,45 @@ import { chromium } from 'playwright';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { COLOR_MODES, SERIES_ROLES, DEFAULT_MODE, cssVarName, hexToRgbTriplet } from './src/theme/colorSchemes.js';
 import { pickRange } from './src/utils/dateRange.js';
+import { SESSION_COOKIE } from './src/lib/auth.js';
 
 const BASE = process.env.UI_URL || 'http://localhost:3000';
 const OUT = '_ui';
 const VIEWPORT = { width: 1440, height: 950 };
 mkdirSync(OUT, { recursive: true });
+
+// Everything below runs against the gated app, so the harness signs in through the same
+// endpoint a person uses and hands each browser context the cookie that comes back. Mints
+// once and reuses it: the second context is the multi-day scenario at checkDays.
+let session;
+async function signIn(context) {
+  if (!session) {
+    try {
+      process.loadEnvFile('.env.local');
+    } catch {
+      // No local env file; rely on APP_PASSWORD from the shell.
+    }
+    if (!process.env.APP_PASSWORD) {
+      throw new Error('ui-check: APP_PASSWORD is not set, so nothing can get past the sign-in gate.');
+    }
+    const res = await fetch(`${BASE}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ password: process.env.APP_PASSWORD }),
+      redirect: 'manual'
+    });
+    const value = res.headers
+      .getSetCookie()
+      .map((c) => c.split(';')[0])
+      .find((c) => c.startsWith(`${SESSION_COOKIE}=`))
+      ?.split('=').slice(1).join('=');
+    if (!value) {
+      throw new Error(`ui-check: sign-in at ${BASE} was rejected — APP_PASSWORD must match the server's .env.local.`);
+    }
+    session = { name: SESSION_COOKIE, value, url: BASE };
+  }
+  await context.addCookies([session]);
+}
 
 const VIEWS = [
   ['1', 'rundown'],
@@ -51,6 +85,7 @@ const browser = await chromium.launch();
 // default happens to match and every measurement below silently changes meaning.
 // The mode loop inside checkChrome paints the other palette on the same page.
 const page = await browser.newPage({ viewport: VIEWPORT, colorScheme: DEFAULT_MODE });
+await signIn(page.context());
 
 // Tailwind v4 mixes an alpha variant of a colour into oklab while the solid token
 // computes to plain rgb, so the computed strings are not comparable. Paint each value
@@ -1743,6 +1778,7 @@ async function checkDayGroups() {
   });
 
   const ctx = await browser.newContext({ viewport: VIEWPORT });
+  await signIn(ctx);
   await ctx.addInitScript((rows) => {
     localStorage.setItem('cati_cdr_studio_raw_records', JSON.stringify(rows));
   }, records);

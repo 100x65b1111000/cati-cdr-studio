@@ -1,4 +1,4 @@
-// Shared by src/middleware.js (Edge runtime) and the route handlers (Node runtime), so
+// Shared by src/proxy.js (Edge runtime) and the route handlers (Node runtime), so
 // it sticks to globals both have: crypto.subtle, btoa/atob. No node:crypto, no Buffer.
 
 export const SESSION_COOKIE = 'cati_cdr_session';
