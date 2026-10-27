@@ -360,6 +360,7 @@ await checkToolbarFits();
 await checkControlHeights();
 await checkPrintTone();
 await checkPrint();
+await checkExports();
 await checkCalendar();
 await checkRawCdrFilter();
 await checkInk();
@@ -1612,6 +1613,30 @@ async function checkPrint() {
     }
   }
   if (restored !== DEFAULT_MODE) failures.push(`print: after the dialog closed the mode stayed "${restored}" instead of returning to ${DEFAULT_MODE}`);
+}
+
+// The export menu is the one feature that hands data to something outside the browser, so
+// a silent throw reads as "the file never arrived". Assert each item actually downloads,
+// with the extension its label promises.
+async function checkExports() {
+  await page.keyboard.press('1');
+  await page.waitForTimeout(400);
+  await page.getByRole('button', { name: /Export/ }).click();
+  for (const [label, ext] of [
+    ['Excel, visible columns', '.xlsx'],
+    ['CSV, every agent-day', '.csv'],
+    ['JSON, full calculation', '.json']
+  ]) {
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: label }).click()
+    ]);
+    const name = download.suggestedFilename();
+    console.log(`export       ${ext.padEnd(5)} ${name}`);
+    if (!name.endsWith(ext)) failures.push(`export: "${label}" downloaded "${name}", not a ${ext} file`);
+  }
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
 }
 
 // The range used to be two native <input type="date">: system chrome the two modes
