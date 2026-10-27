@@ -3,10 +3,12 @@
 import App from './App';
 import { CdrProvider } from './context/CdrContext';
 
-export default function Studio() {
+// The route's view element arrives as children and renders inside the provider, so the
+// sidebar, the header and the view all read one CdrContext.
+export default function Studio({ children }) {
   return (
     <CdrProvider>
-      <App />
+      <App>{children}</App>
     </CdrProvider>
   );
 }

@@ -22,7 +22,7 @@ function focusSearch() {
   return true;
 }
 
-export default function App() {
+export default function App({ children }) {
   const { activeTab, setActiveTab, parseError, clearParseError, analysis, dateRange } = useCdr();
 
   const wantsSearchRef = useRef(false);
@@ -56,7 +56,6 @@ export default function App() {
   }, [activeTab]);
 
   const view = NAV.find((n) => n.id === activeTab) || NAV[0];
-  const View = view.component;
 
   return (
     <div className="relative flex min-h-[100dvh] flex-col bg-k-page text-k-ink antialiased selection:bg-k-accent selection:text-k-accent-ink">
@@ -112,10 +111,10 @@ export default function App() {
 
           {parseError && <ErrorBanner message={parseError} onDismiss={clearParseError} />}
 
-          {View && (
+          {children && (
             <ViewErrorBoundary resetKey={activeTab}>
               <Suspense fallback={<div className="py-16 text-center text-xs text-k-ink-muted">Loading view</div>}>
-                <View />
+                {children}
               </Suspense>
             </ViewErrorBoundary>
           )}

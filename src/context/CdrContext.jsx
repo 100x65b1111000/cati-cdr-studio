@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
 import Papa from 'papaparse';
+import { usePathname, useRouter } from 'next/navigation';
 import { DEFAULT_EXT_MAP, DEFAULT_SHIFT_CONFIG } from '../constants/defaultData';
 import { DEFAULT_DATE_RANGE } from '../utils/dateRange';
 import { loadFromStorage, saveToStorage, removeFromStorage } from '../utils/storage';
@@ -68,7 +69,10 @@ export function CdrProvider({ children }) {
   const [rawRecords, setRawRecords] = useState([]);
   const [activeUpload, setActiveUpload] = useState(null);
   const [uploadHistory, setUploadHistory] = useState([]);
-  const [activeTab, setActiveTab] = useState('rundown');
+  // The URL is the view, so a back button, a shared link and a hotkey all do one thing.
+  const router = useRouter();
+  const activeTab = usePathname().split('/')[1] || 'rundown';
+  const setActiveTab = useCallback((id) => router.push(`/${id}`), [router]);
   const [toasts, setToasts] = useState([]);
   const [isParsing, setIsParsing] = useState(false);
   const [parseError, setParseError] = useState('');
