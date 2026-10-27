@@ -10,10 +10,13 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+.next
 *.local
 .cache
 .eslintcache
-vite.config.js.timestamp-*
+
+# SQLite database. Real CDR data, machine-local, never commit it.
+/data/
 
 # Editor directories and files
 .vscode/*

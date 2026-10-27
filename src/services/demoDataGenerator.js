@@ -1,11 +1,12 @@
 import { DEMO_REGIONS } from '../constants/defaultData';
 
 // A fixed calendar date goes stale: the Today and 7d presets land on an empty
-// table. Day 0 is the day the sample is generated.
-const TODAY = new Date();
-const dayDate = (offset) => new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() + offset);
-
+// table. Day 0 is the day the sample is generated — read per call, not at module
+// scope, or a long-lived server would bake the date in at boot.
 export function generateDemoCDRData(extNameMap) {
+  const TODAY = new Date();
+  const dayDate = (offset) => new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() + offset);
+
   const demoCalls = [];
   const exts = Object.keys(extNameMap);
   const regions = DEMO_REGIONS;

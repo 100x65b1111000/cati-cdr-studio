@@ -3,8 +3,7 @@ import { COLOR_MODES, cssVarName, hexToRgbTriplet, DEFAULT_MODE } from './src/th
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
+    "./src/**/*.{js,jsx}",
   ],
   theme: {
     extend: {
