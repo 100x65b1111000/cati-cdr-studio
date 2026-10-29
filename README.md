@@ -24,17 +24,17 @@ and never committed.
 
 ## What it does
 
-Drop a CDR export (CSV) onto the window, or press **Sample data** for a synthetic team. Records are parsed and stored on the server; the view recalculates in the browser. Calls group into logical shift days, so a shift running 20:00 to 05:00 keeps overnight calls in one row instead of splitting them across two calendar dates.
+Drop a CDR export (CSV) onto the window, or use **Upload CDR CSV** at the foot of the sidebar, where **Export** sits beside it. An empty database seeds itself with a synthetic team on first load, so the views are never blank. Records are parsed and stored on the server; the view recalculates in the browser. Calls group into logical shift days, so a shift running 20:00 to 05:00 keeps overnight calls in one row instead of splitting them across two calendar dates.
 
 Five views, each with its own URL, switched from the sidebar, the narrow-screen header or the keys `1` to `5`:
 
 | View | URL | Contents |
 |---|---|---|
-| Rundown | `/rundown` | One row per agent per shift day: calls, answer rate, calls/hour, talk, breaks, net active, half dones, surveys. Sort, filter, edit, export, print. |
+| Rundown | `/rundown` | One row per agent per shift day: calls, answer rate, calls/hour, talk, breaks, net active, half dones, surveys. Sort, filter, edit, print. |
 | Raw CDR | `/rawCdr` | Every parsed call record, filterable by response, sortable, paginated. |
 | Analytics | `/analytics` | Four charts: volume and answer rate by agent, regional distribution, talk versus break minutes, hourly intensity. |
 | Agents | `/directory` | Extension to name mapping, edited in place. Unmapped extensions show as their number. |
-| Settings | `/settings` | Colour mode, shift rules, the dataset in use, earlier uploads, saved views, sign out. |
+| Settings | `/settings` | Shift rules, the dataset in use, earlier uploads, saved views, sign out. |
 
 A link to any of those opens the same data on a colleague's machine. `Ctrl`+`K` (or `Cmd`+`K`) focuses the current view's search box.
 
@@ -48,7 +48,7 @@ The **Views** popover in the rundown toolbar stores the current date range, sear
 
 ### Columns and export
 
-The Columns menu decides what the table shows and what Excel writes, in that order. The Connected/missed toggle changes both the cell and the export. CSV writes every agent-day regardless of column visibility, and JSON writes the full calculation including the per-break log.
+The Columns menu decides what the table shows, and Print follows it. **Export** sits in the sidebar rather than the toolbar because it writes the dataset, not the view: every agent-day inside the header's date range, in Excel, CSV or JSON. Excel uses the default column set and total calls, CSV writes the summary fields, JSON writes the full calculation including the per-break log.
 
 ## What is shared and what is not
 
@@ -65,7 +65,7 @@ Uploads replace the dataset transactionally and the five most recent uploads are
 
 ## Theme
 
-Two modes (Dark, Light) live in `src/theme/colorSchemes.js` as semantic roles, not raw colours:
+Two modes (Dark, Light), switched from the icon pair at the right of the header, live in `src/theme/colorSchemes.js` as semantic roles, not raw colours:
 
 ```
 page, sunken, surface, surface-hover

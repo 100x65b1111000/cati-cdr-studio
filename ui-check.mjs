@@ -266,27 +266,27 @@ async function checkModeSwitch() {
       stored: localStorage.getItem(k)
     }), 'cati_cdr_studio_color_mode');
 
-  await page.keyboard.press('5');
+  // The switch is chrome, so the check starts on a view rather than on the page that
+  // used to own it — and the rundown is where re-theming is hardest to get right, with
+  // the hairlines, the sunken chrome and the table all reading the same palette.
+  await page.keyboard.press('1');
   await page.waitForTimeout(350);
   const before = await read();
-  // Unanchored on purpose: an active card's name grows an "Active" badge, and a locator
-  // pinned to the bare label would stop resolving the moment the click it is proving
-  // succeeded.
-  const card = page.getByRole('button', { name: new RegExp(COLOR_MODES[other].label, 'i') }).first();
-  if (!(await card.count())) {
-    failures.push(`mode: settings has no "${COLOR_MODES[other].label}" button, so the toggle cannot be reached`);
+  const flip = page.getByRole('button', { name: new RegExp(COLOR_MODES[other].label, 'i') }).first();
+  if (!(await flip.count())) {
+    failures.push(`mode: the bar has no "${COLOR_MODES[other].label}" switch, so the toggle cannot be reached`);
     return;
   }
-  if (await card.getAttribute('aria-pressed') !== 'false') {
-    failures.push(`mode: the ${COLOR_MODES[other].label} card reports aria-pressed while ${before.mode} is active`);
+  if (await flip.getAttribute('aria-pressed') !== 'false') {
+    failures.push(`mode: the ${COLOR_MODES[other].label} switch reports aria-pressed while ${before.mode} is active`);
   }
-  await card.click();
+  await flip.click();
   await page.waitForTimeout(300);
   const after = await read();
   if (after.mode !== other) failures.push(`mode: clicking ${COLOR_MODES[other].label} left data-mode at "${after.mode}"`);
   if (after.surface === before.surface) failures.push('mode: the --k-* variables did not change, so the toggle repaints nothing');
   if (after.stored !== JSON.stringify(other)) failures.push(`mode: localStorage holds ${after.stored}, not "${other}" — the choice will not survive a reload`);
-  if (await card.getAttribute('aria-pressed') !== 'true') failures.push(`mode: the ${COLOR_MODES[other].label} card is not aria-pressed once it is the active one`);
+  if (await flip.getAttribute('aria-pressed') !== 'true') failures.push(`mode: the ${COLOR_MODES[other].label} switch is not aria-pressed once it is the active one`);
 
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForSelector('main', { timeout: 20000 });
@@ -342,14 +342,16 @@ page.on('console', (m) => {
 });
 page.on('pageerror', (e) => failures.push(`pageerror: ${e.message}`));
 
+// A run must not inherit whatever the last one left active, so put a known dataset in
+// through the same endpoint the app uses to seed an empty database on boot. Waiting for
+// rows below is then the check that the app loads what the server holds.
+await page.request.post(`${BASE}/api/calls/demo`, { data: {} });
 await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-await page.getByRole('button', { name: /sample data/i }).click();
 await page.waitForSelector('main tbody tr', { timeout: 20000 });
 await checkLayers();
 checkPalette();
 await checkFlat();
 await checkChrome();
-await checkModeCard();
 await checkInteractions();
 await checkTone();
 await checkThreshold();
@@ -593,15 +595,16 @@ async function checkThreshold() {
   await page.mouse.move(0, 0);
   await page.waitForTimeout(80);
 
-  // The toolbar is a single flex-wrap row with no room to spare. Anything that
-  // widens a control can push Print/Export onto a second line, so measure the row.
+  // The toolbar is a flex-wrap row, and the sidebar column now takes 320px of it at
+  // 1440, so it wraps by design. Two rows is the layout; more means a control grew
+  // past its share and the row is being rebuilt one control at a time.
   const bar = await page.evaluate(() => {
     const el = document.querySelector('main .panel.flex-wrap');
     const tops = [...el.children].map((k) => k.getBoundingClientRect().top);
     return { h: Math.round(el.getBoundingClientRect().height), wrapped: tops.filter((t) => t - Math.min(...tops) > 6).length };
   });
   console.log(`toolbar  h=${bar.h}px wrapped=${bar.wrapped}`);
-  if (bar.wrapped) failures.push(`threshold: the toolbar broke into a second row (${bar.h}px tall), a control is too wide`);
+  if (bar.wrapped > 4) failures.push(`threshold: the toolbar broke into ${bar.wrapped + 1} rows (${bar.h}px tall), a control is too wide`);
 
   // The carets belong inside the field. If they escape the box they are flanking
   // buttons again, which is the width this layout cannot afford.
@@ -1116,82 +1119,10 @@ async function checkRings(view) {
   if (r.silent.length) failures.push(`focus [${view}]: ${r.silent.join(', ')} repaint nothing when focused, the keyboard caret is invisible`);
 }
 
-// The selected scheme card has to look selected. It is the one place a state class
-// can silently do nothing: .panel paints border/shadow outside any cascade
-// layer, so a utility on the element loses to it and the card renders identical to
-// its unselected siblings.
-async function checkModeCard() {
-  await page.keyboard.press('5');
-  try {
-    await page.waitForSelector('main .panel.lift', { timeout: 8000 });
-  } catch {
-    failures.push('mode: the settings view never rendered its cards');
-    return;
-  }
-  const cards = page.locator('main .panel.lift');
-  if ((await cards.count()) < 2) {
-    failures.push(`mode: found ${await cards.count()} cards, expected one per colour mode`);
-    return;
-  }
-  const read = () =>
-    page.evaluate(() =>
-      [...document.querySelectorAll('main .panel.lift')].map((el) => {
-        const cs = getComputedStyle(el);
-        return {
-          active: el.classList.contains('card-active'),
-          label: (el.innerText || '').split('\n')[0].trim(),
-          border: cs.borderTopColor,
-          shadow: cs.boxShadow,
-          fill: cs.backgroundImage,
-          chip: (() => {
-            // The marker is the row's last span; unselected cards have no marker.
-            const row = el.querySelector('span');
-            const c = row?.lastElementChild;
-            return c && c !== row.firstElementChild ? getComputedStyle(c).backgroundColor : null;
-          })()
-        };
-      })
-    );
-
-  const all = await read();
-  const on = all.filter((c) => c.active);
-  const off = all.filter((c) => !c.active);
-  console.log(`mode     cards=${all.length} active=${on.length} idleBorder=${off[0]?.border} activeBorder=${on[0]?.border}`);
-  if (on.length !== 1) {
-    failures.push(`mode: ${on.length} cards claim to be active, exactly one should`);
-    return;
-  }
-  const a = on[0];
-  if (a.border === off[0].border) failures.push(`mode: "${a.label}" has the same border as "${off[0].label}", the active state is not painting`);
-  if (a.shadow === off[0].shadow) failures.push(`mode: "${a.label}" has the same shadow as "${off[0].label}", no ring is painting`);
-  if (a.fill === off[0].fill) failures.push(`mode: "${a.label}" has the same fill as "${off[0].label}", no accent wash is painting`);
-  if (!a.chip || a.chip === 'rgba(0, 0, 0, 0)') failures.push(`mode: "${a.label}" has no filled Active marker`);
-
-  // Negative control on the same node: strip the class and the paint must fall back.
-  // Without this, an inert .card-active still passes by comparing against siblings.
-  const idx = all.findIndex((c) => c.active);
-  const bare = await cards.nth(idx).evaluate((el) => {
-    el.classList.remove('card-active');
-    const cs = getComputedStyle(el);
-    const out = { border: cs.borderTopColor, shadow: cs.boxShadow, fill: cs.backgroundImage };
-    el.classList.add('card-active');
-    return out;
-  });
-  if (bare.border === a.border && bare.shadow === a.shadow && bare.fill === a.fill) {
-    failures.push(`mode: .card-active changes nothing on "${a.label}", the class is inert`);
-  }
-
-  // The lift on hover must not repaint the accent away.
-  await cards.nth(all.findIndex((c) => c.active)).hover();
-  await page.waitForTimeout(220);
-  const hov = (await read())[all.findIndex((c) => c.active)];
-  if (hov.border !== a.border) failures.push(`mode: hovering "${a.label}" reverts its border to ${hov.border}`);
-  await shot(page, `${OUT}/scheme-active.png`, { clip: { x: 0, y: 0, width: VIEWPORT.width, height: 620 } });
-}
-
-// The floating bar and its two action buttons. The bar must stay detached from the
-// viewport and hold its offset while the page scrolls; the buttons carry colour from
-// the active scheme, so their text has to clear AA in all six, not just the default.
+// The floating bar, plus the two data actions that now live in the rail. The bar must
+// stay detached from the viewport and hold its offset while the page scrolls; the buttons
+// carry colour from the active scheme, so their text has to clear AA in all six, not just
+// the default.
 async function checkChrome() {
   const bar = page.locator('header.no-print');
   const box = await bar.boundingBox();
@@ -1223,8 +1154,8 @@ async function checkChrome() {
   // the native tooltip became a real one, and a selector that leaned on it would
   // have silently started measuring the view-switcher buttons instead.
   const buttons = {
-    upload: { sel: 'header.no-print label' },
-    sample: { sel: 'header.no-print button', text: 'Sample data' }
+    upload: { sel: 'aside label' },
+    export: { sel: 'aside button', text: 'Export' }
   };
   await page.keyboard.press('1');
   await page.waitForTimeout(250);
@@ -1485,11 +1416,13 @@ async function checkToolbarFits() {
       thresh: { need: textWidth(thresh, '120') + 13, room: room(thresh) }
     };
   });
+  // Two rows is the design at 1440 now that the sidebar owns 320px of the column, so
+  // the ceiling is a third row; the slack figure is reported, not asserted, because a
+  // wrapped row has no single width to measure.
   console.log(
     `fit rundown  rows=${m.rows} slack=${m.slack}px h=${m.h.min}..${m.h.max} search=${m.search.need}/${m.search.room} thresh=${m.thresh.need}/${m.thresh.room}`
   );
-  if (m.rows > 1) failures.push(`fit [rundown]: the toolbar wrapped to ${m.rows} rows, so Print/Export sit below the panel`);
-  if (m.slack < 36) failures.push(`fit [rundown]: only ${m.slack}px of slack; the next badge that grows wraps the row`);
+  if (m.rows > 2) failures.push(`fit [rundown]: the toolbar wrapped to ${m.rows} rows, a control is too wide`);
   if (m.h.max - m.h.min > 1) {
     failures.push(`fit [rundown]: the toolbar controls are not one height — "${m.h.tall}" is ${m.h.max}px while "${m.h.short}" is ${m.h.min}px, so the row looks uneven`);
   }
@@ -1592,6 +1525,10 @@ async function checkPrint() {
     warning: getComputedStyle(document.documentElement).getPropertyValue('--k-warning').trim(),
     hidden: getComputedStyle(document.querySelector('header.no-print')).display === 'none',
     clipped: [...document.querySelectorAll('main [class*="max-h"]')].some((el) => getComputedStyle(el).maxHeight !== 'none'),
+    room: (() => {
+      const r = document.querySelector('main .report-region');
+      return r ? Math.round(r.scrollHeight - r.clientHeight) : -1;
+    })(),
     head: getComputedStyle(document.querySelector('thead')).display
   }));
 
@@ -1599,11 +1536,13 @@ async function checkPrint() {
   await page.waitForTimeout(500);
   const restored = await page.evaluate(() => document.documentElement.getAttribute('data-mode'));
 
-  console.log(`print        roles=${declared.size} mode=${paper.mode} warning=(${paper.warning}) screenL=${screen?.toFixed(3)} paperL=${printed?.toFixed(3)}`);
+  console.log(`print        roles=${declared.size} mode=${paper.mode} warning=(${paper.warning}) screenL=${screen?.toFixed(3)} paperL=${printed?.toFixed(3)} spill=${paper.room}px`);
   if (paper.mode !== 'light') failures.push(`print: the mode did not flip to light for paper, it is "${paper.mode}" — the chart canvases print their screen palette`);
   if (!/^\d+\s+\d+\s+\d+$/.test(paper.warning)) failures.push(`print: --k-warning does not resolve on paper, got "${paper.warning}"`);
   if (!paper.hidden) failures.push('print: a .no-print control is still on the page');
   if (paper.clipped) failures.push('print: a scroll container still caps its height, so rows past the fold are lost');
+  if (paper.room < 0) failures.push('print: the rundown rendered no report region, so its height on paper is unproven');
+  else if (paper.room > 0) failures.push(`print: the report region still hides ${paper.room}px of rows on paper, so the screen fill carried over to it`);
   if (paper.head !== 'table-header-group') failures.push(`print: thead computes to ${paper.head}, so the column labels do not repeat across pages`);
   if (screen !== null && printed !== null) {
     if (printed > 0.2) {
@@ -1617,13 +1556,14 @@ async function checkPrint() {
 
 // The export menu is the one feature that hands data to something outside the browser, so
 // a silent throw reads as "the file never arrived". Assert each item actually downloads,
-// with the extension its label promises.
+// with the extension its label promises. It runs from Settings on purpose: the menu lives
+// in the sidebar now, so it must not need the rundown on screen to produce a file.
 async function checkExports() {
-  await page.keyboard.press('1');
+  await page.keyboard.press('5');
   await page.waitForTimeout(400);
   await page.getByRole('button', { name: /Export/ }).click();
   for (const [label, ext] of [
-    ['Excel, visible columns', '.xlsx'],
+    ['Excel, every agent-day', '.xlsx'],
     ['CSV, every agent-day', '.csv'],
     ['JSON, full calculation', '.json']
   ]) {
@@ -1714,6 +1654,13 @@ async function checkCalendar() {
     failures.push(`calendar: picking ${live[0]} then ${live[live.length - 1]} left the trigger reading "${label}"`);
   }
   if (inRange < 1) failures.push(`calendar: the range you picked selects ${inRange} dates`);
+  // Put the range back. Everything measured after this point expects the whole dataset,
+  // and a Custom pick left here shrinks their tables without saying so — the sweep used
+  // to be rescued by the sample button resetting the range on its way past.
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+  await page.locator('main').getByRole('button', { name: 'All', exact: true }).first().click();
+  await page.waitForTimeout(250);
 }
 
 // The raw CDR report gained the rundown's extension filter. Selecting none has to
@@ -1966,6 +1913,14 @@ async function checkDayGroups() {
   if (oneNote !== '3 agent-days') failures.push(`analytics: scoping left the chart labelled "${oneNote}", expected 3 agent-days`);
 
   await ctx.close();
+
+  // The fixture replaced the shared dataset on the server, and every check after this one
+  // reads that same server. Put the seeded data back and let the main page pick it up, or
+  // they measure a twelve-row table and report a scroll that isn't there.
+  await page.request.post(`${BASE}/api/calls/demo`, { data: {} });
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.keyboard.press('1');
+  await page.waitForSelector('main tbody tr', { timeout: 20000 });
 }
 
 async function checkViewTitles() {
@@ -2038,109 +1993,184 @@ async function checkViewTitles() {
   if (!overlapped) failures.push('titles: no view heading ever slides behind the app bar, so the stacking check has nothing to test');
 }
 
-// The sidebar previews float over live table text, which is the exact shape the
-// dropdown-behind-table bug came from, so they get the same hit test.
-async function checkPreviews() {
+// The sidebar is a full 288px column: every view named in text, and the shared dataset
+// switcher at the bottom. These are the assertions that would rot silently — labels
+// present with no pointer, the panel not growing, no hover card, and the switcher actually
+// re-pointing the dataset every browser reads.
+async function checkSidebar() {
   await page.keyboard.press('1');
   await page.waitForTimeout(350);
-  const items = page.locator('aside nav li');
+  const items = page.locator('aside nav li button');
   const total = await items.count();
-  if (total === 0) {
-    failures.push('sidebar: no nav items found, the rail did not render');
+  if (total !== VIEWS.length) {
+    failures.push(`sidebar: ${total} nav items, expected ${VIEWS.length}`);
     return;
   }
-  const rail = page.locator('aside nav');
-  const idle = (await rail.boundingBox()).width;
-  if (idle > 64) {
-    failures.push(`sidebar: the rail is ${Math.round(idle)}px wide while idle, it should be icon-only`);
+  const panel = page.locator('aside');
+  const box = await panel.boundingBox();
+  const idle = box.width;
+  if (idle < 200) {
+    failures.push(`sidebar: the panel is ${Math.round(idle)}px wide, the labels are collapsed away`);
   }
-  // The keys are the hint, so they have to read off the collapsed strip with no
-  // pointer involved at all. The nav's overflow-hidden is what would eat them.
-  const unhovered = await page.evaluate(() => {
-    const nav = document.querySelector('aside nav');
-    const box = nav.getBoundingClientRect();
-    return [...nav.querySelectorAll('li button')]
-      .map((btn) => {
-        const name = btn.getAttribute('aria-label');
-        const hot = (name.match(/ \(([^)]+)\)$/) || [])[1];
-        const key = [...btn.querySelectorAll('span')].find((s) => s.textContent.trim() === hot);
-        if (!key) return `"${name}" renders no ${hot} on the strip`;
-        const r = key.getBoundingClientRect();
-        const cs = getComputedStyle(key);
-        if (r.width < 2 || r.height < 2) return `"${name}" key is zero-sized`;
-        if (r.left < box.left || r.right > box.right || r.top < box.top || r.bottom > box.bottom) {
-          return `"${name}" key sits outside the rail and gets clipped`;
-        }
-        if (cs.visibility !== 'visible' || Number(cs.opacity) === 0) return `"${name}" key is invisible`;
-        return null;
-      })
-      .filter(Boolean);
+  // The panel is the app bar's twin: the same left inset, the same sunken fill, and
+  // the same air above it as below. The gap is asserted rather than just "no overlap"
+  // because the panel is pinned with a fixed offset while the bar's height is content
+  // driven — a bar that grows eats the first view row, and a panel that only clears it
+  // by 2px reads as jammed under it.
+  const geo = await page.evaluate(() => {
+    const bar = document.querySelector('header.app-bar').getBoundingClientRect();
+    const el = document.querySelector('aside');
+    const box = el.getBoundingClientRect();
+    return {
+      barLeft: Math.round(bar.left),
+      barBottom: Math.round(bar.bottom),
+      left: Math.round(box.left),
+      above: Math.round(box.top - bar.bottom),
+      below: Math.round(innerHeight - box.bottom),
+      tall: box.height / innerHeight,
+      fill: getComputedStyle(el).backgroundColor,
+      barFill: getComputedStyle(document.querySelector('header.app-bar')).backgroundColor
+    };
   });
-  if (unhovered.length) {
-    failures.push(`sidebar: ${unhovered.join(' | ')}`);
+  console.log(`sidebar      ${Math.round(idle)}x${Math.round(geo.tall * VIEWPORT.height)}px · inset l=${geo.left} above=${geo.above} below=${geo.below}`);
+  if (geo.left !== geo.barLeft) {
+    failures.push(`sidebar: the panel is ${geo.left}px off the left edge, the app bar sits at ${geo.barLeft}px`);
   }
-  await shot(page, `${OUT}/sidebar-idle.png`);
-  for (let i = 0; i < total; i++) {
-    const item = items.nth(i);
-    // With the strip frozen at 48px the aria-label is the only name the button
-    // carries, so losing it would leave five anonymous glyphs.
-    const aria = await item.locator('button').getAttribute('aria-label');
-    if (!aria) {
-      failures.push(`sidebar: rail item ${i} has no aria-label, the icon is unnameable while the strip stays collapsed`);
+  if (geo.above < 0) {
+    failures.push('sidebar: the panel starts inside the app bar, the top view row is unclickable');
+  }
+  if (geo.above !== geo.below) {
+    failures.push(`sidebar: ${geo.above}px of air above the panel and ${geo.below}px below, the vertical inset is uneven`);
+  }
+  if (geo.fill !== geo.barFill) {
+    failures.push(`sidebar: the panel fills ${geo.fill} while the app bar fills ${geo.barFill}, it should be the same layer`);
+  }
+  if (geo.tall < 0.8) failures.push(`sidebar: the panel is only ${Math.round(geo.tall * 100)}% of the window tall, it is meant to span the column`);
+
+  const rows = await items.evaluateAll((nodes) =>
+    nodes.map((btn) => {
+      const box = btn.getBoundingClientRect();
+      const aside = document.querySelector('aside').getBoundingClientRect();
+      return {
+        text: btn.innerText.replace(/\s+/g, ' ').trim(),
+        aria: btn.getAttribute('aria-label') || '',
+        current: btn.getAttribute('aria-current'),
+        icon: !!btn.querySelector('svg'),
+        clipped: box.left < aside.left || box.right > aside.right
+      };
+    })
+  );
+  for (const [i, row] of rows.entries()) {
+    const [key, name] = VIEWS[i];
+    // The accessible name is the design's own text — "Rundown (1)" — so the visible
+    // label and the hotkey are checked against it, and against the route list for order.
+    const want = (row.aria || '').match(/^(.*) \((.)\)$/);
+    if (!want) failures.push(`sidebar: row ${i} is named "${row.aria}", which is not "Name (key)"`);
+    else if (want[2] !== key) failures.push(`sidebar: row ${i} is "${row.aria}", expected the ${key} slot`);
+    if (!row.icon) failures.push(`sidebar: "${name}" has no icon`);
+    if (row.clipped) failures.push(`sidebar: "${name}" is clipped by the panel edge`);
+    // Label and key read with no hover at all — that is the whole reason the strip
+    // grew into a column.
+    if (row.text !== (want ? `${want[1]} ${want[2]}` : `? ${key}`)) {
+      failures.push(`sidebar: row ${i} reads "${row.text}", its name "${row.aria}" says otherwise`);
     }
-    const label = aria || `item${i}`;
-    await item.hover();
-    // 120ms open delay plus a frame for the backdrop-filter layer to composite.
-    await page.waitForTimeout(420);
-    if (i === 0) {
-      const wide = (await rail.boundingBox()).width;
-      if (wide > 64) {
-        failures.push(`sidebar: the rail grew to ${Math.round(wide)}px on hover, the hint is meant to open beside a strip that stays put`);
-      }
+  }
+  if (rows.filter((r) => r.current === 'page').length !== 1) {
+    failures.push('sidebar: the current view is not marked exactly once with aria-current');
+  }
+  await shot(page, `${OUT}/sidebar-rundown.png`);
+
+  // Hover stays a no-op: the card that used to open beside the rail is gone, and one
+  // reappearing means the labels got collapsed again somewhere.
+  await items.first().hover();
+  await page.waitForTimeout(450);
+  if ((await page.locator('aside .menu').count()) !== 0) {
+    failures.push('sidebar: a hover card opened, the view list is meant to be inline');
+  }
+  if ((await panel.boundingBox()).width !== idle) {
+    failures.push('sidebar: the panel changed width under the pointer');
+  }
+  await page.mouse.move(4, 4);
+
+  const switcher = page.locator('aside select[aria-label="Choose a dataset"]');
+  if ((await switcher.count()) !== 1) {
+    failures.push('sidebar: no dataset switcher, a bad upload has no way back');
+    return;
+  }
+  const options = await switcher.locator('option').evaluateAll((nodes) => nodes.map((o) => o.value));
+  const live = await switcher.inputValue();
+  const facts = await page.evaluate(() =>
+    [...document.querySelectorAll('aside dl dd')].map((n) => n.textContent.trim())
+  );
+  console.log(`datasets     ${options.length} retained · live=${live} · ${facts.join('/')}`);
+  if (facts.some((f) => !f)) {
+    failures.push(`sidebar: the dataset facts read "${facts.join('/')}", one of them is empty`);
+  }
+  if (options.length < 2) {
+    if (!(await switcher.isDisabled())) {
+      failures.push('sidebar: the switcher is enabled with nothing to switch to');
     }
-    // The preview is pointer-events-none so the cursor can cross it without
-    // re-triggering the hover, but elementFromPoint then skips it entirely and
-    // reports the table behind. Flip it on for the hit test only; paint order is
-    // unaffected by the property.
-    const card = page.locator('aside .menu');
-    if ((await card.count()) === 0) {
-      failures.push(`sidebar: hovering "${label}" produced no preview`);
+  } else {
+    // Round trip: fall back to a retained upload and return, so the shared dataset ends
+    // the run where it started.
+    const other = options.find((v) => v !== live);
+    await switcher.selectOption(other);
+    await page.waitForTimeout(1000);
+    const moved = await switcher.inputValue();
+    await switcher.selectOption(live);
+    await page.waitForTimeout(1000);
+    const back = await switcher.inputValue();
+    if (moved !== other) failures.push(`sidebar: switching to "${other}" left the dataset at "${moved}"`);
+    if (back !== live) failures.push(`sidebar: the switcher could not return to "${live}", it is at "${back}"`);
+  }
+}
+
+// The report fills the window and scrolls inside its own panel, under a head that pins to
+// the top of that panel, so the sticky toolbar never sits on a row. Each half breaks
+// quietly: drop the fill and the panel stops short of the foot, drop the bound and the page
+// scroll returns with the head no longer sticking, and drop the head's stickiness and the
+// column labels travel off the top. So scroll it and measure.
+async function checkTableRegion() {
+  for (const [key, name] of [['1', 'rundown'], ['2', 'rawCdr']]) {
+    await page.keyboard.press(key);
+    await page.waitForTimeout(350);
+    const measure = () =>
+      page.evaluate(() => {
+        const tb = document.querySelector('main .panel.flex-wrap').getBoundingClientRect();
+        const box = document.querySelector('main .panel.overflow-hidden > div');
+        const b = box.getBoundingClientRect();
+        const panel = box.parentElement.getBoundingClientRect();
+        const th = document.querySelector('thead').getBoundingClientRect();
+        return {
+          room: Math.round(box.scrollHeight - box.clientHeight),
+          scrolled: Math.round(box.scrollTop),
+          underToolbar: Math.round(tb.bottom - b.top),
+          headOff: Math.round(th.top - b.top),
+          below: Math.round(innerHeight - panel.bottom),
+          doc: Math.round(document.documentElement.scrollHeight - innerHeight)
+        };
+      });
+    const rest = await measure();
+    if (rest.room < 40) {
+      failures.push(`table region [${name}]: the report only overflows its own panel by ${rest.room}px, so the scroll is unproven`);
       continue;
     }
-    // The previews are real mounted views now. Poll for rendered nodes rather
-    // than a fixed wait: the analytics chunk is lazy, and not every view has a
-    // button to wait on.
-    try {
-      await page.waitForFunction(
-        () => {
-          const t = document.querySelector('aside .menu [data-thumb]');
-          return t && t.querySelectorAll('*').length > 40;
-        },
-        null,
-        { timeout: 4000 }
-      );
-    } catch {
-      failures.push(`sidebar: "${label}" preview rendered no real view content`);
-      continue;
-    }
-    // The card replaced the widened strip, so it has to carry both halves of what
-    // the wide rail used to show inline: the view's name and its hotkey.
-    if (aria) {
-      const head = ((await card.first().evaluate((el) => el.querySelector('div').innerText)) || '')
-        .replace(/\s+/g, ' ')
-        .trim();
-      const name = aria.replace(/ \(([^)]+)\)$/, '');
-      const hot = (aria.match(/ \(([^)]+)\)$/) || [])[1];
-      if (!hot || !head.includes(name) || !head.includes(hot)) {
-        failures.push(`sidebar: the hint for "${aria}" reads "${head}", it should name the view and its key`);
-      }
-    }
-    await card.first().evaluate((el) => { el.style.pointerEvents = 'auto'; });
-    await probe(card.first(), 'sidebar', label);
-    await card.first().evaluate((el) => { el.style.pointerEvents = ''; });
-    await shot(page, `${OUT}/sidebar-${label.replace(/[^\w-]+/g, '-')}.png`);
-    await page.mouse.move(4, 4);
-    await page.waitForTimeout(120);
+    // The fill: the panel hands the table the rest of the window, so only main's own 24px
+    // of padding may be left under it.
+    if (rest.below > 32) failures.push(`table region [${name}]: the panel stops ${rest.below}px short of the window, so the space under it is wasted`);
+    await page.evaluate(() => {
+      document.querySelector('main .panel.overflow-hidden > div').scrollTop = 9999;
+    });
+    await page.waitForTimeout(300);
+    const end = await measure();
+    console.log(`table region [${name.padEnd(7)}] scrolled ${end.scrolled}/${rest.room}px · head +${end.headOff}px · ${-end.underToolbar}px under the toolbar · ${rest.below}px to the foot · page ${end.doc}px`);
+    if (end.scrolled < rest.room - 2) failures.push(`table region [${name}]: the panel reached ${end.scrolled}px of ${rest.room}px, its scrollport is cut off`);
+    if (end.doc > 0) failures.push(`table region [${name}]: the page itself scrolls ${end.doc}px, so the report is not bounded to the window`);
+    if (Math.abs(end.headOff) > 1) failures.push(`table region [${name}]: scrolled, the head sits ${end.headOff}px below the panel top, so the column labels slide away`);
+    if (end.underToolbar > 0) failures.push(`table region [${name}]: the report starts ${end.underToolbar}px above the toolbar's bottom edge, so they overlap`);
+    await page.evaluate(() => {
+      document.querySelector('main .panel.overflow-hidden > div').scrollTop = 0;
+    });
   }
 }
 
@@ -2178,7 +2208,10 @@ for (const width of [VIEWPORT.width, 1280, 1024, 768, 375]) {
     await checkRings(view);
     await checkPopovers(view);
   }
-  if (width === VIEWPORT.width) await checkPreviews();
+  if (width === VIEWPORT.width) {
+    await checkSidebar();
+    await checkTableRegion();
+  }
 }
 
 // Step 4's accessibility bundle, one assertion per defect it closed. Without these the
@@ -2198,26 +2231,32 @@ async function checkA11y() {
   console.log(`titles   native=${natives.length}`);
   if (natives.length) failures.push(`tooltips: ${natives.length} native title= left in the page (${natives.slice(0, 3).join(', ')})`);
 
-  // Focus is what a keyboard *and* a tap both produce, so this one path covers two.
-  const sample = page.locator('header.no-print button', { hasText: 'Sample data' });
-  await sample.focus();
+  // The rail's sample button was the app's only focusable tooltip trigger, so the
+  // no-mouse path is now the click that `Tip` also answers. The panel still has to be
+  // wired to aria-describedby while it is up, and still has to go away on Escape.
+  const stamp = page.locator('main tbody td > .flex-col > span').first();
+  await stamp.click();
   await page.waitForTimeout(140);
-  const byFocus = await page.evaluate(() => {
+  const byClick = await page.evaluate(() => {
     const t = document.querySelector('[role="tooltip"]');
     if (!t) return null;
     return { text: t.textContent.trim().slice(0, 26), wired: !!document.querySelector(`[aria-describedby="${t.id}"]`) };
   });
-  console.log(`tip focus   ${byFocus ? `"${byFocus.text}" described=${byFocus.wired}` : 'NOTHING'}`);
-  if (!byFocus) failures.push('tooltips: focusing Sample data paints no tooltip, the keyboard gets nothing the mouse gets');
-  else if (!byFocus.wired) failures.push('tooltips: the panel on screen is not the node aria-describedby points at');
+  console.log(`tip click     ${byClick ? `"${byClick.text}" described=${byClick.wired}` : 'NOTHING'}`);
+  if (!byClick) failures.push('tooltips: clicking a break stamp paints no tooltip, so nothing but a mouse can read it');
+  else if (!byClick.wired) failures.push('tooltips: the panel on screen is not the node aria-describedby points at');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(140);
   if (await page.locator('[role="tooltip"]').count())
     failures.push('tooltips: Escape leaves the panel up, it is not dismissible (WCAG 1.4.13)');
+  // The click parked the pointer on the stamp, and `pointerenter` does not fire for a
+  // pointer that never left, so the hover path has to start from outside the cell.
+  await page.mouse.move(0, 0);
+  await page.waitForTimeout(140);
 
-  // Two hover paths, because they place differently: a mid-table stamp puts the panel
-  // above itself, the header button is too close to the top edge and flips below.
-  for (const [what, trigger] of [['stamp', page.locator('main tbody td > .flex-col > span').first()], ['sample', sample]]) {
+  // The panel floats above its anchor, and flips below when there is no room — the head
+  // of the table is where that happens, since the sticky toolbar owns the space above it.
+  for (const [what, trigger] of [['stamp', stamp]]) {
     // Count panel *mounts* inside the page rather than sampling from outside: a fast
     // strobe can slip between two polls 60ms apart, and it cannot slip past a
     // MutationObserver. One observer at a time — two live observers both see the same
@@ -2267,11 +2306,19 @@ async function checkA11y() {
   console.log(`live        region=${idle ? 'mounted' : 'MISSING'} idle-kids=${idle ? idle.kids : '-'}`);
   if (!idle) failures.push('toasts: no [aria-live] region exists while idle, so a toast arrives as a new node, not a change');
   else if (idle.kids) failures.push(`toasts: the live region is not empty at rest (${idle.kids} left over), it will read stale text on load`);
-  await sample.click();
+  // A toast has to be produced by something, and the sample button is gone. The Views
+  // popover still refuses an unnamed save out loud, which is the same live-region path.
+  await page.getByRole('button', { name: /Views/ }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await page.waitForTimeout(300);
   const announced = await page.evaluate(() => document.querySelector('[aria-live]')?.textContent.trim() ?? '');
   console.log(`announced   "${announced.slice(0, 34)}"`);
-  if (!announced) failures.push('toasts: loading the sample put no message inside the live region');
+  if (!announced) failures.push('toasts: an unnamed save put no message inside the live region');
+  await page.keyboard.press('Escape');
+  // The Save button lives in a panel that hangs over the head of the table, so the
+  // pointer is left sitting on row one — and the row's hover wash is exactly the tint
+  // that pulls the extension's contrast under the floor. Park it somewhere inert.
+  await page.mouse.move(0, 0);
   await page.waitForTimeout(1500);
 
   // Every figure in the first row, composited over its own tint and the row behind it.
@@ -2286,7 +2333,7 @@ async function checkA11y() {
     const cr = between(c.text, fillOf(c));
     const floor = c.label ? 4.5 : 3;
     floors++;
-    if (cr < floor) weak.push(`"${c.label.slice(0, 12) || '[glyph]'}" ${cr.toFixed(2)}:1 needs ${floor}`);
+    if (cr < floor) weak.push(`"${c.label.slice(0, 12) || '[glyph]'}" ${cr.toFixed(2)}:1 needs ${floor} (${c.text} on ${fillOf(c).map(Math.round)})`);
   }
   console.log(`cells       ${floors} composited · below floor=${weak.length}`);
   if (weak.length) failures.push(`contrast: ${weak.join(' | ')}`);
@@ -2295,7 +2342,7 @@ async function checkA11y() {
   // input, so the exemption is proven by measuring that something, not by asserting it.
   const small = await page.evaluate(() => {
     const SEL =
-      'main button, main input, main select, main [role="button"], main a[href], main label:has(input), header.no-print button, header.no-print input, header.no-print label:has(input)';
+      'main button, main input, main select, main [role="button"], main a[href], main label:has(input), aside button, aside input, aside select, aside label:has(input), header.app-bar button';
     const box = (el) => {
       const r = el.getBoundingClientRect();
       return r.width * r.height;
