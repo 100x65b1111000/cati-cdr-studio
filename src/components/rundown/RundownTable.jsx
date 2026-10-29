@@ -31,7 +31,7 @@ function mergeVisibleColumns(saved) {
 
 const agentCount = (n) => `${n} ${n === 1 ? 'agent' : 'agents'}`;
 
-export default function RundownTable({ preview = false }) {
+export default function RundownTable() {
   const {
     analysis,
     dateRange,
@@ -169,14 +169,10 @@ export default function RundownTable({ preview = false }) {
     [dateRange, searchQuery, selectedExtensions, scope, visibleColumns, connView, sortField, sortAsc, pageSize]
   );
 
-  // The sidebar preview mounts a second copy of this view. Only the real one
-  // gets to own the saved state, or the preview's fresh selection would overwrite
-  // the agent subset the user restored.
   useEffect(() => {
-    if (preview) return;
     const id = setTimeout(() => saveToStorage('view_state', filters), 400);
     return () => clearTimeout(id);
-  }, [filters, preview]);
+  }, [filters]);
 
   const applyFilters = (saved) => {
     if (!saved) return;
@@ -216,7 +212,7 @@ export default function RundownTable({ preview = false }) {
   const noData = Object.keys(analysis).length === 0;
 
   return (
-    <div className="space-y-4">
+    <div className="flex min-h-0 flex-1 flex-col space-y-4">
       <RundownToolbar
         searchQuery={searchQuery}
         setSearchQuery={(q) => {
@@ -235,7 +231,6 @@ export default function RundownTable({ preview = false }) {
         setConnView={setConnView}
         filters={filters}
         onApplyFilters={applyFilters}
-        rows={rows}
       />
 
       <DayScopeSelect
@@ -244,8 +239,8 @@ export default function RundownTable({ preview = false }) {
         onChange={pickDay}
       />
 
-      <div className="panel overflow-hidden rounded-xl">
-        <div aria-busy={isParsing || undefined} className="overflow-x-auto">
+      <div className="panel report-panel overflow-hidden rounded-xl">
+        <div aria-busy={isParsing || undefined} className="report-region overflow-auto">
           <table className="w-full text-left text-xs text-k-ink-muted">
             <thead className="sticky top-0 z-[25] border-b border-k-hairline thead text-2xs uppercase tracking-wider">
               <tr>
@@ -305,7 +300,7 @@ export default function RundownTable({ preview = false }) {
                       title={noData ? 'No calls loaded' : 'Nothing matches these filters'}
                       body={
                         noData
-                          ? 'Load the sample data or drop a CDR CSV to build the rundown.'
+                          ? 'Upload a CDR CSV from the sidebar to build the rundown.'
                           : 'Widen the date range, clear the search, or select more agents in the toolbar.'
                       }
                     />

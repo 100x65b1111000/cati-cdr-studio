@@ -1,26 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import {
-  BracketsCurly,
-  Columns,
-  FileCsv,
-  FileXls,
-  FloppyDisk,
-  Printer,
-  Timer,
-  Trash
-} from '@phosphor-icons/react';
+import { Columns, FloppyDisk, Printer, Timer, Trash } from '@phosphor-icons/react';
 import { useCdr } from '../../context/CdrContext';
 import { DEFAULT_SHIFT_CONFIG } from '../../constants/defaultData';
-import { exportRundownToExcel, exportRundownToCSV, exportAnalysisToJSON } from '../../services/exportService';
 import ExtensionFilter, { Checkbox } from '../ui/ExtensionFilter';
 import FilterPopover from '../ui/FilterPopover';
 import SearchInput from '../ui/SearchInput';
 import Segmented from '../ui/Segmented';
 import Stepper from '../ui/Stepper';
 import { COLUMN_BY_ID, FILTERABLE_COLUMN_IDS } from './columns';
-
-const menuItem =
-  'hoverable flex w-full items-center gap-2 rounded-md border border-transparent px-2.5 py-1.5 text-left text-xs text-k-ink';
 
 // The stepper and the typed value share one clamp, so the two paths cannot disagree
 // about what a valid threshold is.
@@ -39,14 +26,12 @@ export default function RundownToolbar({
   connView,
   setConnView,
   filters,
-  onApplyFilters,
-  rows
+  onApplyFilters
 }) {
   const {
     extNameMap,
     shiftConfig,
     updateShiftConfig,
-    analysis,
     addToast,
     savedViews,
     addSavedView,
@@ -93,24 +78,11 @@ export default function RundownToolbar({
     setViewName('');
   };
 
-  const exportExcel = async () => {
-    if (shownColumns === 0) {
-      addToast('Every column is hidden, so there is nothing to export.', 'error');
-      return;
-    }
-    if (rows.length === 0) {
-      addToast('No rows match the current filters.', 'error');
-      return;
-    }
-    try {
-      await exportRundownToExcel(rows, visibleColumns, connView);
-    } catch (err) {
-      addToast(`Excel export failed: ${err.message}`, 'error');
-    }
-  };
-
   return (
-    <div className="no-print panel relative z-30 flex flex-wrap items-center gap-2 rounded-xl px-3 py-2.5">
+    // Sticky, parked 8px under the app bar, so the filters and Print stay with
+    // a reader working down a long shift. z-30 keeps it under the z-40 chrome and above
+    // the z-[25] table head, whose rows slide behind it.
+    <div className="no-print panel sticky under-bar z-30 flex flex-wrap items-center gap-2 rounded-xl px-3 py-2.5">
       <SearchInput
         value={searchQuery}
         onChange={setSearchQuery}
@@ -152,7 +124,7 @@ export default function RundownToolbar({
 
       {/* The stepper lives inside the field, stacked on the right the way a native
           number input does it. Flanking buttons cost the pill 40px, and this row has
-          no room to spare: at 1440px a wrap drops Print/Export below the panel. */}
+          no room to spare: at 1440px a wrap drops Print below the panel. */}
       {/* One hue, one hover surface. This control is about breaks, so it owns the same
           token the Timer glyph and the Break metric use: `--tone` is what the stylesheet
           hands to the edge, the glow and the stepper hovers, and leaving it unset made
@@ -266,26 +238,6 @@ export default function RundownToolbar({
           <Printer size={15} className="text-k-danger" />
           Print
         </button>
-        <FilterPopover label="Export" icon={FileXls} tone="success" align="right">
-          <div className="p-1">
-            <button type="button" className={menuItem} onClick={exportExcel}>
-              <FileXls size={15} className="text-k-success" />
-              Excel, visible columns
-            </button>
-            <button
-              type="button"
-              className={menuItem}
-              onClick={() => exportRundownToCSV(analysis, extNameMap)}
-            >
-              <FileCsv size={15} className="text-k-talk" />
-              CSV, every agent-day
-            </button>
-            <button type="button" className={menuItem} onClick={() => exportAnalysisToJSON(analysis)}>
-              <BracketsCurly size={15} className="text-k-throughput" />
-              JSON, full calculation
-            </button>
-          </div>
-        </FilterPopover>
       </div>
     </div>
   );

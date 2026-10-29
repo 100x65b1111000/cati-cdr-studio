@@ -182,8 +182,8 @@ export default function RawCDRTable() {
   }, [viewState]);
 
   return (
-    <div className="space-y-4">
-      <div className="no-print panel relative z-30 flex flex-wrap items-center gap-2 rounded-xl px-3 py-2.5">
+    <div className="flex min-h-0 flex-1 flex-col space-y-4">
+      <div className="no-print panel sticky under-bar z-30 flex flex-wrap items-center gap-2 rounded-xl px-3 py-2.5">
         <SearchInput
           value={search}
           onChange={(q) => {
@@ -231,8 +231,8 @@ export default function RawCDRTable() {
         }}
       />
 
-      <div className="panel overflow-hidden rounded-xl">
-        <div aria-busy={isParsing || undefined} className="max-h-[70vh] overflow-auto print:max-h-none">
+      <div className="panel report-panel overflow-hidden rounded-xl">
+        <div aria-busy={isParsing || undefined} className="report-region overflow-auto">
           <table className="w-full text-left text-xs text-k-ink-muted">
             <thead className="sticky top-0 z-[25] border-b border-k-hairline thead text-2xs uppercase tracking-wider">
               <tr>
@@ -260,7 +260,7 @@ export default function RawCDRTable() {
                       title={rawCalls.length === 0 ? 'No calls loaded' : 'No call matches'}
                       body={
                         rawCalls.length === 0
-                          ? 'Load the sample data or drop a CDR CSV first.'
+                          ? 'Upload a CDR CSV from the sidebar first.'
                           : 'Clear the search, widen the response filter, or extend the date range.'
                       }
                     />

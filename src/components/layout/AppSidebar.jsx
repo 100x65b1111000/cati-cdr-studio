@@ -1,161 +1,117 @@
-import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import React from 'react';
 import { useCdr } from '../../context/CdrContext';
 import { NAV } from './navConfig';
+import DataActions from './DataActions';
 import { availableDates } from '../../utils/dateRange';
-import { COLUMNS } from '../rundown/columns';
-import { COLOR_MODES } from '../../theme/colorSchemes';
 
-const CHIPS = {
-  rundown: (s) => [[s.agents, 'agents'], [s.calls, 'calls'], [s.columns, 'columns']],
-  rawCdr: (s) => [[s.calls, 'rows'], [s.fields, 'fields']],
-  analytics: (s) => [[s.agentDays, 'agent-days'], [s.dates, 'dates']],
-  directory: (s) => [[s.agents, 'extensions'], [s.overrides, 'overrides']],
-  settings: (s) => [[s.modes, 'modes'], [s.views, 'views']]
-};
+// The dataset card is the reference app's "Active run" panel: a switcher, then the
+// facts about what is loaded. `row_count` is every CSV row the server kept and
+// `rawRecords` is the ones that parsed into a call, so the difference is what got
+// dropped — the number that used to only appear in the preview modal.
+function DatasetCard() {
+  const { activeUpload, uploadHistory, restoreUpload, isParsing, rawRecords, analysis, extNameMap } = useCdr();
+  const skipped = activeUpload ? activeUpload.rowCount - rawRecords.length : 0;
+  const facts = [
+    [activeUpload?.rowCount ?? 0, 'rows read'],
+    [rawRecords.length, 'valid calls'],
+    [skipped, 'skipped'],
+    [Object.keys(extNameMap).length, 'extensions'],
+    [availableDates(analysis).length, 'shift days'],
+    [activeUpload?.source === 'demo' ? 'sample' : activeUpload?.source || '—', 'source']
+  ];
 
-// The real view, mounted, cropped to its top-left and scaled into the card.
-// 820x420 of layout at 0.32 keeps the type just legible enough to read as
-// *this* section instead of a generic page.
-const THUMB = { w: 820, h: 420, scale: 0.32 };
-
-function Thumb({ item }) {
-  const View = item.component;
   return (
-    <div
-      data-thumb
-      className="overflow-hidden rounded-lg border border-k-hairline bg-k-page"
-      style={{ width: THUMB.w * THUMB.scale, height: THUMB.h * THUMB.scale }}
-    >
-      <div style={{ width: THUMB.w, transform: `scale(${THUMB.scale})`, transformOrigin: 'top left' }}>
-        <Suspense fallback={null}>
-          <View preview />
-        </Suspense>
+    // One step up from the panel's `sunken`, so it reads as a plate on the dark column
+    // rather than a hole in it: the panel is now the deepest layer the sidebar owns.
+    <div className="flex flex-col gap-3 rounded-xl border border-k-hairline bg-k-page/60 p-3">
+      <div className="flex flex-col gap-1.5">
+        <span className="text-2xs font-medium uppercase tracking-wide text-k-ink-faint">Active dataset</span>
+        {/* One native select does the whole job: the live upload is the selected
+            option, the retained ones are what you can go back to. */}
+        <select
+          aria-label="Choose a dataset"
+          value={activeUpload?.id ?? ''}
+          onChange={(event) => event.target.value && restoreUpload(Number(event.target.value))}
+          disabled={isParsing || uploadHistory.length === 0}
+          className="field w-full rounded-lg px-2 py-1.5 text-meta text-k-ink disabled:opacity-60"
+        >
+          <option value={activeUpload?.id ?? ''}>{activeUpload ? activeUpload.filename : 'No upload stored'}</option>
+          {uploadHistory.map((upload) => (
+            <option key={upload.id} value={upload.id}>
+              {upload.filename} — {upload.rowCount} rows
+            </option>
+          ))}
+        </select>
       </div>
-    </div>
-  );
-}
 
-function useStats() {
-  const { rawCalls, rawRecords, analysis, extNameMap, manualOverrides, savedViews } = useCdr();
-  return useMemo(() => {
-    const agentDays = Object.values(analysis).reduce((n, byDate) => n + Object.keys(byDate).length, 0);
-    return {
-      agents: Object.keys(extNameMap).length,
-      calls: rawCalls.length,
-      columns: COLUMNS.length,
-      fields: rawRecords[0] ? Object.keys(rawRecords[0]).length : 0,
-      agentDays,
-      dates: availableDates(analysis).length,
-      overrides: Object.keys(manualOverrides).length,
-      views: savedViews.length,
-      modes: Object.keys(COLOR_MODES).length
-    };
-  }, [rawCalls, rawRecords, analysis, extNameMap, manualOverrides, savedViews]);
-}
-
-function Preview({ item, stats, top }) {
-  const Icon = item.Icon;
-  return (
-    <div
-      aria-hidden="true"
-      style={{ top }}
-      className="menu animate-pop-down pointer-events-none absolute left-full z-10 ml-3 w-72 rounded-xl p-3"
-    >
-      <div className="flex items-center gap-1.5">
-        <Icon size={14} className="text-k-accent" />
-        <span className="text-xs font-semibold text-k-ink">{item.label}</span>
-        <kbd className="num ml-auto rounded-[4px] border border-k-hairline px-1.5 text-2xs text-k-ink-muted">
-          {item.hotkey}
-        </kbd>
-      </div>
-      <div className="mt-2">
-        <Thumb item={item} />
-      </div>
-      <p className="mt-2 text-meta text-k-ink-muted">{item.desc}</p>
-      <div className="mt-2 flex flex-wrap gap-1">
-        {CHIPS[item.id](stats).map(([n, l]) => (
-          <span
-            key={l}
-            className="num rounded-md bg-k-sunken/70 px-1.5 py-0.5 text-2xs text-k-ink-muted ring-1 ring-inset ring-k-hairline"
-          >
-            <span className="font-semibold text-k-ink">{n}</span> {l}
-          </span>
+      <dl className="grid grid-cols-2 gap-x-2 gap-y-1 text-2xs">
+        {facts.map(([value, label]) => (
+          <React.Fragment key={label}>
+            <dt className="text-k-ink-faint">{label}</dt>
+            <dd className="num truncate text-right text-k-ink-muted">{value}</dd>
+          </React.Fragment>
         ))}
-      </div>
+      </dl>
     </div>
   );
 }
 
 export default function AppSidebar() {
-  const { activeTab, setActiveTab } = useCdr();
-  const stats = useStats();
-  const [peek, setPeek] = useState(null);
-  const timer = useRef(0);
-
-  useEffect(() => () => clearTimeout(timer.current), []);
-
-  // A short open delay keeps the panel from strobing while the pointer travels
-  // down the list. Close is immediate so it never lags behind the cursor.
-  // The offset is measured against the aside because the preview is its child,
-  // not the nav's: the nav has to clip, and clipping would take the card with it.
-  const show = (id, el) => {
-    const top = el.getBoundingClientRect().top - el.closest('aside').getBoundingClientRect().top;
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => setPeek({ id, top }), 120);
-  };
-  const hide = () => {
-    clearTimeout(timer.current);
-    setPeek(null);
-  };
-
-  const peeked = peek && NAV.find((n) => n.id === peek.id);
+  const { activeTab, setActiveTab, shiftConfig } = useCdr();
+  const shift = `${shiftConfig.shiftStartTime} → ${shiftConfig.shiftEndTime}${
+    shiftConfig.shiftEndDay > shiftConfig.shiftStartDay ? ' +1' : ''
+  }`;
 
   return (
-    // Detached rail: 48px of icons, each with its key at the top-right corner, and
-    // it never grows. The card that opens beside it is the long version of the hint
-    // rather than the only one, so reading the view list costs no layout shift.
-    <aside className="no-print fixed left-4 top-1/2 z-40 hidden -translate-y-1/2 lg:block">
-      <nav
-        aria-label="Views"
-        className="panel relative w-12 overflow-hidden rounded-2xl shadow-2xl shadow-black/40"
-      >
-        <ul className="space-y-1 p-1.5">
-          {NAV.map((item) => {
-            const active = activeTab === item.id;
-            return (
-              <li
-                key={item.id}
-                onMouseEnter={(e) => show(item.id, e.currentTarget)}
-                onMouseLeave={hide}
-                onFocus={(e) => show(item.id, e.currentTarget)}
-                onBlur={hide}
-              >
-                <button
-                  type="button"
-                  onClick={() => setActiveTab(item.id)}
-                  aria-current={active ? 'page' : undefined}
-                  aria-label={`${item.label} (${item.hotkey})`}
-                  className={`relative flex w-full items-center justify-center rounded-xl px-1 py-2 text-xs font-medium transition-colors ${
-                    active
-                      ? 'bg-k-accent text-k-accent-ink'
-                      : 'hoverable text-k-ink-muted'
-                  }`}
-                >
-                  <item.Icon size={17} className="shrink-0" />
-                  {/* The key is the hint, so it lives on the strip rather than in the
-                      card: the view list has to be readable without the pointer ever
-                      finding the rail. It carries its own plate so the badge reads the
-                      same on the accent fill as it does on the idle surface. */}
-                  <span className="num absolute right-0.5 top-0.5 rounded-[3px] bg-k-sunken/85 px-[2px] text-2xs font-medium text-k-ink-muted ring-1 ring-inset ring-k-hairline">
-                    {item.hotkey}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-      {peeked && <Preview item={peeked} stats={stats} top={peek.top} />}
+    // The app bar's own geometry, repeated: 8px off the left edge and 8px of air at
+    // both ends of the vertical run (`under-bar` parks it clear of the bar). `app-bar`
+    // rather than `panel` so it is the same sunken layer as the bar instead of a card
+    // lifted out of the content. It costs the content 19.5rem.
+    <aside className="app-bar no-print fixed bottom-2 left-2 under-bar z-40 hidden w-72 flex-col overflow-hidden rounded-2xl lg:flex">
+      {/* The scroll is on the inside, never on the aside itself: a panel that both
+          clips and paints is where a focus ring or an overflowed label disappears. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+        <nav aria-label="Views">
+          <ul className="flex flex-col gap-0.5">
+            {NAV.map((item) => {
+              const active = activeTab === item.id;
+              return (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab(item.id)}
+                    aria-current={active ? 'page' : undefined}
+                    aria-label={`${item.label} (${item.hotkey})`}
+                    className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-meta font-medium transition-colors ${
+                      active ? 'bg-k-accent/15 text-k-accent' : 'hoverable text-k-ink-muted'
+                    }`}
+                  >
+                    <item.Icon size={16} weight={active ? 'fill' : 'regular'} className="shrink-0" />
+                    <span className="truncate">{item.label}</span>
+                    <kbd
+                      className={`num ml-auto shrink-0 rounded-[4px] border px-1.5 text-2xs ${
+                        active ? 'border-k-accent/40 text-k-accent' : 'border-k-hairline text-k-ink-muted'
+                      }`}
+                    >
+                      {item.hotkey}
+                    </kbd>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+
+        {/* `mt-auto` lives here rather than on the card so the whole data cluster — load,
+            switch, read — travels to the foot together. */}
+        <DataActions className="mt-auto grid-cols-1" />
+
+        <DatasetCard />
+
+        <p className="text-2xs leading-relaxed text-k-ink-faint">
+          break {shiftConfig.breakThresholdMinutes} min · {shift}
+        </p>
+      </div>
     </aside>
   );
 }

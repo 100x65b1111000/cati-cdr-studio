@@ -203,20 +203,6 @@ export function CdrProvider({ children }) {
   }, []);
 
   // 8. Actions
-  const loadDemoData = useCallback(async () => {
-    setIsParsing(true);
-    try {
-      applyDataset(await demoRequest(Object.keys(extNameMap)));
-      // A new dataset replaces the old one, so a saved range preset would hide it.
-      setDateRange(DEFAULT_DATE_RANGE);
-      addToast('Demo CDR dataset loaded!', 'success');
-    } catch (err) {
-      setParseError(err.message);
-    } finally {
-      setIsParsing(false);
-    }
-  }, [extNameMap, applyDataset, addToast]);
-
   const handleFileDropOrSelect = useCallback((file) => {
     if (!file) return;
     setParseError('');
@@ -401,7 +387,6 @@ export function CdrProvider({ children }) {
     setSelectedAgentDetail,
 
     // Operations
-    loadDemoData,
     handleFileDropOrSelect,
     confirmPendingUpload,
     cancelPendingUpload,

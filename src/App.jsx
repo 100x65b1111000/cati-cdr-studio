@@ -73,7 +73,7 @@ export default function App({ children }) {
       <AppHeader />
       <AppSidebar />
 
-      <div className="relative flex min-w-0 flex-1 flex-col lg:pl-20">
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col lg:pl-[19.5rem]">
         <header className="hidden print:block print:pb-2">
           <h2 className="text-sm font-semibold text-k-ink">{view.label}</h2>
           <p className="num text-meta text-k-ink-muted">
@@ -81,7 +81,14 @@ export default function App({ children }) {
           </p>
         </header>
 
-        <main id="view" tabIndex={-1} className="mx-auto w-full max-w-7xl flex-1 space-y-6 p-4 sm:p-6">
+        {/* A column, and `min-h-0` so it stops refusing to shrink below its own content:
+            the report region below takes whatever height this leaves rather than guessing
+            at the chrome stacked above it. */}
+        <main
+          id="view"
+          tabIndex={-1}
+          className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col space-y-6 p-4 sm:p-6"
+        >
           {/* The rail is 48px of icons and the floating bar stays on the brand, so this
               is the only place a view says what it is. It borrows the tiles' icon plate
               and the header's title ink rather than inventing a third heading style. */}

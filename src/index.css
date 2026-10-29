@@ -94,7 +94,7 @@ body {
    whether a call-site utility paints at all: unlayered beats layered, so a
    resting surface written outside a layer silently discards the
    `focus:border-k-accent`, `border-k-success` and `border-k-accent` overrides
-   sprinkled over them. States (.card-active, .lift, .hoverable, .row-hover,
+   sprinkled over them. States (.lift, .hoverable, .row-hover,
    .cbox) stay unlayered below, because those have to outrank the utilities they
    sit on top of.
 
@@ -120,6 +120,34 @@ body {
     background-color: rgb(var(--k-sunken, 2 3 6) / 1);
     border: 1px solid rgb(var(--k-hairline-strong, 62 74 94) / 1);
     box-shadow: 0 10px 24px -12px rgb(0 0 0 / 0.5);
+  }
+
+  /* Where chrome that has to stay on screen parks: the app bar is sticky at top-2 and
+     74px tall, so its bottom edge is 82px and everything pinned under it starts 8px
+     below that. One value, because the sidebar and the table toolbars have to line up
+     with each other as well as with the bar. ui-check asserts the bar never grows past
+     it and that the gaps stay even. */
+  .under-bar {
+    top: 5.625rem;
+  }
+
+  /* The report panel takes the height the window has left and the region inside it takes
+     what is left once pagination has had its row, so the table fills to the bottom of the
+     screen instead of guessing at the chrome stacked above it — bar, heading, toolbar and
+     day row, every one of which can grow or vanish. The panel scrolls through its region,
+     under a head pinned to the top of that box, so the sticky toolbar never sits on a row.
+     20rem is the floor — the region's 16rem plus the pagination row — and below that the
+     page scrolls again with the toolbar parked over the top of the table. Print lifts it
+     in the @media block below, along with the overflow itself. */
+  .report-panel {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0%;
+    min-height: 20rem;
+  }
+
+  .report-region {
+    flex: 1 1 0%;
   }
 
   /* Popovers and previews float over table text, so they get the deepest cast in
@@ -191,19 +219,6 @@ body {
     color: rgb(var(--k-danger, 255 123 123) / 0.8);
     transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
   }
-}
-
-/* The selected mode card. A rule rather than `border-k-accent` plus `ring-*`
-   utilities because box-shadow is one property: the utilities would replace
-   .panel's cast, and this keeps the edge, the tint and the ring. The :hover twin
-   out-specifies .lift:hover, so the accent survives the lift. */
-.panel.card-active,
-.panel.card-active:hover {
-  border-color: rgb(var(--k-accent, 77 141 245) / 1);
-  background-image: linear-gradient(rgb(var(--k-accent, 77 141 245) / 0.12), rgb(var(--k-accent, 77 141 245) / 0.12));
-  box-shadow:
-    0 0 0 3px rgb(var(--k-accent, 77 141 245) / 0.3),
-    0 1px 2px rgb(0 0 0 / 0.06);
 }
 
 /* Entrance animations. Every one is one-shot (`both`) so nothing keeps moving
@@ -427,6 +442,18 @@ body {
   main .overflow-y-auto {
     max-height: none !important;
     overflow: visible !important;
+  }
+
+  /* Paper has no leftover window to hand the report, so the column that grows into one
+     has to stop growing: every box takes its content height and the table runs the full
+     length of the page. `flex: none` leaves the toolbars flex containers — it only stops
+     them stretching as items. */
+  main,
+  main > div,
+  main .panel,
+  main .report-region {
+    flex: none !important;
+    min-height: 0 !important;
   }
 
   thead {

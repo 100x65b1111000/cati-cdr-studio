@@ -12,6 +12,9 @@ const TONE = {
   success: { hue: 'var(--k-success)', icon: 'text-k-success', chip: 'ring-k-success/35 text-k-success', open: 'border-k-success/70 bg-k-success/10 text-k-success' }
 };
 
+// `stretch` is for a trigger that lives in a stacked column — the sidebar's action
+// cluster — where every other control fills its cell. The menu takes the same width,
+// because a popover that hangs past a scrolling panel gets clipped by it.
 export default function FilterPopover({
   label,
   icon: Icon,
@@ -19,7 +22,8 @@ export default function FilterPopover({
   children,
   width = 'w-72',
   align = 'left',
-  tone = 'accent'
+  tone = 'accent',
+  stretch = false
 }) {
   const t = TONE[tone] || TONE.accent;
   const [open, setOpen] = useState(false);
@@ -42,14 +46,14 @@ export default function FilterPopover({
   }, [open]);
 
   return (
-    <div ref={ref} className="relative shrink-0" style={{ '--tone': t.hue }}>
+    <div ref={ref} className={`relative ${stretch ? 'w-full' : 'shrink-0'}`} style={{ '--tone': t.hue }}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors active:translate-y-[1px] ${
-          open ? t.open : 'hoverable border-k-hairline-strong bg-k-surface-hover/50 text-k-ink-muted'
-        }`}
+          stretch ? 'w-full justify-center' : ''
+        } ${open ? t.open : 'hoverable border-k-hairline-strong bg-k-surface-hover/50 text-k-ink-muted'}`}
       >
         {Icon && <Icon size={15} className={open ? '' : t.icon} />}
         <span>{label}</span>

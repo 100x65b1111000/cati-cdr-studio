@@ -229,7 +229,7 @@ export default function AnalyticsView() {
       <div className="panel rounded-2xl">
         <EmptyState
           title="Nothing to chart"
-          body="Load the sample data or drop a CDR CSV, then widen the date range above."
+          body="Upload a CDR CSV from the sidebar, then widen the date range above."
         />
       </div>
     );

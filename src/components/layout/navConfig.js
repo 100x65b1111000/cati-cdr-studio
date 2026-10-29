@@ -7,8 +7,8 @@ import {
   Sliders
 } from '@phosphor-icons/react';
 
-// Shared by the sidebar, the narrow-screen header, the print title, the hover preview and
-// the route in app/(app)/[view]/page.jsx, so the view list has exactly one source. `id` is
+// Shared by the sidebar, the narrow-screen header, the print title and the route in
+// app/(app)/[view]/page.jsx, so the view list has exactly one source. `id` is
 // also the URL segment, and `hotkey` feeds VIEW_BY_KEY in App.jsx.
 //
 // Every view is lazy: the route gives it a URL and React.lazy gives it a chunk. A chunk
@@ -52,7 +52,7 @@ export const NAV = [
     label: 'Settings',
     Icon: Sliders,
     hotkey: '5',
-    desc: 'Colour mode, shift rules, manual overrides and saved views.',
+    desc: 'Shift rules, manual overrides and saved views.',
     component: lazy(() => import('../settings/SettingsView'))
   }
 ];
