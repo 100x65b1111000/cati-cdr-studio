@@ -1,7 +1,6 @@
 import React from 'react';
 import { Moon, Sun } from '@phosphor-icons/react';
 import { useCdr } from '../../context/CdrContext';
-import { NAV } from './navConfig';
 import DataActions from './DataActions';
 import Segmented from '../ui/Segmented';
 import { COLOR_MODES } from '../../theme/colorSchemes';
@@ -13,31 +12,24 @@ import { availableDates, rangeLabel } from '../../utils/dateRange';
 const MODE_ICONS = { dark: Moon, light: Sun };
 const MODES = Object.entries(COLOR_MODES).map(([id, mode]) => {
   const Icon = MODE_ICONS[id];
-  return {
-    id,
-    label: (
-      <>
-        <Icon size={14} />
-        <span className="sr-only">{mode.label}</span>
-      </>
-    )
-  };
+  return { id, label: <><Icon size={14} /><span className="sr-only">{mode.label}</span></> };
 });
 
 // Detached floating bar: 8px clear of the viewport on three sides, and lifted off
 // the page by its own shadow. It reads as a different layer from the cards because
 // .app-bar fills with `sunken`, not the `surface` the content uses, so it stays
 // distinguishable without needing distance. Identity on the left; what is loaded, and
-// which palette paints it, on the right. Loading a file lives in the rail, and the view
-// switcher does too — both only come back to the bar below lg, where there is no rail to
-// hold them. The mode switch stays in the bar at every width: it is chrome, not a
-// setting you should have to visit a page for.
+// which palette paints it, on the right. Below lg there is no rail, so loading a file
+// comes back to the bar — the views went to the bottom bar instead — and the bar scrolls
+// away with the page rather than pinning a second row of chrome over a phone screen. The
+// mode switch stays in the bar at every width: it is chrome, not a setting you should
+// have to visit a page for.
 export default function AppHeader() {
-  const { activeTab, setActiveTab, rawCalls, analysis, dateRange, colorScheme, setColorScheme } = useCdr();
+  const { rawCalls, analysis, dateRange, colorScheme, setColorScheme } = useCdr();
   const dates = availableDates(analysis);
 
   return (
-    <header className="app-bar no-print sticky top-2 z-40 mx-2 mt-2 flex flex-wrap items-center justify-between gap-4 rounded-2xl px-6 py-4">
+    <header className="app-bar no-print z-40 mx-2 mt-2 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-3 sm:gap-4 sm:px-6 sm:py-4 lg:sticky lg:top-2">
       <div className="flex min-w-0 items-center gap-3">
         {/* The shift dial, same geometry as public/favicon.svg, drawn through the
             theme roles so it re-colours with the scheme instead of being a picture. */}
@@ -49,10 +41,10 @@ export default function AppHeader() {
           </svg>
         </div>
         <div className="min-w-0">
-          <h1 className="truncate text-lg font-bold leading-tight tracking-tight text-k-ink">
+          <h1 className="truncate text-base font-bold leading-tight tracking-tight text-k-ink sm:text-lg">
             CATI CDR Studio
           </h1>
-          <p className="truncate text-xs leading-tight text-k-ink-muted">CDR Team Rundown &amp; Shift Intelligence</p>
+          <p className="hidden truncate text-xs leading-tight text-k-ink-muted sm:block">CDR Team Rundown &amp; Shift Intelligence</p>
         </div>
       </div>
 
@@ -61,39 +53,15 @@ export default function AppHeader() {
           that keeps a switch the same height as its row measures siblings within the
           parent, where the 42px brand block would set the bar. */}
       <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
-        <p className="flex shrink-0 items-center gap-2 text-xs leading-tight text-k-ink-muted">
+        {/* Below sm the date range already appears with the view heading and the row
+            count repeats the table, so the bar keeps only the mode switch. */}
+        <p className="hidden shrink-0 items-center gap-2 text-xs leading-tight text-k-ink-muted sm:flex">
           <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-k-success" />
-          <span className="num">{rawCalls.length} calls</span>
-          <span className="text-k-ink-faint">·</span>
-          <span className="num">{rangeLabel(dateRange, dates)}</span>
+          <span className="num">{rawCalls.length} calls · {rangeLabel(dateRange, dates)}</span>
         </p>
         <Segmented label="Colour mode" options={MODES} value={colorScheme} onChange={setColorScheme} />
       </div>
 
-      <nav
-        aria-label="Views"
-        className="order-3 flex w-full items-center gap-1 overflow-x-auto rounded-xl border border-k-hairline bg-k-surface/70 p-1.5 md:order-none md:w-auto lg:hidden"
-      >
-        {NAV.map(({ id, label, Icon }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setActiveTab(id)}
-            aria-current={activeTab === id ? 'page' : undefined}
-            className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3.5 py-2 text-xs font-medium transition-all ${
-              activeTab === id
-                ? 'bg-k-accent text-k-accent-ink'
-                : 'hoverable text-k-ink-muted'
-            }`}
-          >
-            <Icon size={16} />
-            <span>{label}</span>
-          </button>
-        ))}
-      </nav>
-
-      {/* `order-last` because the nav below already claims order-3: without it these
-          two would jump above the view switcher when both rows are on screen. */}
       <DataActions className="order-last w-full grid-cols-2 lg:hidden" />
     </header>
   );

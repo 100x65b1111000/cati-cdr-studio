@@ -1,3 +1,4 @@
+import 'animate.css';
 import '../index.css';
 import { COLOR_MODES, cssVarName, hexToRgbTriplet } from '../theme/colorSchemes';
 import '@fontsource/fira-sans/400.css';
@@ -28,6 +29,10 @@ const THEME_SCRIPT = `(function () {
              matchMedia('(prefers-color-scheme: light)').matches) mode = 'light';
   } catch (e) { /* private mode or a corrupt value: dark is the shipped default */ }
   document.documentElement.dataset.mode = mode;
+  try {
+    if (JSON.parse(localStorage.getItem('cati_cdr_studio_motion')) === 'full')
+      document.documentElement.dataset.motion = 'full';
+  } catch (e) { /* reduced motion stays honoured until the context writes the choice */ }
 })();`;
 
 // The --k-* tokens normally arrive from CdrContext's layout effect. A server-rendered

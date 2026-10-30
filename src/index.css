@@ -122,13 +122,21 @@ body {
     box-shadow: 0 10px 24px -12px rgb(0 0 0 / 0.5);
   }
 
-  /* Where chrome that has to stay on screen parks: the app bar is sticky at top-2 and
-     74px tall, so its bottom edge is 82px and everything pinned under it starts 8px
-     below that. One value, because the sidebar and the table toolbars have to line up
-     with each other as well as with the bar. ui-check asserts the bar never grows past
-     it and that the gaps stay even. */
+  /* Where chrome that has to stay on screen parks. From lg the app bar is sticky at
+     top-2 and 74px tall, so its bottom edge is 82px and everything pinned under it
+     starts 8px below that — one value, because the sidebar and the table toolbars have
+     to line up with each other as well as with the bar. Below lg the bar scrolls away
+     (the bottom nav carries the view switch instead), so the same chrome parks 8px off
+     the viewport top. ui-check asserts the bar never grows past it and the gaps stay
+     even. */
   .under-bar {
-    top: 5.625rem;
+    top: 0.5rem;
+  }
+
+  @media (min-width: 64rem) {
+    .under-bar {
+      top: 5.625rem;
+    }
   }
 
   /* The report panel takes the height the window has left and the region inside it takes
@@ -235,7 +243,9 @@ body {
   from { opacity: 0; }
   to { opacity: 1; }
 }
-@keyframes slideInRight {
+/* Ours is `slideIn`, not animate.css's `slideInRight`, which sweeps a full 100%: a toast
+   that crossed the screen would be a worse idea than the one that fades in. */
+@keyframes slideIn {
   from { opacity: 0; transform: translateX(18px); }
   to { opacity: 1; transform: none; }
 }
@@ -252,8 +262,19 @@ body {
     animation: fadeIn 160ms ease-out both;
   }
   .animate-slide-in {
-    animation: slideInRight 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: slideIn 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
+}
+
+/* The page switch is animate.css's `slideInUp` or `slideInDown`, picked by which way the
+   rail order went — see `slide` in CdrContext. Its 1s default is an age for a switch.
+   A sweep is a transform and a transform's overflow is scrollable overflow, so `main` is
+   clipped for the length of the ramp; clipped for ever, it would cut off every page taller
+   than the window. No `scale` in a switch either: a scaled ancestor changes the measured box
+   of every canvas inside it on every frame, and chart.js answers that with a resize, which
+   skips its animation and snaps the chart to its final data. */
+:root {
+  --animate-duration: 450ms;
 }
 
 /* Cards lift on hover: one pixel of travel and a darker edge. The cast deepens
@@ -355,6 +376,14 @@ body {
   border-width: 0 2px 2px 0;
   transform: rotate(45deg) translate(-1px, -1px);
 }
+/* The box is the one control that can sit outside a popover, so it paints its own focus
+   rather than taking the page's base ring in the raw accent. On `box-shadow` and not
+   `border-color`, because the border is transitioned and a focus read in the same frame
+   gets the from-value back. */
+.cbox:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(var(--tone, var(--k-accent, 77 141 245)) / 0.5);
+}
 
 /* Each mode sets `accent-ink` to whichever end clears AA on its own accent — near-black
    in dark, white in light — which is the right punch-through on any of the saturated
@@ -363,14 +392,23 @@ body {
   outline-color: rgb(var(--tone, var(--k-accent, 77 141 245)));
 }
 
+/* Two clamps cut every ramp when the OS asks for reduced motion: this one, and animate.css's
+   own reduced-motion block, which pins `.animate__animated` to 1ms. One millisecond is a
+   single displaced frame — a page switch still measures 1080px of travel and looks like
+   nothing, which is the whole bug. `data-motion='full'` is a person opting back in from
+   Settings, so this clamp steps aside for it and the library's 1ms is answered with the
+   duration the rule was written with. */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  html:not([data-motion='full']) *,
+  html:not([data-motion='full']) *::before,
+  html:not([data-motion='full']) *::after {
     animation-duration: 0.01ms !important;
     animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+  html[data-motion='full'] .animate__animated {
+    animation-duration: var(--animate-duration) !important;
   }
 }
 

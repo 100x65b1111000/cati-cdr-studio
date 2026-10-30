@@ -17,7 +17,7 @@ export default function MetricStrip({ items }) {
       {items.map(({ label, value, chips = [], Icon, role = 'accent' }) => (
         <div
           key={label}
-          className="panel lift relative flex flex-col overflow-hidden rounded-2xl border border-k-hairline p-5"
+          className="panel lift relative flex flex-col overflow-hidden rounded-2xl border border-k-hairline p-4 sm:p-5"
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -34,8 +34,10 @@ export default function MetricStrip({ items }) {
           </div>
           {chips.length > 0 && (
             <div className="mt-auto flex flex-wrap gap-1.5 pt-3">
+              {/* A long region name used to run under the card's edge and get sliced;
+                  ellipsis keeps the chip inside it. */}
               {chips.map(({ text, tone = role }) => (
-                <Chip key={text} tone={tone}>
+                <Chip key={text} tone={tone} className="max-w-full truncate">
                   {text}
                 </Chip>
               ))}

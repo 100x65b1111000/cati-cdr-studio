@@ -2,6 +2,7 @@ import React, { Suspense, useEffect, useRef } from 'react';
 import { useCdr } from './context/CdrContext';
 import AppHeader from './components/layout/AppHeader';
 import AppSidebar from './components/layout/AppSidebar';
+import MobileNav from './components/layout/MobileNav';
 import { NAV } from './components/layout/navConfig';
 import DateRangeControl from './components/layout/DateRangeControl';
 import ToastContainer from './components/common/ToastContainer';
@@ -23,7 +24,7 @@ function focusSearch() {
 }
 
 export default function App({ children }) {
-  const { activeTab, setActiveTab, parseError, clearParseError, analysis, dateRange } = useCdr();
+  const { activeTab, setActiveTab, slide, parseError, clearParseError, analysis, dateRange } = useCdr();
 
   const wantsSearchRef = useRef(false);
 
@@ -71,6 +72,7 @@ export default function App({ children }) {
       </a>
 
       <AppHeader />
+      <MobileNav />
       <AppSidebar />
 
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col lg:pl-[19.5rem]">
@@ -84,10 +86,12 @@ export default function App({ children }) {
         {/* A column, and `min-h-0` so it stops refusing to shrink below its own content:
             the report region below takes whatever height this leaves rather than guessing
             at the chrome stacked above it. */}
+        {/* The extra bottom padding is the room the fixed bottom nav needs below lg;
+            without it the last row of a report parks underneath it. */}
         <main
           id="view"
           tabIndex={-1}
-          className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col space-y-6 p-4 sm:p-6"
+          className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col space-y-4 p-4 pb-24 sm:space-y-6 sm:p-6 sm:pb-24 lg:pb-6"
         >
           {/* The rail is 48px of icons and the floating bar stays on the brand, so this
               is the only place a view says what it is. It borrows the tiles' icon plate
@@ -97,18 +101,29 @@ export default function App({ children }) {
               whole heading scrolls up and paints on top of the floating app bar. */}
           <div className="no-print relative z-[35] space-y-2">
             <div className="flex flex-wrap items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-k-accent/25 bg-k-accent/10 text-k-accent">
-                <view.Icon size={18} />
-              </span>
-              <div className="min-w-0">
-                <h2 className="text-lg font-bold leading-tight tracking-tight text-k-ink">{view.label}</h2>
-                <p className="text-xs leading-tight text-k-ink-muted">{view.desc}</p>
+              {/* The heading is what tells you the view changed, so it arrives with the
+                  view. One wrapper, not two animated siblings: animate.css travels 100% of
+                  the element's own box, so a 36px plate and a 350px title sliding
+                  "together" tear apart mid-flight. Keyed per tab to replay it;
+                  `DateRangeControl` stays outside the key or a half-typed custom range
+                  would vanish on every switch. */}
+              <div key={activeTab} className={`animate__animated ${slide} flex min-w-0 items-center gap-3`}>
+                {/* A phone knows its view from the bottom bar; the plate and the
+                    description are the first thing to cost it a row of content. */}
+                <span className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-k-accent/25 bg-k-accent/10 text-k-accent sm:flex">
+                  <view.Icon size={18} />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="text-base font-bold leading-tight tracking-tight text-k-ink sm:text-lg">{view.label}</h2>
+                  <p className="hidden text-xs leading-tight text-k-ink-muted sm:block">{view.desc}</p>
+                </div>
               </div>
-              <div className="ml-auto">
+              <div className="w-full sm:ml-auto sm:w-auto">
                 <DateRangeControl />
               </div>
             </div>
-            <p className="text-xs text-k-ink-muted">
+            {/* Digits and Ctrl+K are desktop habits; a phone has neither. */}
+            <p className="hidden text-xs text-k-ink-muted md:block">
               <kbd className="num rounded-md border border-k-hairline px-1">1</kbd> to{' '}
               <kbd className="num rounded-md border border-k-hairline px-1">5</kbd> switch views,{' '}
               <kbd className="num rounded-md border border-k-hairline px-1">Ctrl</kbd>+

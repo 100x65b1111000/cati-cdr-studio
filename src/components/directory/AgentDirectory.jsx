@@ -63,7 +63,7 @@ function AgentCard({ ext, name, onRename, onDelete }) {
 }
 
 export default function AgentDirectory() {
-  const { extNameMap, updateExtMapping, removeExtMapping, setIsAddAgentOpen } = useCdr();
+  const { extNameMap, updateExtMapping, removeExtMapping, setIsAddAgentOpen, slide } = useCdr();
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState('extension');
   const [sortAsc, setSortAsc] = useState(true);
@@ -85,7 +85,7 @@ export default function AgentDirectory() {
   const mapped = Object.keys(extNameMap).length;
 
   return (
-    <div className="panel overflow-hidden rounded-xl">
+    <div className={`animate__animated ${slide} panel overflow-hidden rounded-xl`}>
       <div className="no-print flex flex-wrap items-center gap-2 border-b border-k-hairline bg-k-surface/50 px-4 py-3">
         <h3 className="mr-1 flex items-center gap-2 text-xs font-semibold text-k-ink">
           <UsersThree size={16} className="text-k-talk" />
@@ -97,10 +97,10 @@ export default function AgentDirectory() {
           onChange={setSearch}
           label="Extension or name"
           placeholder="Extension or name"
-          className="w-56 flex-none"
+          className="w-full flex-none sm:w-56"
           primary
         />
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="flex w-full items-center justify-end gap-1.5 sm:ml-auto sm:w-auto">
           <Segmented
             label="Sort mappings by"
             options={SORT_OPTIONS}

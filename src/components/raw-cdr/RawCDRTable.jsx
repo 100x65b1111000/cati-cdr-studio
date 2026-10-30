@@ -41,7 +41,7 @@ const RESPONSES = [
 ];
 
 export default function RawCDRTable() {
-  const { rawCalls, shiftConfig, dateRange, analysis, extNameMap, isParsing } = useCdr();
+  const { rawCalls, shiftConfig, dateRange, analysis, extNameMap, isParsing, slide } = useCdr();
 
   const restoredRef = useRef(loadFromStorage('raw_view_state', null));
   const [search, setSearch] = useState(() => restoredRef.current?.search || '');
@@ -182,8 +182,8 @@ export default function RawCDRTable() {
   }, [viewState]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col space-y-4">
-      <div className="no-print panel sticky under-bar z-30 flex flex-wrap items-center gap-2 rounded-xl px-3 py-2.5">
+    <div className={`animate__animated ${slide} flex min-h-0 flex-1 flex-col space-y-4`}>
+      <div className="no-print panel under-bar z-30 flex flex-wrap items-center gap-2 rounded-xl px-3 py-2.5 sm:sticky">
         <SearchInput
           value={search}
           onChange={(q) => {
@@ -192,7 +192,7 @@ export default function RawCDRTable() {
           }}
           label="Extension, number or region"
           placeholder="Extension, number or region"
-          className="w-64 flex-none"
+          className="w-full flex-none sm:w-64"
           primary
         />
 
@@ -216,7 +216,9 @@ export default function RawCDRTable() {
           }}
         />
 
-        <div className="ml-auto flex items-center gap-1.5">
+        {/* The zero-row filter still reads the same table, so the tallies only ride
+            along where the toolbar has a spare corner. */}
+        <div className="ml-auto hidden items-center gap-1.5 sm:flex">
           <Chip tone="throughput">{rawCalls.length} calls</Chip>
           <Chip tone="success">{answered} answered</Chip>
         </div>

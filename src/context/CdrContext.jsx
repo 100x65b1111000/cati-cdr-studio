@@ -4,8 +4,10 @@ import { usePathname, useRouter } from 'next/navigation';
 import { DEFAULT_EXT_MAP, DEFAULT_SHIFT_CONFIG } from '../constants/defaultData';
 import { DEFAULT_DATE_RANGE } from '../utils/dateRange';
 import { loadFromStorage, saveToStorage, removeFromStorage } from '../utils/storage';
+import { reducedMotion } from '../utils/motion';
 import { parseRawCallRecords, calculateShiftAnalysis } from '../services/shiftCalculator';
 import { COLOR_MODES, DEFAULT_MODE, cssVarName, getMode, hexToRgbTriplet } from '../theme/colorSchemes';
+import { NAV } from '../components/layout/navConfig';
 
 const CdrContext = createContext(null);
 
@@ -47,6 +49,14 @@ export function CdrProvider({ children }) {
     return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : DEFAULT_MODE;
   });
 
+  // 'system' follows the OS. 'full' is for a person whose Windows animation effects are
+  // off but who still wants to see a view switch: under `prefers-reduced-motion` both
+  // index.css and animate.css clamp every ramp to about 1ms, which is one displaced frame
+  // rather than a transition. `data-motion` is the only thing that lifts those clamps.
+  const [motion, setMotion] = useState(() =>
+    loadFromStorage('motion', null) === 'full' ? 'full' : 'system'
+  );
+
   // The mode to hand back when the print dialog closes. A ref, not state: it must
   // outlive the re-render that the print flip itself causes.
   const printRestore = useRef(null);
@@ -73,6 +83,44 @@ export function CdrProvider({ children }) {
   const router = useRouter();
   const activeTab = usePathname().split('/')[1] || 'rundown';
   const setActiveTab = useCallback((id) => router.push(`/${id}`), [router]);
+  // Which way the incoming page travels: forward through the rail lifts it from below,
+  // back through the rail drops it from above. Cached against the tab it describes, so a
+  // re-render for an unrelated reason cannot change the animation name mid-flight and
+  // restart the sweep from the other side.
+  const slide = useRef({ tab: activeTab, cls: 'animate__slideInUp' });
+  if (slide.current.tab !== activeTab) {
+    const rank = (id) => NAV.findIndex((v) => v.id === id);
+    slide.current = {
+      tab: activeTab,
+      cls: rank(activeTab) > rank(slide.current.tab) ? 'animate__slideInUp' : 'animate__slideInDown'
+    };
+  }
+
+  // A view arriving on a sweep is a transform, and a transform's overflow is scrollable
+  // overflow: for the length of the ramp the document grows by the whole sweep, so a
+  // scrollbar flashes in and the page can be scrolled into blank space. Clipping `main` all
+  // the time would cut off every page taller than the window, so the clip exists only for
+  // the ramp — and not at all under reduced motion, where the ramp is a single frame and a
+  // clip would only blink the bottom of a long page off.
+  // Layout, not passive: the first painted frame is the most displaced one.
+  useLayoutEffect(() => {
+    const el = document.querySelector('main');
+    if (!el || reducedMotion()) return;
+    // On with the switch, not with the first animation frame: `animationstart` is a frame
+    // late, and by then the displaced page has already grown the document, the browser has
+    // clamped the scroll offset to it, and the sticky app bar has ridden that up out of the
+    // window. Off with the ramp — only its own two names, so a popover or a toast
+    // animating inside the view cannot take the clip off early.
+    el.style.overflow = 'clip';
+    const end = (e) => {
+      if (e.animationName === 'slideInUp' || e.animationName === 'slideInDown') el.style.overflow = '';
+    };
+    el.addEventListener('animationend', end);
+    return () => {
+      el.removeEventListener('animationend', end);
+      el.style.overflow = '';
+    };
+  }, [activeTab]);
   const [toasts, setToasts] = useState([]);
   const [isParsing, setIsParsing] = useState(false);
   const [parseError, setParseError] = useState('');
@@ -119,6 +167,13 @@ export function CdrProvider({ children }) {
     root.setAttribute('data-mode', colorScheme);
     saveToStorage('color_mode', colorScheme);
   }, [colorScheme]);
+
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    if (motion === 'full') root.dataset.motion = 'full';
+    else delete root.dataset.motion;
+    saveToStorage('motion', motion);
+  }, [motion]);
 
   // A <canvas> is a bitmap: themeColor() bakes the on-screen palette into its pixels at
   // render time, so no print stylesheet can reach it — printing from dark mode put dark
@@ -368,8 +423,11 @@ export function CdrProvider({ children }) {
     deleteSavedView,
     activeTab,
     setActiveTab,
+    slide: slide.current.cls,
     colorScheme,
     setColorScheme,
+    motion,
+    setMotion,
     isParsing,
     parseError,
     clearParseError,

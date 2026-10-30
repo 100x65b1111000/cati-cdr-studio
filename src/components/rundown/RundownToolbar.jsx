@@ -81,14 +81,16 @@ export default function RundownToolbar({
   return (
     // Sticky, parked 8px under the app bar, so the filters and Print stay with
     // a reader working down a long shift. z-30 keeps it under the z-40 chrome and above
-    // the z-[25] table head, whose rows slide behind it.
-    <div className="no-print panel sticky under-bar z-30 flex flex-wrap items-center gap-2 rounded-xl px-3 py-2.5">
+    // the z-[25] table head, whose rows slide behind it. A phone stacks these controls
+    // four rows deep, so there the bar scrolls with the page instead of parking a third
+    // of the viewport over the table.
+    <div className="no-print panel under-bar z-30 flex flex-wrap items-center gap-2 rounded-xl px-3 py-2.5 sm:sticky">
       <SearchInput
         value={searchQuery}
         onChange={setSearchQuery}
         label="Agent or extension"
         placeholder="Agent or extension"
-        className="w-44 flex-none"
+        className="w-full flex-none sm:w-44"
         primary
       />
 
@@ -99,18 +101,22 @@ export default function RundownToolbar({
         onChange={setSelectedExtensions}
       />
 
-      <FilterPopover label="Columns" icon={Columns} tone="region" badge={`${shownColumns}/${FILTERABLE_COLUMN_IDS.length}`}>
-        <div className="space-y-0.5 p-2">
-          {FILTERABLE_COLUMN_IDS.map((id) => (
-            <Checkbox key={id} checked={!!visibleColumns[id]} onChange={() => toggleColumn(id)}>
-              {COLUMN_BY_ID[id]?.label || id}
-            </Checkbox>
-          ))}
-          <p className="px-2 pt-1.5 text-2xs text-k-ink-muted">
-            Excel writes the columns that are visible here.
-          </p>
-        </div>
-      </FilterPopover>
+      {/* On a phone the table scrolls sideways and the column picker is the one
+          control whose job a narrow screen cannot show anyway. */}
+      <div className="hidden sm:block">
+        <FilterPopover label="Columns" icon={Columns} tone="region" badge={`${shownColumns}/${FILTERABLE_COLUMN_IDS.length}`}>
+          <div className="space-y-0.5 p-2">
+            {FILTERABLE_COLUMN_IDS.map((id) => (
+              <Checkbox key={id} checked={!!visibleColumns[id]} onChange={() => toggleColumn(id)}>
+                {COLUMN_BY_ID[id]?.label || id}
+              </Checkbox>
+            ))}
+            <p className="px-2 pt-1.5 text-2xs text-k-ink-muted">
+              Excel writes the columns that are visible here.
+            </p>
+          </div>
+        </FilterPopover>
+      </div>
 
       <Segmented
         label="Call stats view"
@@ -232,11 +238,13 @@ export default function RundownToolbar({
         <button
           type="button"
           onClick={() => window.print()}
+          aria-label="Print"
           style={{ '--tone': 'var(--k-danger)' }}
-          className="hoverable inline-flex items-center gap-1.5 rounded-lg border border-k-hairline-strong bg-k-surface-hover/60 px-3 py-1.5 text-xs font-medium text-k-ink-muted active:translate-y-[1px]"
+          className="hoverable inline-flex items-center gap-1.5 rounded-lg border border-k-hairline-strong bg-k-surface-hover/60 px-2 py-1.5 text-xs font-medium text-k-ink-muted active:translate-y-[1px] sm:px-3"
         >
           <Printer size={15} className="text-k-danger" />
-          Print
+          {/* The glyph alone buys this button a place on the Break row at 375px. */}
+          <span className="hidden sm:inline">Print</span>
         </button>
       </div>
     </div>

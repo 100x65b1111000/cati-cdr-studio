@@ -4,14 +4,11 @@ import { useCdr } from '../../context/CdrContext';
 import { rangeDates } from '../../utils/dateRange';
 import { defaultVisibleColumns } from '../rundown/columns';
 import { exportAnalysisToJSON, exportRundownToCSV, exportRundownToExcel } from '../../services/exportService';
-import FilterPopover from '../ui/FilterPopover';
-
-const menuItem =
-  'hoverable flex w-full items-center gap-2 rounded-md border border-transparent px-2.5 py-1.5 text-left text-xs text-k-ink';
+import FilterPopover, { menuItem } from '../ui/FilterPopover';
 
 // The upload label owns the file input and the parsing state. Both controls fill their
-// grid cell, so the caller only decides the shape: one column in the rail, two in the
-// bar below `lg`, where there is no rail to hold them.
+// grid cell, so the caller only decides the shape: one column in the sidebar, two in the
+// bar below `lg`, where there is no sidebar to hold them.
 export default function DataActions({ className = 'grid-cols-1' }) {
   const { isParsing, handleFileDropOrSelect, analysis, extNameMap, dateRange, addToast } = useCdr();
 
@@ -21,7 +18,7 @@ export default function DataActions({ className = 'grid-cols-1' }) {
     e.target.value = '';
   }
 
-  // The rail is chrome, so it exports what chrome knows: the dataset, narrowed by the
+  // The sidebar is chrome, so it exports what chrome knows: the dataset, narrowed by the
   // header's date range. A view's own filters — search, agent picks, hidden columns —
   // belong to the view, and Print is what carries them onto paper.
   const inRange = () => {
@@ -63,7 +60,7 @@ export default function DataActions({ className = 'grid-cols-1' }) {
           className="hidden"
         />
       </label>
-      <FilterPopover label="Export" icon={FileXls} tone="success" width="w-full" stretch>
+      <FilterPopover label="Export" icon={FileXls} tone="success" width="w-full">
         <div className="p-1">
           <button
             type="button"

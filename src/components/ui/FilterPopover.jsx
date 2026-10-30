@@ -15,6 +15,15 @@ const TONE = {
 // `stretch` is for a trigger that lives in a stacked column — the sidebar's action
 // cluster — where every other control fills its cell. The menu takes the same width,
 // because a popover that hangs past a scrolling panel gets clipped by it.
+// The row every popover menu paints its options with — the Agents checkboxes, the
+// Columns list and the Export items all want the same plate, so it lives beside the
+// wrapper that owns the tone rather than being retyped per call site.
+export const menuItem =
+  'hoverable flex w-full cursor-pointer items-center gap-2 rounded-md border border-transparent px-2.5 py-1.5 text-left text-xs text-k-ink';
+
+// `width="w-full"` is also how a caller says the trigger fills its cell — the sidebar's
+// stacked action cluster, where every other control does and a popover that hangs past
+// the panel gets clipped by it.
 export default function FilterPopover({
   label,
   icon: Icon,
@@ -22,9 +31,9 @@ export default function FilterPopover({
   children,
   width = 'w-72',
   align = 'left',
-  tone = 'accent',
-  stretch = false
+  tone = 'accent'
 }) {
+  const stretch = width === 'w-full';
   const t = TONE[tone] || TONE.accent;
   const [open, setOpen] = useState(false);
   const ref = useRef(null);

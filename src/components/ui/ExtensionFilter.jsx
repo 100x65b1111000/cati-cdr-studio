@@ -1,16 +1,14 @@
 import React, { useState } from 'react';
 import { UserFocus } from '@phosphor-icons/react';
-import FilterPopover from './FilterPopover';
+import FilterPopover, { menuItem } from './FilterPopover';
 import SearchInput from './SearchInput';
-
-const menuItem = 'hoverable flex cursor-pointer items-center gap-2 rounded-md border border-transparent px-2 py-1 text-xs text-k-ink';
 
 export function Checkbox({ checked, onChange, children }) {
   // The visible box is 18px; the target is the whole row, because a label wrapping the
   // input forwards every click inside it. 26px tall and full-width, so the row clears
   // 2.5.8 on its own and the box never has to grow into the text.
   return (
-    <label className={`${menuItem} w-full`}>
+    <label className={menuItem}>
       <input type="checkbox" checked={checked} onChange={onChange} className="cbox" />
       <span className="flex min-w-0 flex-1 items-center gap-2">{children}</span>
     </label>

@@ -19,7 +19,7 @@ export default function ToastContainer() {
     <div
       role="status"
       aria-live="polite"
-      className="no-print pointer-events-none fixed bottom-4 right-4 z-[60] flex flex-col gap-2"
+      className="no-print pointer-events-none fixed bottom-20 right-4 z-[60] flex flex-col gap-2 lg:bottom-4"
     >
       {(toasts || []).map((toast) => {
         const { Icon, tone } = BY_TYPE[toast.type] || BY_TYPE.info;

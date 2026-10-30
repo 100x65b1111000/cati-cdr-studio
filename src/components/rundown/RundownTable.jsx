@@ -13,6 +13,25 @@ import { COLUMNS, COLUMN_BY_ID, defaultVisibleColumns } from './columns';
 const collator = new Intl.Collator(undefined, { numeric: true });
 const numeric = (a, b) => collator.compare(a, b);
 
+// `navigator.clipboard` exists only in a secure context, and the team browses this app
+// over plain http on the LAN, where it is undefined. The textarea path is the old
+// execCommand route, which still needs the click that got us here.
+function copyText(text) {
+  if (navigator.clipboard) return navigator.clipboard.writeText(text);
+  return new Promise((resolve, reject) => {
+    const el = document.createElement('textarea');
+    el.value = text;
+    el.setAttribute('readonly', '');
+    el.style.cssText = 'position:fixed;opacity:0';
+    document.body.append(el);
+    el.select();
+    const ok = document.execCommand('copy');
+    el.remove();
+    if (ok) resolve();
+    else reject(new Error('copy refused'));
+  });
+}
+
 // Auto layout splits leftover width across every column, so short numbers end up
 // with huge gutters. Pin each column to its content and let one eat the slack.
 const FLEX_COLUMN = 'break_stamps';
@@ -39,7 +58,9 @@ export default function RundownTable() {
     extNameMap,
     updateManualOverride,
     setSelectedAgentDetail,
-    isParsing
+    addToast,
+    isParsing,
+    slide
   } = useCdr();
 
   const restoredRef = useRef(loadFromStorage('view_state', null));
@@ -206,13 +227,28 @@ export default function RundownTable() {
 
   const openDetail = (row) => setSelectedAgentDetail({ ext: row.extension, dateStr: row.date });
   const setOverride = (ext, date, field, value) => updateManualOverride(ext, date, field, value);
+
+  // Every figure in the grid is a copy target, so one number can be lifted into a sheet
+  // without exporting the row. One handler on the cell, not a button per figure: the
+  // values stay text. What gets copied is the nearest `.num` — the chip or figure the
+  // pointer is on — so a click on one break stamp takes that stamp and not the column.
+  // The cells that answer for themselves keep their click.
+  const copyCell = (e) => {
+    if (e.target.closest('button, input')) return;
+    const text = (e.target.closest('.num') || e.currentTarget).innerText.trim();
+    if (!text || text === '-') return;
+    copyText(text)
+      .then(() => addToast(`Copied ${text.replace(/\s+/g, ' ')}`, 'info'))
+      .catch(() => addToast('The browser refused the copy.', 'error'));
+  };
+
   const shownColumns = COLUMNS.filter((c) => visibleColumns[c.id]);
   const ctx = { connView, setOverride, openDetail };
 
   const noData = Object.keys(analysis).length === 0;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col space-y-4">
+    <div className={`animate__animated ${slide} flex min-h-0 flex-1 flex-col space-y-4`}>
       <RundownToolbar
         searchQuery={searchQuery}
         setSearchQuery={(q) => {
@@ -325,7 +361,8 @@ export default function RundownTable() {
                       {shownColumns.map((col) => (
                         <td
                           key={col.id}
-                          className={`whitespace-nowrap px-3 align-middle ${colWidth(col.id)} ${
+                          onClick={copyCell}
+                          className={`whitespace-nowrap px-3 align-middle cursor-copy ${colWidth(col.id)} ${
                             col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
                           }`}
                         >

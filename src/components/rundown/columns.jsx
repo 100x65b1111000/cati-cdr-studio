@@ -38,8 +38,8 @@ export const COLUMNS = [
     label: 'Extension',
     align: 'center',
     value: (row) => row.extension,
-    // Plain text on purpose: the row is not a target. The Details column is the only
-    // way in, so nothing here can look clickable and quietly open a panel.
+    // Plain text, not a control: a click takes the figure to the clipboard, and the
+    // Details column stays the only way into the panel.
     cell: (row) => <span className="num font-medium text-k-accent">{row.extension}</span>
   },
   {

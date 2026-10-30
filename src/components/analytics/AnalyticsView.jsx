@@ -17,6 +17,7 @@ import { ChartBar, ChartDonut, ChartLine, Timer } from '@phosphor-icons/react';
 import { useCdr } from '../../context/CdrContext';
 import { DEFAULT_SHIFT_CONFIG } from '../../constants/defaultData';
 import { themeColor, themeSeries } from '../../theme/colorSchemes';
+import { reducedMotion } from '../../utils/motion';
 import { createShiftDateResolver } from '../../services/shiftCalculator';
 import { inDateRange, rangeDates } from '../../utils/dateRange';
 import DayScopeSelect from '../ui/DayScopeSelect';
@@ -62,7 +63,7 @@ function Chart({ icon: Icon, title, note, empty, children }) {
 }
 
 export default function AnalyticsView() {
-  const { analysis, extNameMap, rawCalls, shiftConfig, dateRange, colorScheme } = useCdr();
+  const { analysis, extNameMap, rawCalls, shiftConfig, dateRange, colorScheme, slide } = useCdr();
   const [dayScope, setDayScope] = useState('');
 
   // Every chart here blends the shifts in range, which is exactly what you do not
@@ -91,6 +92,9 @@ export default function AnalyticsView() {
       const surface = themeColor('surface');
       const series = themeSeries();
       const [accent, talk, throughput, breakTime, success] = series;
+      // Chart.js animates in JS, so the CSS ramp in `prefers-reduced-motion` cannot
+      // reach it — the duration has to be switched off here as well.
+      const reduce = reducedMotion();
 
       const resolveShiftDate = createShiftDateResolver(shiftConfig);
       const dateSet = new Set(rangeDates(dateRange, analysis));
@@ -179,7 +183,7 @@ export default function AnalyticsView() {
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          animation: false,
+          animation: { duration: reduce ? 0 : 700, easing: 'easeOutQuart' },
           plugins: { legend: { labels: { color: ink, boxWidth: 10, boxHeight: 10 } } }
         },
         volumeData: {
@@ -236,7 +240,7 @@ export default function AnalyticsView() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className={`animate__animated ${slide} space-y-6`}>
       <DayScopeSelect days={shiftDays} value={scope} onChange={setDayScope} />
 
       <MetricsStrip dayScope={scope} />

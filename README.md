@@ -15,10 +15,16 @@ npm run build
 npm start        # serve the build, the production mode
 ```
 
+A colleague on the same network opens the printed Network URL instead. In dev that address
+has to be listed in `allowedDevOrigins` in `next.config.mjs`: Next serves dev chunks only to
+origins it knows, and it is a DHCP lease, so it changes with the machine's address.
+
 `APP_PASSWORD` gates the whole app and `SESSION_SECRET` signs the 12-hour session cookie, so
 a request with a hand-written cookie is rejected. Signing out revokes the token itself, not
 just the browser's copy of it, in a table beside the data it protects — a value left on a
-shared machine stops working. With either variable missing the app fails closed: no password
+shared machine stops working. The signing key also mixes in a nonce that
+`src/instrumentation.js` rewrites at every server start, so restarting the server signs
+every device out as well. With either variable missing the app fails closed: no password
 matches, no token verifies. `DB_PATH` defaults to `data/cdr.sqlite`, which is created on boot
 and never committed.
 
@@ -26,15 +32,16 @@ and never committed.
 
 Drop a CDR export (CSV) onto the window, or use **Upload CDR CSV** at the foot of the sidebar, where **Export** sits beside it. An empty database seeds itself with a synthetic team on first load, so the views are never blank. Records are parsed and stored on the server; the view recalculates in the browser. Calls group into logical shift days, so a shift running 20:00 to 05:00 keeps overnight calls in one row instead of splitting them across two calendar dates.
 
-Five views, each with its own URL, switched from the sidebar, the narrow-screen header or the keys `1` to `5`:
+Five views, each with its own URL, switched from the sidebar at desktop widths, a fixed bar at
+the foot of the screen on a phone, or the keys `1` to `5`:
 
 | View | URL | Contents |
 |---|---|---|
-| Rundown | `/rundown` | One row per agent per shift day: calls, answer rate, calls/hour, talk, breaks, net active, half dones, surveys. Sort, filter, edit, print. |
+| Rundown | `/rundown` | One row per agent per shift day: calls, answer rate, calls/hour, talk, breaks, net active, half dones, surveys. Sort, filter, edit, print, copy any figure with a click. |
 | Raw CDR | `/rawCdr` | Every parsed call record, filterable by response, sortable, paginated. |
 | Analytics | `/analytics` | Four charts: volume and answer rate by agent, regional distribution, talk versus break minutes, hourly intensity. |
 | Agents | `/directory` | Extension to name mapping, edited in place. Unmapped extensions show as their number. |
-| Settings | `/settings` | Shift rules, the dataset in use, earlier uploads, saved views, sign out. |
+| Settings | `/settings` | Shift rules, the dataset in use, earlier uploads, saved views, motion, sign out. |
 
 A link to any of those opens the same data on a colleague's machine. `Ctrl`+`K` (or `Cmd`+`K`) focuses the current view's search box.
 
@@ -57,7 +64,7 @@ Only the records live on the server. Everything else stays in this browser's `lo
 | Where | Contents |
 |---|---|
 | Server (`data/cdr.sqlite`) | Every uploaded CDR as parsed call rows plus the raw CSV row, kept as upload history |
-| Browser | Shift window and break threshold, extension-to-name map, half-done and survey overrides, colour mode, date range, saved views, last-used rundown filters |
+| Browser | Shift window and break threshold, extension-to-name map, half-done and survey overrides, colour mode, motion, date range, saved views, last-used rundown filters |
 
 **This has a consequence worth knowing:** two browsers can compute different numbers from the same records if their shift rules or extension maps differ. Promoting `shift_config` and `ext_map` to server truth is the obvious next step.
 
@@ -79,6 +86,13 @@ talk, throughput, break-time, region
 `CdrContext` writes the active mode to `--k-<role>` variables on `<html>`, Tailwind exposes each one as a `k-*` utility, and Chart.js reads the same variables, so a mode change reaches the canvas without a second colour list. `danger` marks a missed call, `critical` marks a required field or destructive action, and the two never share a hex. `src/app/layout.jsx` inlines a classic script that resolves the stored mode before first paint, so a light choice does not flash dark on load; the same layout emits one rule per mode as a fallback for the server-rendered login page.
 
 Print overrides the variables to paper and near-black ink in `src/index.css`. Interactive chrome is hidden by an explicit `.no-print` class on the sidebar, toolbars, pagination and toasts, and the printed page carries the view name and date range as a header. Charts are bitmaps, so printing from dark mode flips the mode to light first, which is the only thing that repaints them.
+
+The view switch is an animate.css sweep whose direction follows the rail order, which makes
+where you came from visible. A switch is a transform, so `main` is clipped for the length of
+the ramp; clipped for ever it would cut off pages taller than the window. Under
+`prefers-reduced-motion` both stylesheets clamp every ramp to about a millisecond, which made
+the switch invisible — **Settings → Motion** lets a person whose OS has animation effects off
+run the sweeps anyway, stored per browser.
 
 ## CSV format
 
@@ -121,6 +135,7 @@ src/
   App.jsx                    Sidebar plus main column, keyboard shortcuts, modals
   Studio.jsx                 Provider around the app
   proxy.js                   Session check on every route (Next 16's middleware)
+  instrumentation.js         Boot hook: rewrites the session nonce, so a restart signs everyone out
   index.css                  Tokens, .num, scrollbars, focus, print
   constants/defaultData.js   Default map, shift config, presets, regions
   context/CdrContext.jsx     All state, actions, the server dataset, localStorage effects
@@ -137,10 +152,11 @@ src/
   theme/colorSchemes.js      Two colour modes as semantic roles
   utils/
     dateRange.js             Preset and range resolution
+    motion.js                The one reading of prefers-reduced-motion and the in-app opt-in
     timeFormatter.js         Durations
     storage.js               Prefixed localStorage
   components/
-    layout/                  Sidebar, header, navConfig, DateRangeControl, DataActions
+    layout/                  Sidebar, header, MobileNav, navConfig, DateRangeControl, DataActions
     dashboard/               MetricsStrip
     rundown/                 Table, toolbar, column model, EditCell
     raw-cdr/                 RawCDRTable
@@ -153,7 +169,7 @@ src/
     common/                  Pagination, ToastContainer
 ```
 
-Fonts are self-hosted through `@fontsource`. Icons are `@phosphor-icons/react`. No CDN links. Every figure uses the `.num` class, which is a monospace face with tabular numerals, so columns of digits align.
+Fonts are self-hosted through `@fontsource` and `animate.css` supplies the view-switch keyframes. Icons are `@phosphor-icons/react`. No CDN links. Every figure uses the `.num` class, which is a monospace face with tabular numerals, so columns of digits align.
 
 ## Known debt
 

@@ -15,13 +15,16 @@ export default function SettingsView() {
     activeUpload,
     uploadHistory,
     restoreUpload,
-    isParsing
+    isParsing,
+    motion,
+    setMotion,
+    slide
   } = useCdr();
 
   const dates = availableDates(analysis);
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+    <div className={`animate__animated ${slide} grid grid-cols-1 gap-6 lg:grid-cols-3`}>
       <section className="panel space-y-3 rounded-2xl p-5 lg:col-span-2">
         <h2 className="border-b border-k-hairline pb-3 text-sm font-bold text-k-ink">Data</h2>
         <p className="num text-xs text-k-ink-muted">
@@ -78,6 +81,26 @@ export default function SettingsView() {
             Sign out
           </button>
         </form>
+
+        {/* Reduced motion is the reason a person would see no transition at all: both
+            index.css and animate.css clamp every ramp to about a millisecond, which is one
+            displaced frame. The OS flag is inherited, so the app lets it be overridden here
+            rather than asking anyone to go digging in Windows settings. */}
+        <h2 className="mt-5 border-t border-k-hairline pt-4 text-sm font-bold text-k-ink">Motion</h2>
+        <p className="mt-3 text-xs text-k-ink-muted">
+          If Windows has animation effects switched off, every transition in this app — the
+          view switch included — is cut to about a millisecond, which looks like the page
+          snapping into place. Run them at full length in this browser instead.
+        </p>
+        <label className="mt-3 flex items-center gap-2.5 text-xs text-k-ink">
+          <input
+            type="checkbox"
+            className="cbox"
+            checked={motion === 'full'}
+            onChange={(e) => setMotion(e.target.checked ? 'full' : 'system')}
+          />
+          Always animate view switches
+        </label>
       </section>
 
       <section className="panel rounded-2xl p-5 lg:col-span-3">
