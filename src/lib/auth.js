@@ -2,7 +2,13 @@
 // the same code runs in the request pipeline and in a plain `node ui-check.mjs` process,
 // and crypto.subtle is a global in both.
 
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
 export const SESSION_COOKIE = 'cati_cdr_session';
+// Same path instrumentation.js writes at boot; the two constants live apart because
+// that file is compiled for the edge runtime too and must not import this module.
+const SESSION_BOOT_FILE = path.join('data', '.session-boot');
 const TTL_MS = 12 * 60 * 60 * 1000;
 
 const encoder = new TextEncoder();
@@ -49,13 +55,26 @@ export async function checkPassword(candidate, real) {
   return (await digest(candidate)) === (await digest(real));
 }
 
+// The nonce instrumentation.js rewrites at every server start. A missing file falls
+// back to the env secret alone, so a build that never ran the boot hook still signs in
+// rather than failing every request.
+function bootNonce() {
+  try {
+    return readFileSync(SESSION_BOOT_FILE, 'utf8').trim();
+  } catch {
+    return '';
+  }
+}
+
 // Fail closed: with no SESSION_SECRET every token is unverifiable, and with no
 // APP_PASSWORD nothing can satisfy the check. A misconfigured deploy must lock the
-// team out, not leave the door open because a .env.local went missing.
+// team out, not leave the door open because a .env.local went missing. The signing key
+// is the env secret plus the boot nonce, so a restart retires every outstanding cookie.
 export function secrets() {
+  const session = process.env.SESSION_SECRET || '';
   return {
     password: process.env.APP_PASSWORD || '',
-    session: process.env.SESSION_SECRET || ''
+    session: session && `${session}:${bootNonce()}`
   };
 }
 
