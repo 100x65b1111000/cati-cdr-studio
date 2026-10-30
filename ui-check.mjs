@@ -57,6 +57,10 @@ const VIEWS = [
   ['5', 'settings']
 ];
 
+// The two views that render a report table, so a check that walks cells or headers does
+// not re-spell the pair.
+const TABLE_VIEWS = VIEWS.slice(0, 2);
+
 const failures = [];
 
 // The sample file has one date, so the two-click range can't be exercised through
@@ -84,6 +88,26 @@ async function shot(page, path, opts) {
   }
 }
 
+// Every view switch, dialog dismissal and stepper nudge is a key press followed by a
+// settle wait; 44 sites wrote both lines. A switch is not the key plus the ramp: the route
+// has to change, the lazy view has to mount, and only then does the 450ms sweep start — so
+// the page was still moving when a fixed wait expired, and the geometry below measured a
+// page in flight. The floor lets the commit happen; the wait is the app finishing.
+const press = (key, ms = 500, pg = page) =>
+  pg
+    .keyboard.press(key)
+    .then(() => pg.waitForTimeout(ms))
+    .then(() =>
+      pg.waitForFunction(
+        () =>
+          [...document.querySelectorAll('main .animate__animated')].every((el) =>
+            el.getAnimations().every((a) => a.playState !== 'running')
+          ),
+        null,
+        { timeout: 8000 }
+      )
+    );
+
 const browser = await chromium.launch();
 // Pin the emulated preference, or the app boots into whichever mode Playwright's
 // default happens to match and every measurement below silently changes meaning.
@@ -108,13 +132,111 @@ const paint = (vals) =>
     });
   }, vals);
 const chans = (vals) => paint(vals).then((list) => list.map((c) => c.slice(0, 3)));
-const near = (a, b) => a.every((n, i) => Math.abs(n - b[i]) <= 3);
+const near = (a, b, tol = 3) => a.every((n, i) => Math.abs(n - b[i]) <= tol);
 const rgb = (a) => `rgb(${a.join(' ')})`;
+// The sync twin of chans(): three channels out of a computed rgb()/oklab() string, for
+// the comparisons that do not need a composite. 4 checks wrote their own extractor.
+const chan = (s) => ((s || '').match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+// Two computed colour strings, close enough to be the same hue. The sites that only have
+// strings (never a composite to flatten) and a tolerance of their own.
+const rgbNear = (a, b, tol = 2) => near(chan(a), chan(b), tol);
 
-const lum = (c) => {
-  const f = (v) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4);
-  return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]);
+// A box padded and clamped to the viewport: the clip a screenshot of one control wants.
+// Two checks spelled the arithmetic out longhand.
+const clip = (b, pad = 24) => {
+  const x = Math.max(0, b.x - pad);
+  const y = Math.max(0, b.y - pad);
+  return { x, y, width: Math.min(b.width + 2 * pad, VIEWPORT.width - x - 1), height: Math.min(b.height + 2 * pad, VIEWPORT.height - y - 1) };
 };
+
+// Click a trigger and hand back the menu it owns. The menu is a child of the trigger's
+// own wrapper (which is what declares `--tone`), so a global `.menu` read picks up
+// whatever panel a previous check left open instead of the one just probed.
+const openMenu = async (trigger, ms = 260, pg = page) => {
+  await trigger.click();
+  await pg.waitForTimeout(ms);
+  return trigger.locator('xpath=ancestor::div[1]').locator('.menu');
+};
+
+// Every page the run opens reports into the same list, tagged by whoever opened it.
+const watch = (pg, tag = '') => {
+  pg.on('console', (m) => {
+    if (m.type() === 'error') failures.push(`console${tag}: ${m.text()}`);
+  });
+  pg.on('pageerror', (e) => failures.push(`pageerror${tag}: ${e.message}`));
+};
+
+// The number a line of toolbar text carries: "3 of 9 dates", "1 to 20 of 240". -1 when
+// the line is not on the page at all, so a vanished control reads as a failed count.
+const textNum = (re, g = 1) =>
+  page.evaluate(
+    ([source, group]) => {
+      const t = [...document.querySelectorAll('main span')]
+        .map((s) => (s.textContent || '').trim())
+        .find((x) => new RegExp(source).test(x));
+      return t ? Number(t.match(new RegExp(source))[group]) : -1;
+    },
+    [re.source, g]
+  );
+
+// The sidebar's rows, read once. Both checks walk this list, and the accessible name
+// "Rundown (1)" is the single source for the visible label and the hotkey.
+const navRows = () =>
+  page.evaluate(() => {
+    const aside = document.querySelector('aside').getBoundingClientRect();
+    return [...document.querySelectorAll('aside nav li button')].map((btn) => {
+      const box = btn.getBoundingClientRect();
+      const label = btn.getAttribute('aria-label') || '';
+      const m = label.match(/^(.*) \((.)\)$/);
+      return {
+        label,
+        key: m ? m[2] : '',
+        name: m ? m[1] : label,
+        text: btn.innerText.replace(/\s+/g, ' ').trim(),
+        current: btn.getAttribute('aria-current'),
+        icon: !!btn.querySelector('svg'),
+        clipped: box.left < aside.left || box.right > aside.right
+      };
+    });
+  });
+
+// The properties a hover may answer with. One of them moving is a state nobody sees, so
+// every hover check shares the same floor of two; the map is a parameter because a
+// search field carries its wash in background-image, not background-color.
+const HOVER_PROPS = { border: 'borderTopColor', bg: 'backgroundColor', shadow: 'boxShadow', color: 'color' };
+async function hoverMoves(loc, name, props = HOVER_PROPS) {
+  const read = () =>
+    loc.evaluate((node, map) => {
+      const cs = getComputedStyle(node);
+      return Object.fromEntries(Object.entries(map).map(([k, css]) => [k, cs[css]]));
+    }, props);
+  const idle = await read();
+  await loc.hover();
+  await page.waitForTimeout(220);
+  const over = await read();
+  const changed = Object.keys(idle).filter((k) => idle[k] !== over[k]);
+  console.log(`hover ${String(name).padEnd(16)} ${changed.length ? changed.join(',') : 'NOTHING'}`);
+  if (changed.length < 2)
+    failures.push(`hover: "${name}" repaints only ${changed.join(',') || 'nothing'}, still too subtle to notice`);
+  return { idle, changed };
+}
+
+// The token as the loaded stylesheet actually resolves it: paint it on a spare span,
+// read the computed colour back, drop the span. Six checks wrote these four lines.
+const cssColor = (expr, sel) =>
+  page.evaluate(([e, s]) => {
+    const p = document.createElement('span');
+    p.style.color = e;
+    (s ? document.querySelector(s) : document.body).appendChild(p);
+    const v = getComputedStyle(p).color;
+    p.remove();
+    return v;
+  }, [expr, sel]);
+
+// sRGB linearisation: the one place the knee lives, shared by the contrast and the
+// L*/Lab maths below.
+const lin = (v) => (v / 255 <= 0.04045 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4);
+const lum = (c) => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
 const between = (a, b) => {
   const [hi, lo] = [lum(a), lum(b)].sort((m, n) => n - m);
   return (hi + 0.05) / (lo + 0.05);
@@ -171,8 +293,7 @@ const fillOf = (r) => {
 // when the page never loaded.
 const toRgbArr = (hex) => hexToRgbTriplet(hex).split(' ').map(Number);
 const toLab = (c) => {
-  const f = (v) => (v / 255 <= 0.04045 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4);
-  const [R, G, B] = c.map(f);
+  const [R, G, B] = c.map(lin);
   const t = (v) => (v > 0.008856 ? Math.cbrt(v) : 7.787 * v + 16 / 116);
   const [fx, fy, fz] = [
     t((0.4124 * R + 0.3576 * G + 0.1805 * B) / 0.95047),
@@ -237,8 +358,7 @@ async function checkFlat() {
   for (const gone of ['backdrop-filter', 'pulseSlow', '.dot-layer', '.dot-bg', '.blob', '.glass-', '.glow-']) {
     if (css.includes(gone)) failures.push(`flat: src/index.css still contains "${gone}", which the repaint deleted`);
   }
-  await page.keyboard.press('1');
-  await page.waitForTimeout(350);
+  await press('1');
   const live = await page.evaluate(() => {
     const all = [...document.querySelectorAll('body *')];
     return {
@@ -269,8 +389,7 @@ async function checkModeSwitch() {
   // The switch is chrome, so the check starts on a view rather than on the page that
   // used to own it — and the rundown is where re-theming is hardest to get right, with
   // the hairlines, the sunken chrome and the table all reading the same palette.
-  await page.keyboard.press('1');
-  await page.waitForTimeout(350);
+  await press('1');
   const before = await read();
   const flip = page.getByRole('button', { name: new RegExp(COLOR_MODES[other].label, 'i') }).first();
   if (!(await flip.count())) {
@@ -294,15 +413,12 @@ async function checkModeSwitch() {
   const kept = await read();
   if (kept.mode !== other) failures.push(`mode: after a reload the app is back in "${kept.mode}", the stored choice was ignored`);
 
-  await page.keyboard.press('3');
-  await page.waitForTimeout(1200);
+  await press('3', 1200);
   const litLum = await bitmapLum();
-  await page.keyboard.press('5');
-  await page.waitForTimeout(350);
+  await press('5');
   await page.getByRole('button', { name: new RegExp(COLOR_MODES[DEFAULT_MODE].label, 'i') }).first().click();
   await page.waitForTimeout(300);
-  await page.keyboard.press('3');
-  await page.waitForTimeout(1200);
+  await press('3', 1200);
   const darkLum = await bitmapLum();
   console.log(`mode         ${before.mode}->${after.mode} stored=${JSON.stringify(after.stored)} reload=${kept.mode} chartL ${litLum?.toFixed(3)} vs ${darkLum?.toFixed(3)}`);
   if (litLum === null || darkLum === null) {
@@ -337,10 +453,7 @@ const bitmapLum = () =>
     return n ? sum / n : null;
   });
 
-page.on('console', (m) => {
-  if (m.type() === 'error') failures.push(`console: ${m.text()}`);
-});
-page.on('pageerror', (e) => failures.push(`pageerror: ${e.message}`));
+watch(page);
 
 // A run must not inherit whatever the last one left active, so put a known dataset in
 // through the same endpoint the app uses to seed an empty database on boot. Waiting for
@@ -357,9 +470,11 @@ await checkTone();
 await checkThreshold();
 await checkDetail();
 await checkCellSteppers();
+await checkCopy();
 await checkFieldHover();
 await checkToolbarFits();
 await checkControlHeights();
+await checkMotion();
 await checkPrintTone();
 await checkPrint();
 await checkExports();
@@ -377,8 +492,7 @@ await checkModeSwitch();
 // The mapping list burned a full page of width on two short values. The grid is the
 // fix, so measure the packing rather than trusting the class names.
 async function checkDirectory() {
-  await page.keyboard.press('4');
-  await page.waitForTimeout(400);
+  await press('4');
   const r = await page.evaluate(() => {
     const cards = [...document.querySelectorAll('main .panel.lift')];
     if (!cards.length) return null;
@@ -417,11 +531,8 @@ async function checkDirectory() {
 // the trigger's own icon rather than a restated hex, so it survives a mode switch
 // and it fails if the hue is wired to the menu but not to the button.
 async function checkTone() {
-  await page.keyboard.press('1');
-  await page.waitForTimeout(350);
+  await press('1');
 
-  const ch = (s) => ((s || '').match(/[\d.]+/g) || []).slice(0, 3).map(Number);
-  const same = (a, b) => a.length === 3 && b.length === 3 && a.every((n, i) => Math.abs(n - b[i]) <= 1);
   const key = (a) => (a ? a.join(',') : 'none');
 
   async function probe(label) {
@@ -432,13 +543,8 @@ async function checkTone() {
     }
     // The idle trigger colours its icon through the tone map, so the icon is the hue
     // the user says the menu should match.
-    const icon = ch(await trigger.locator('svg').first().evaluate((el) => getComputedStyle(el).color));
-    await trigger.click();
-    await page.waitForTimeout(260);
-    // The menu lives inside the trigger's own wrapper, and the wrapper is what
-    // declares --tone. Measuring `.menu` globally picks up whatever panel a
-    // previous check left open, so scope the read to the popover actually probed.
-    const menu = trigger.locator('xpath=ancestor::div[1]').locator('.menu');
+    const icon = chan(await trigger.locator('svg').first().evaluate((el) => getComputedStyle(el).color));
+    const menu = await openMenu(trigger);
     if (!(await menu.count())) {
       failures.push(`tone: "${label}" never opened a menu`);
       return null;
@@ -475,19 +581,18 @@ async function checkTone() {
     if (await item.count()) {
       await item.hover();
       await page.waitForTimeout(200);
-      hoverBorder = ch(await item.evaluate((el) => getComputedStyle(el).borderTopColor));
+      hoverBorder = chan(await item.evaluate((el) => getComputedStyle(el).borderTopColor));
     }
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(150);
+    await press('Escape', 150);
     return {
       icon,
-      tone: ch(r.tone),
-      border: ch(r.border),
-      fill: r.fill ? ch(r.fill) : null,
+      tone: chan(r.tone),
+      border: chan(r.border),
+      fill: r.fill ? chan(r.fill) : null,
       hoverBorder,
       hasBox: r.hasBox,
-      btn: r.btn ? ch(r.btn) : null,
-      fieldBorder: r.fieldBorder ? ch(r.fieldBorder) : null
+      btn: r.btn ? chan(r.btn) : null,
+      fieldBorder: r.fieldBorder ? chan(r.fieldBorder) : null
     };
   }
 
@@ -510,18 +615,18 @@ async function checkTone() {
     failures.push(`tone: the Agents and Columns menus share hue ${key(agents.tone)}, the popover is not following its trigger`);
   }
   for (const [name, p] of [['agents', agents], ['columns', columns], ['views', views]]) {
-    if (!same(p.icon, p.tone)) failures.push(`tone [${name}]: the menu is ${key(p.tone)} but its trigger icon is ${key(p.icon)}`);
-    if (!same(p.icon, p.border)) failures.push(`tone [${name}]: the menu edge is ${key(p.border)}, not the trigger's ${key(p.icon)}`);
-    if (p.hoverBorder && !same(p.icon, p.hoverBorder)) failures.push(`tone [${name}]: a hovered menu item lights ${key(p.hoverBorder)} instead of ${key(p.icon)}`);
+    if (!near(p.icon, p.tone, 1)) failures.push(`tone [${name}]: the menu is ${key(p.tone)} but its trigger icon is ${key(p.icon)}`);
+    if (!near(p.icon, p.border, 1)) failures.push(`tone [${name}]: the menu edge is ${key(p.border)}, not the trigger's ${key(p.icon)}`);
+    if (p.hoverBorder && !near(p.icon, p.hoverBorder, 1)) failures.push(`tone [${name}]: a hovered menu item lights ${key(p.hoverBorder)} instead of ${key(p.icon)}`);
     // A checked box is the loudest element in the panel; a blue tick in an amber menu
     // reads as two different apps stitched together.
     if (p.hasBox) {
       if (!p.fill) failures.push(`tone [${name}]: the menu has a checked box but no fill to read`);
-      else if (!same(p.icon, p.fill)) failures.push(`tone [${name}]: a checked box fills ${key(p.fill)}, not the trigger's ${key(p.icon)}`);
+      else if (!near(p.icon, p.fill, 1)) failures.push(`tone [${name}]: a checked box fills ${key(p.fill)}, not the trigger's ${key(p.icon)}`);
     }
     // Controls the panel owns, painted by the call site rather than the stylesheet.
-    if (p.btn && !same(p.icon, p.btn)) failures.push(`tone [${name}]: the panel's primary button is ${key(p.btn)}, not the trigger's ${key(p.icon)}`);
-    if (p.fieldBorder && !same(p.icon, p.fieldBorder)) failures.push(`tone [${name}]: a focused field in the panel edges to ${key(p.fieldBorder)}, not the trigger's ${key(p.icon)}`);
+    if (p.btn && !near(p.icon, p.btn, 1)) failures.push(`tone [${name}]: the panel's primary button is ${key(p.btn)}, not the trigger's ${key(p.icon)}`);
+    if (p.fieldBorder && !near(p.icon, p.fieldBorder, 1)) failures.push(`tone [${name}]: a focused field in the panel edges to ${key(p.fieldBorder)}, not the trigger's ${key(p.icon)}`);
   }
   if (!views.btn) failures.push('tone [views]: the Save button lost its .tone-btn class, it is accent again');
 }
@@ -529,8 +634,7 @@ async function checkTone() {
 // The break threshold control: one outlined pill holding a centred number and a
 // stepper that commits rather than leaving a draft behind.
 async function checkThreshold() {
-  await page.keyboard.press('1');
-  await page.waitForTimeout(350);
+  await press('1');
   const field = page.locator('main input[aria-label="Idle break threshold in minutes"]');
   if (!(await field.count())) {
     failures.push('threshold: no break threshold field to measure');
@@ -565,20 +669,15 @@ async function checkThreshold() {
   // Every other field in this toolbar lights up under the pointer. This one used to
   // sit dead, because its outline was a `ring-*` utility outside the hover contract.
   const pillBox = await pill.boundingBox();
-  const clip = {
-    x: Math.max(0, pillBox.x - 12),
-    y: Math.max(0, pillBox.y - 12),
-    width: Math.min(pillBox.width + 24, VIEWPORT.width - 4),
-    height: Math.min(pillBox.height + 24, VIEWPORT.height - 4)
-  };
-  await shot(page, `${OUT}/threshold-idle.png`, { clip });
+  const crop = clip(pillBox, 12);
+  await shot(page, `${OUT}/threshold-idle.png`, { clip: crop });
   await page.mouse.move(pillBox.x + 6, pillBox.y + pillBox.height / 2);
   await page.waitForTimeout(80);
   const hov = await pill.evaluate((el) => {
     const cs = getComputedStyle(el);
     return { color: cs.borderTopColor, shadow: cs.boxShadow, wash: cs.backgroundImage };
   });
-  await shot(page, `${OUT}/threshold-hover.png`, { clip });
+  await shot(page, `${OUT}/threshold-hover.png`, { clip: crop });
   console.log(`hover threshold  ${rest.color} ${rest.shadow} -> ${hov.color} ${hov.shadow}`);
   if (hov.color === rest.color) failures.push('threshold: hovering the pill never moved its edge, the control is dead to the pointer');
   // The flat model answers the pointer with an edge and a wash, not a cast, so the
@@ -595,17 +694,6 @@ async function checkThreshold() {
   await page.mouse.move(0, 0);
   await page.waitForTimeout(80);
 
-  // The toolbar is a flex-wrap row, and the sidebar column now takes 320px of it at
-  // 1440, so it wraps by design. Two rows is the layout; more means a control grew
-  // past its share and the row is being rebuilt one control at a time.
-  const bar = await page.evaluate(() => {
-    const el = document.querySelector('main .panel.flex-wrap');
-    const tops = [...el.children].map((k) => k.getBoundingClientRect().top);
-    return { h: Math.round(el.getBoundingClientRect().height), wrapped: tops.filter((t) => t - Math.min(...tops) > 6).length };
-  });
-  console.log(`toolbar  h=${bar.h}px wrapped=${bar.wrapped}`);
-  if (bar.wrapped > 4) failures.push(`threshold: the toolbar broke into ${bar.wrapped + 1} rows (${bar.h}px tall), a control is too wide`);
-
   // The carets belong inside the field. If they escape the box they are flanking
   // buttons again, which is the width this layout cannot afford.
   const nest = await page.evaluate(() => {
@@ -617,12 +705,10 @@ async function checkThreshold() {
 
   // The pill gained two stepper buttons, so the crops above are here to catch it
   // overflowing its own container rather than wrapping cleanly.
-  if (pillBox) {
-    await field.focus();
-    await page.waitForTimeout(180);
-    await shot(page, `${OUT}/threshold-focus.png`, { clip });
-    await field.blur();
-  }
+  await field.focus();
+  await page.waitForTimeout(180);
+  await shot(page, `${OUT}/threshold-focus.png`, { clip: crop });
+  await field.blur();
 
   const step = async (label) => {
     await page.locator(`main button[aria-label="${label}"]`).click();
@@ -634,9 +720,7 @@ async function checkThreshold() {
     .getByText(new RegExp(`Break threshold updated to ${Number(rest.value) + 1} min`))
     .count();
   const down = await step('Decrease the break threshold by one minute');
-  await step('Increase the break threshold by one minute');
-  await step('Decrease the break threshold by one minute');
-  console.log(`steppers  +1=${up} toast=${toast} -1=${down} back=${await field.inputValue()}`);
+  console.log(`steppers  +1=${up} toast=${toast} -1=${down}`);
   if (String(Number(rest.value) + 1) !== up) failures.push(`threshold: + set the field to "${up}" from "${rest.value}"`);
   if (!toast) failures.push('threshold: + changed the draft but never committed it, no recalculation reported');
   if (String(Number(up) - 1) !== down) failures.push(`threshold: - set the field to "${down}" from "${up}"`);
@@ -646,36 +730,28 @@ async function checkThreshold() {
 // point: the whole row opened the agent panel, and the close button hovered accent
 // blue like every other control.
 async function checkDetail() {
-  await page.keyboard.press('1');
-  await page.waitForTimeout(350);
+  await press('1');
 
+  const accent = await cssColor('rgb(var(--k-accent))');
   const chip = await page.evaluate(() => {
     const el = document.querySelector('main tbody tr td:nth-child(3) > span');
     if (!el) return null;
     const cs = getComputedStyle(el);
-    const probe = document.createElement('span');
-    probe.style.color = 'rgb(var(--k-accent))';
-    document.body.appendChild(probe);
-    const accent = getComputedStyle(probe).color;
-    probe.remove();
-    return { text: el.innerText.trim(), bg: cs.backgroundColor, color: cs.color, accent, radius: parseFloat(cs.borderRadius) || 0 };
+    return { text: el.innerText.trim(), bg: cs.backgroundColor, color: cs.color, radius: parseFloat(cs.borderRadius) || 0 };
   });
-  const ch3 = (s) => ((s || '').match(/[\d.]+/g) || []).slice(0, 3).map(Number).join(',');
-  const near = (a, b) => ch3(a).split(',').every((n, i) => Math.abs(Number(n) - Number(ch3(b).split(',')[i])) <= 2);
-  console.log(`chip   calls="${chip?.text}" bg=${chip?.bg} text=${ch3(chip?.color)} accent=${ch3(chip?.accent)} radius=${chip?.radius}`);
+  console.log(`chip   calls="${chip?.text}" bg=${chip?.bg} text=${chan(chip?.color).join(',')} accent=${chan(accent).join(',')} radius=${chip?.radius}`);
   if (!chip) failures.push('chip: no total-calls cell to read');
   else {
     if (/rgba\(0, 0, 0, 0\)|transparent/.test(chip.bg)) failures.push(`chip: the total sits on nothing (bg=${chip.bg}), it is not a chip`);
     if (chip.radius < 2) failures.push(`chip: the total's corners are ${chip.radius}px, it is a raw block not a chip`);
-    if (!near(chip.color, chip.accent)) failures.push(`chip: the total reads ${ch3(chip.color)}, a flat grey on grey is the bland version`);
+    if (!rgbNear(chip.color, accent)) failures.push(`chip: the total reads ${chan(chip.color).join(',')}, a flat grey on grey is the bland version`);
   }
 
   await page.locator('main tbody tr').nth(1).click();
   await page.waitForTimeout(400);
   if (await page.locator('[role="dialog"]').count()) {
     failures.push('details: clicking a row opens the agent panel, only the Details button should');
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(300);
+    await press('Escape', 300);
   }
 
   await page.locator('main tbody tr [aria-label^="Breakdown for"]').first().click();
@@ -685,14 +761,10 @@ async function checkDetail() {
     failures.push('details: the Details button no longer opens the panel');
     return;
   }
+  const want = await cssColor('rgb(var(--k-danger) / 1)');
   const paint = await close.evaluate((el) => {
-    const p = document.createElement('span');
-    p.style.color = 'rgb(var(--k-danger) / 1)';
-    el.appendChild(p);
-    const want = getComputedStyle(p).color;
-    p.remove();
     const cs = getComputedStyle(el);
-    return { want, color: cs.color, bg: cs.backgroundColor };
+    return { color: cs.color, bg: cs.backgroundColor };
   });
   await close.hover();
   await page.waitForTimeout(220);
@@ -700,11 +772,10 @@ async function checkDetail() {
     const cs = getComputedStyle(el);
     return `${cs.color}|${cs.backgroundColor}|${cs.boxShadow}`;
   });
-  const nums = (s) => ((s || '').match(/[\d.]+/g) || []).slice(0, 3).map(Number);
   const rest = `${paint.color}|${paint.bg}`;
-  console.log(`close  danger=${nums(paint.want).join(',')} idle=${nums(paint.color).join(',')} bg=${nums(paint.bg).join(',')}`);
-  if (!nums(paint.want).every((n, i) => Math.abs(n - nums(paint.color)[i]) <= 2))
-    failures.push(`close: the button is ${nums(paint.color).join(',')}, not the scheme's danger ${nums(paint.want).join(',')}`);
+  console.log(`close  danger=${chan(want).join(',')} idle=${chan(paint.color).join(',')} bg=${chan(paint.bg).join(',')}`);
+  if (!rgbNear(want, paint.color))
+    failures.push(`close: the button is ${chan(paint.color).join(',')}, not the scheme's danger ${chan(want).join(',')}`);
   if (/rgba\(0, 0, 0, 0\)|transparent/.test(paint.bg)) failures.push('close: the button has no red wash behind it');
   if (rest === on) failures.push('close: hovering the button repaints nothing');
 
@@ -716,8 +787,7 @@ async function checkDetail() {
 // The editable cells carry the same in-field steppers as the break threshold, so a
 // click has to land in the data and not just in the box.
 async function checkCellSteppers() {
-  await page.keyboard.press('1');
-  await page.waitForTimeout(300);
+  await press('1');
 
   // Half dones and surveys are the only editable cells in the grid. An outline is what
   // says "you can type here" without the number looking like a button, and it has to be
@@ -799,20 +869,55 @@ async function checkCellSteppers() {
   if (String(Number(before)) !== back) failures.push(`cell stepper: two - from "${after}" landed on "${back}", not back on "${before}"`);
 }
 
+// A click on a figure in the grid takes it to the clipboard. Two ways this is silently
+// useless: the copy never lands (a browser that refused the write, a promise nobody reads
+// back) and the cell handler stealing the click from the two cells that edit themselves.
+// The third is granularity — a click on one break stamp has to take that stamp, not the
+// column, or the cell copies text nobody pointed at.
+async function checkCopy() {
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await press('1');
+  const clip = () => page.evaluate(() => navigator.clipboard.readText().catch(() => null));
+  const tap = async (loc) => {
+    const want = (await loc.innerText()).trim();
+    await loc.click();
+    await page.waitForTimeout(260);
+    return { want, got: await clip() };
+  };
+
+  const cell = page.locator('main tbody tr.row-hover td').first();
+  const one = await tap(cell);
+  const cursor = await cell.evaluate((td) => getComputedStyle(td).cursor);
+  console.log(`copy cell      "${one.want}" -> "${one.got}" cursor=${cursor}`);
+  if (one.got !== one.want) failures.push(`copy: clicking "${one.want}" left "${one.got}" on the clipboard`);
+  if (cursor !== 'copy') failures.push(`copy: the value cells show a ${cursor} cursor, so nothing says they can be clicked`);
+  if (!(await page.getByText(`Copied ${one.want}`).count()))
+    failures.push('copy: the value reached the clipboard with no word about it, which is indistinguishable from nothing happening');
+
+  const stamp = await tap(page.locator('main tbody td .num', { hasText: ' - ' }).first());
+  console.log(`copy chip      "${stamp.want}" -> "${stamp.got}"`);
+  if (stamp.got !== stamp.want)
+    failures.push(`copy: clicking one stamp "${stamp.want}" left "${stamp.got}", the click takes more than the value under it`);
+
+  await page.locator('main tbody tr.row-hover input').first().click();
+  await page.waitForTimeout(200);
+  const kept = await clip();
+  console.log(`copy edit      input click leaves "${kept}"`);
+  if (kept !== stamp.got) failures.push(`copy: clicking the editable cell rewrote the clipboard to "${kept}"`);
+  // Hand the keyboard back: a focused cell swallows the number keys the next check uses
+  // to switch views, and it types them into the draft instead.
+  await press('Escape', 200);
+}
+
 // `k-ink` is #F4F7FC in studio — white. It is the right colour for a heading and the
 // wrong one for twenty rows of figures, so no cell may render its own text with it.
 // Names are the exception the user asked for: prose reads better neutral than tinted.
 async function checkInk() {
   const ALLOW_WHITE = ['agent'];
-  for (const [key, view] of [['1', 'rundown'], ['2', 'rawCdr']]) {
-    await page.keyboard.press(key);
-    await page.waitForTimeout(350);
-    const white = await page.evaluate((allow) => {
-      const probe = document.createElement('span');
-      probe.style.color = 'rgb(var(--k-ink))';
-      document.body.appendChild(probe);
-      const ink = getComputedStyle(probe).color;
-      probe.remove();
+  const ink = await cssColor('rgb(var(--k-ink))');
+  for (const [key, view] of TABLE_VIEWS) {
+    await press(key);
+    const white = await page.evaluate(([allow, ink]) => {
       const hits = [];
       const head = [...document.querySelectorAll('main thead th')].map((th) => th.innerText.trim().toLowerCase());
       for (const td of document.querySelectorAll('main tbody tr:first-child td')) {
@@ -826,18 +931,17 @@ async function checkInk() {
         }
       }
       return hits;
-    }, ALLOW_WHITE);
+    }, [ALLOW_WHITE, ink]);
     console.log(`ink ${view.padEnd(9)} white=${white.length}${white.length ? ` ${white.join(' ')}` : ''}`);
     if (white.length) failures.push(`${view}: ${white.length} cell value(s) still render in white k-ink — ${white.join(', ')}`);
   }
 }
 
 
-// Every column centres. Asserted per label, so a renamed column shows up as an
-// unclassified one rather than being quietly skipped.
+// Every column centres, head and cells alike. Asserted per label, so the failure names
+// the column rather than an index someone has to go and look up.
 async function checkAlign() {
-  await page.keyboard.press('1');
-  await page.waitForTimeout(350);
+  await press('1');
   const cols = await page.evaluate(() =>
     [...document.querySelectorAll('main thead th')].map((th, i) => ({
       label: th.innerText.trim().toLowerCase(),
@@ -845,14 +949,11 @@ async function checkAlign() {
       cell: getComputedStyle(document.querySelector(`main tbody tr > td:nth-child(${i + 1})`)).textAlign
     }))
   );
-  const KNOWN = ['extension', 'agent', 'shift date', 'regions', 'calls', 'calls/hr', 'half', 'surveys', 'talk', 'span', 'breaks', 'total breaks', 'break time', 'net active', 'details'];
   console.log(`align  ${cols.map((c) => `${c.label}:${c.head}`).join(' ')}`);
   for (const c of cols) {
     if (c.head !== c.cell) failures.push(`align: "${c.label}" centres its header (${c.head}) but not its cells (${c.cell})`);
     if (c.head !== 'center') failures.push(`align: "${c.label}" reads ${c.head}, every column is meant to centre`);
   }
-  const unknown = cols.filter((c) => !KNOWN.includes(c.label)).map((c) => c.label);
-  if (unknown.length) failures.push(`align: unclassified column(s) ${unknown.join(', ')} — add them to KNOWN`);
 }
 
 
@@ -860,40 +961,19 @@ async function checkAlign() {
 // native OS box, a Details column that can be switched off, and break stamps that
 // wrap into a pile instead of a list. Each is measured, not eyeballed.
 async function checkInteractions() {
-  await page.keyboard.press('1');
-  await page.waitForTimeout(400);
+  await press('1');
 
-  const paint = (el) =>
-    el.evaluate((node) => {
-      const cs = getComputedStyle(node);
-      return { border: cs.borderTopColor, bg: cs.backgroundColor, shadow: cs.boxShadow, color: cs.color };
-    });
-
-  // A state that repaints one property out of four is still a hover you cannot see.
+  // The numbers say a state exists; this is the crop for judging whether it reads.
   async function hoverStep(name, loc) {
     const target = loc.first();
     if (!(await target.count())) {
       failures.push(`hover: no "${name}" element to measure`);
       return;
     }
-    const idle = await paint(target);
-    await target.hover();
-    await page.waitForTimeout(220);
-    const on = await paint(target);
-    const changed = ['border', 'bg', 'shadow', 'color'].filter((k) => idle[k] !== on[k]);
-    console.log(`hover ${name.padEnd(16)} ${changed.length ? changed.join(',') : 'NOTHING'}`);
-    if (changed.length < 2) {
-      failures.push(`hover: "${name}" repaints only ${changed.join(',') || 'nothing'}, still too subtle to notice`);
-    }
-    // The numbers say a state exists; this is the crop for judging whether it reads.
+    await hoverMoves(target, name);
     const b = await target.boundingBox();
-    if (b) {
-      const x = Math.max(0, b.x - 24);
-      const y = Math.max(0, b.y - 24);
-      await shot(page, `${OUT}/hover-${name.replace(/[^\w-]+/g, '-').toLowerCase()}.png`, {
-        clip: { x, y, width: Math.min(b.width + 48, VIEWPORT.width - x - 1), height: Math.min(b.height + 48, VIEWPORT.height - y - 1) }
-      });
-    }
+    if (b)
+      await shot(page, `${OUT}/hover-${name.replace(/[^\w-]+/g, '-').toLowerCase()}.png`, { clip: clip(b) });
   }
 
   const columns = page.getByRole('button', { name: /Columns/ });
@@ -956,8 +1036,7 @@ async function checkInteractions() {
       failures.push(`checkbox: no tick painted on the checked box (content=${box.tick.content})`);
     if (box.noTick.w > 0) failures.push('checkbox: the tick shows on unchecked boxes too');
   }
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(150);
+  await press('Escape', 150);
 
   // Rows are wide and stacked twenty deep, so they take a fill step rather than a
   // wash. Still has to be a step the eye can find. Measured with the popover closed:
@@ -1119,13 +1198,12 @@ async function checkRings(view) {
   if (r.silent.length) failures.push(`focus [${view}]: ${r.silent.join(', ')} repaint nothing when focused, the keyboard caret is invisible`);
 }
 
-// The floating bar, plus the two data actions that now live in the rail. The bar must
+// The floating bar, plus the two data actions that now live in the sidebar. The bar must
 // stay detached from the viewport and hold its offset while the page scrolls; the buttons
 // carry colour from the active scheme, so their text has to clear AA in all six, not just
 // the default.
 async function checkChrome() {
   const bar = page.locator('header.no-print');
-  const box = await bar.boundingBox();
   const gaps = await bar.evaluate((el) => ({
     top: Math.round(el.getBoundingClientRect().top),
     left: Math.round(el.getBoundingClientRect().left),
@@ -1137,7 +1215,6 @@ async function checkChrome() {
   console.log(
     `float    top=${gaps.top}px left=${gaps.left}px right=${gaps.right}px radius=${gaps.radius} shadow=${gaps.lifted} clearance=${gaps.clearance}px`
   );
-  if (box === null) failures.push('float: the header did not render');
   if (gaps.top < 8 || gaps.left < 8 || gaps.right < 8) {
     failures.push(`float: the bar is still touching an edge (${gaps.top}/${gaps.left}/${gaps.right}px gaps)`);
   }
@@ -1157,8 +1234,7 @@ async function checkChrome() {
     upload: { sel: 'aside label' },
     export: { sel: 'aside button', text: 'Export' }
   };
-  await page.keyboard.press('1');
-  await page.waitForTimeout(250);
+  await press('1');
   // Two metrics carry a hue of their own. Which nth-child a column is depends on how
   // many are hidden, so resolve each from its header rather than hardcode a position.
   const HUES = [
@@ -1279,8 +1355,7 @@ async function checkPopovers(view) {
     }
     await probe(menu.last(), view, label);
     await shot(page, `${OUT}/${view}--${label.replace(/[^\w-]+/g, '-')}.png`);
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(120);
+    await press('Escape', 120);
   }
 }
 
@@ -1292,13 +1367,7 @@ async function checkPopovers(view) {
 // there. Both floors are asserted, and the live document is read back so a palette edit
 // that never reached the DOM cannot pass.
 async function checkLayers() {
-  const L = (hex) => {
-    const f = (v) => (v / 255 <= 0.04045 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4);
-    const n = parseInt(hex.slice(1), 16);
-    const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(f);
-    const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    return y > 0.008856 ? 116 * Math.cbrt(y) - 16 : 903.3 * y;
-  };
+  const L = (hex) => toLab(toRgbArr(hex))[0];
   for (const [id, mode] of Object.entries(COLOR_MODES)) {
     const c = mode.colors;
     const plate = L(c.surface) - L(c.page);
@@ -1326,38 +1395,18 @@ async function checkLayers() {
 // The complaint was that a search bar never answered the pointer. Hover only has
 // something to say while the field is not focused, so that is the state measured.
 async function checkFieldHover() {
-  for (const [key, view] of [
-    ['1', 'rundown'],
-    ['2', 'rawCdr']
-  ]) {
-    await page.keyboard.press(key);
-    await page.waitForTimeout(350);
+  for (const [key, view] of TABLE_VIEWS) {
+    await press(key);
     const field = page.locator('main input[type="search"]').first();
     if (!(await field.count())) {
       failures.push(`hover [${view}]: the toolbar has no search field to measure`);
       continue;
     }
-    // One recoloured property is still a hover you cannot see, so count the moves
-    // rather than assert a cast. The wash lands in `background-image` by design: a
-    // field that swaps its opaque sunken fill for a translucent tint reads inverted.
-    const read = () =>
-      field.evaluate((el) => {
-        const s = getComputedStyle(el);
-        return { edge: s.borderTopColor, wash: s.backgroundImage, shadow: s.boxShadow, color: s.color };
-      });
-    const rest = await read();
-    await field.hover();
-    await page.waitForTimeout(150);
-    const over = await read();
+    // The wash lands in `background-image` by design: a field that swaps its opaque
+    // sunken fill for a translucent tint reads inverted.
+    await hoverMoves(field, view, { edge: 'borderTopColor', wash: 'backgroundImage', shadow: 'boxShadow', color: 'color' });
     await page.mouse.move(4, 4);
     await page.waitForTimeout(120);
-    const changed = Object.keys(rest).filter((k) => rest[k] !== over[k]);
-    console.log(`hover ${view.padEnd(8)} ${changed.length ? changed.join(',') : 'NOTHING'} (${rest.edge} -> ${over.edge})`);
-    if (changed.length < 2) {
-      failures.push(
-        `hover [${view}]: the search bar repaints only ${changed.join(',') || 'nothing'}, the pointer gets no answer`
-      );
-    }
   }
 }
 
@@ -1367,8 +1416,7 @@ async function checkFieldHover() {
 // classes — one row, slack still left for the badges to grow into, and neither field
 // so narrow it clips what it has to show.
 async function checkToolbarFits() {
-  await page.keyboard.press('1');
-  await page.waitForTimeout(350);
+  await press('1');
   const m = await page.evaluate(() => {
     const bar = document.querySelector('main .panel');
     const cs = getComputedStyle(bar);
@@ -1416,7 +1464,7 @@ async function checkToolbarFits() {
       thresh: { need: textWidth(thresh, '120') + 13, room: room(thresh) }
     };
   });
-  // Two rows is the design at 1440 now that the sidebar owns 320px of the column, so
+  // Two rows is the design at 1440 now that the sidebar owns 288px of the column, so
   // the ceiling is a third row; the slack figure is reported, not asserted, because a
   // wrapped row has no single width to measure.
   console.log(
@@ -1438,8 +1486,7 @@ async function checkToolbarFits() {
 // excluded by the 24px floor.
 async function checkControlHeights() {
   for (const [key, name] of VIEWS) {
-    await page.keyboard.press(key);
-    await page.waitForTimeout(300);
+    await press(key);
     const rows = await page.evaluate(() =>
       [...document.querySelectorAll('main [role="group"], header [role="group"]')].map((g) => {
         const sibs = [...g.parentElement.children].filter((c) => c.getBoundingClientRect().height >= 24);
@@ -1456,8 +1503,167 @@ async function checkControlHeights() {
       }
     }
   }
-  await page.keyboard.press('1');
-  await page.waitForTimeout(300);
+  await press('1');
+}
+
+// A switch that only swaps the text in place reads as a freeze, and a chart that snaps to
+// its new numbers reads as a screenshot. Both have to move — and "move" is measured as how
+// long the page stays displaced, not how far: a ramp clamped to 1ms still travels the whole
+// height of the view, in a single frame, and reads as nothing at all.
+async function checkMotion() {
+  // Sampled from inside the page on animation frames: a round trip per sample is slower than
+  // the ramp itself, so measuring from outside only ever catches a settled page.
+  const displaced = (pg) =>
+    pg.evaluate(
+      () =>
+        new Promise((done) => {
+          let first = 0, last = 0, px = 0, nodes = 0, name = 'none', ms = 0;
+          let barLo = Infinity, barHi = -Infinity;
+          const t0 = performance.now();
+          const poll = () => {
+            const now = performance.now() - t0;
+            // The chrome has to stay put: a displaced page grows the document, the browser
+            // clamps the scroll offset to it, and the sticky bar rides that out of the window.
+            const bar = document.querySelector('header.app-bar')?.getBoundingClientRect().top;
+            if (bar !== undefined) {
+              barLo = Math.min(barLo, bar);
+              barHi = Math.max(barHi, bar);
+            }
+            const found = [...document.querySelectorAll('main .animate__animated')];
+            nodes = Math.max(nodes, found.length);
+            for (const el of found) {
+              const cs = getComputedStyle(el);
+              if (cs.animationName !== 'none') {
+                name = cs.animationName;
+                ms = Math.round(parseFloat(cs.animationDuration) * 1000);
+              }
+              const y = Math.abs(new DOMMatrix(cs.transform).m42);
+              if (y > 40) {
+                if (!first) first = now;
+                last = now;
+              }
+              px = Math.max(px, y);
+            }
+            if (now < 1600) requestAnimationFrame(poll);
+            else
+              done({
+                px: Math.round(px),
+                held: Math.round(last - first),
+                nodes,
+                name,
+                ms,
+                barLo: Math.round(barLo),
+                barHi: Math.round(barHi)
+              });
+          };
+          poll();
+        })
+    );
+
+  // The key press has to come from Node, so the sampler starts first and the switch lands
+  // while the page is already being watched.
+  const sweep = async (pg, key) => {
+    const watching = displaced(pg);
+    await pg.keyboard.press(key);
+    return watching;
+  };
+
+  await press('1');
+  const enter = await sweep(page, '2');
+  console.log(
+    `motion view    ${enter.name} ${enter.ms}ms, ${enter.px}px held ${enter.held}ms over ${enter.nodes} nodes`
+  );
+  if (enter.name === 'none' || enter.ms < 200)
+    failures.push(`motion: the switch ramps "${enter.name}" ${enter.ms}ms, so it reads as a silent text swap`);
+  if (enter.held < 150)
+    failures.push(`motion: the switch stays displaced for ${enter.held}ms, which reads as a snap, not a sweep`);
+  if (enter.nodes < 2)
+    failures.push(`motion: only ${enter.nodes} nodes ride the sweep, so the heading sits still while the view moves`);
+
+  // The direction belongs to the rail, not to the page: forward through the views lifts the
+  // next one from below, back through them drops the previous one from above. A switch that
+  // always travels the same way reads as a page that ignores where you came from.
+  const back = await sweep(page, '1');
+  console.log(`motion return  ${back.name} ${back.ms}ms, held ${back.held}ms`);
+  if (enter.name !== 'slideInUp')
+    failures.push(`motion: 1→2 ramped "${enter.name}", so a forward switch does not rise from below`);
+  if (back.name !== 'slideInDown')
+    failures.push(`motion: 2→1 ramped "${back.name}", so a backward switch does not drop from above`);
+  for (const [leg, s] of [['1→2', enter], ['2→1', back]]) {
+    console.log(`motion bar     ${leg} stays ${s.barLo}→${s.barHi}px`);
+    if (s.barHi - s.barLo > 1)
+      failures.push(
+        `motion: the app bar moves ${s.barLo}→${s.barHi}px on the ${leg} switch, so the header flickers as the page grows the document under it`
+      );
+  }
+
+  // The spill only bites when the incoming page is the taller one: its displaced height
+  // lengthens the scroll range, the browser re-anchors the scroll offset to keep something
+  // steady under the eyes, and the sticky bar rides that out of the window. Switching from
+  // raw CDR, which fits, into settings, which does not, is the one pair that does it.
+  await press('2');
+  const taller = await sweep(page, '5');
+  console.log(`motion bar     2→5 stays ${taller.barLo}→${taller.barHi}px`);
+  if (taller.barHi - taller.barLo > 1)
+    failures.push(
+      `motion: switching into a taller view moved the app bar ${taller.barLo}→${taller.barHi}px, so the header flickers`
+    );
+
+  // Sample from inside the page on animation frames: a round-trip per sample is slower
+  // than the chunk load, so measuring from outside only ever catches the settled chart.
+  // And the sampler has to be running before the key goes, because the chart only starts
+  // drawing once the route has settled — press first and measure second sees a finished
+  // picture and calls it a ramp.
+  const chart = page.evaluate(
+    () =>
+      new Promise((done) => {
+        const out = [];
+        const t0 = performance.now();
+        const poll = () => {
+          const c = document.querySelector('main canvas');
+          if (c) {
+            const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+            let n = 0;
+            for (let i = 3; i < d.length; i += 4) if (d[i] > 8) n++;
+            if (out[out.length - 1] !== n) out.push(n);
+          }
+          const ms = performance.now() - t0;
+          // 1500ms, not 900: the chart does not begin until the route has settled, so the
+          // window has to cover the wait as well as the 700ms ramp.
+          if (ms < 2500 && !(out.length > 4 && ms > 1500)) requestAnimationFrame(poll);
+          else done(out);
+        };
+        poll();
+      })
+  );
+  await page.keyboard.press('3');
+  const levels = await chart;
+  console.log(`motion chart   ${levels.length} frames: ${levels.slice(0, 8).join('>')}`);
+  if (levels.length < 5) failures.push(`motion: the volume chart drew ${levels.length} frames, so it snaps to its data`);
+  // The failure that hid this feature for three rounds: a browser reporting reduced motion
+  // clamps every ramp to about a millisecond — animate.css pins `.animate__animated`, our own
+  // stylesheet pins `*` — so the sweep is a single frame and no amount of travel is visible.
+  // The clamp has to hold, and Settings' Motion opt-in has to lift it.
+  const ctx = await browser.newContext({ viewport: VIEWPORT, colorScheme: DEFAULT_MODE, reducedMotion: 'reduce' });
+  await signIn(ctx);
+  const pg = await ctx.newPage();
+  await pg.goto(BASE, { waitUntil: 'load' });
+  await pg.waitForSelector('main h2');
+  await pg.waitForTimeout(600);
+  const clamped = await sweep(pg, '2');
+  await pg.evaluate(() => {
+    document.documentElement.dataset.motion = 'full';
+  });
+  const opted = await sweep(pg, '3');
+  await ctx.close();
+  console.log(
+    `motion reduce  ${clamped.ms}ms held ${clamped.held}ms · opt-in ${opted.ms}ms held ${opted.held}ms`
+  );
+  if (clamped.held > 60)
+    failures.push(`motion: reduced motion sweeps for ${clamped.held}ms, so the OS flag is ignored`);
+  if (opted.held < 150)
+    failures.push(`motion: the Motion opt-in sweeps for only ${opted.held}ms, so it cannot be overridden`);
+  await press('1');
 }
 
 // A `hoverable` control takes its edge and wash from --tone, which falls back
@@ -1465,8 +1671,7 @@ async function checkControlHeights() {
 // hovering it lights the wrong hue — the popovers get this from FilterPopover, and
 // Print is the one control that sets it by hand.
 async function checkPrintTone() {
-  await page.keyboard.press('1');
-  await page.waitForTimeout(350);
+  await press('1');
   const btn = page.getByRole('button', { name: 'Print', exact: true });
   if (!(await btn.count())) {
     failures.push('print: the rundown toolbar has no Print button');
@@ -1477,7 +1682,7 @@ async function checkPrintTone() {
   await page.waitForTimeout(200);
   const edge = await btn.evaluate((el) => getComputedStyle(el).borderTopColor);
   await page.mouse.move(4, 4);
-  const tri = (s) => (s.match(/[\d.]+/g) || []).slice(0, 3).join(',');
+  const tri = (s) => chan(s).join(',');
   console.log(`print tone   icon=${tri(icon)} hover=${tri(edge)}`);
   if (tri(icon) !== tri(edge)) {
     failures.push(`print: the icon is rgb(${tri(icon)}) but hovering lights it rgb(${tri(edge)})`);
@@ -1508,8 +1713,7 @@ async function checkPrint() {
     }
   }
 
-  await page.keyboard.press('3');
-  await page.waitForTimeout(1200);
+  await press('3', 1200);
   const screen = await bitmapLum();
   if (screen === null) failures.push('print: the analytics view rendered no canvas to measure');
 
@@ -1518,8 +1722,7 @@ async function checkPrint() {
   const printed = await bitmapLum();
   // The table-only assertions run on the rundown view, because analytics has no
   // <thead> or scroll-capped container to measure and a null here would read as a pass.
-  await page.keyboard.press('1');
-  await page.waitForTimeout(350);
+  await press('1');
   const paper = await page.evaluate(() => ({
     mode: document.documentElement.getAttribute('data-mode'),
     warning: getComputedStyle(document.documentElement).getPropertyValue('--k-warning').trim(),
@@ -1559,8 +1762,7 @@ async function checkPrint() {
 // with the extension its label promises. It runs from Settings on purpose: the menu lives
 // in the sidebar now, so it must not need the rundown on screen to produce a file.
 async function checkExports() {
-  await page.keyboard.press('5');
-  await page.waitForTimeout(400);
+  await press('5');
   await page.getByRole('button', { name: /Export/ }).click();
   for (const [label, ext] of [
     ['Excel, every agent-day', '.xlsx'],
@@ -1575,8 +1777,7 @@ async function checkExports() {
     console.log(`export       ${ext.padEnd(5)} ${name}`);
     if (!name.endsWith(ext)) failures.push(`export: "${label}" downloaded "${name}", not a ${ext} file`);
   }
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(200);
+  await press('Escape', 200);
 }
 
 // The range used to be two native <input type="date">: system chrome the two modes
@@ -1584,8 +1785,7 @@ async function checkExports() {
 // browser picker is gone, the panel that replaced it clears the toolbar under it, and
 // the grid offers exactly the dates the data carries.
 async function checkCalendar() {
-  await page.keyboard.press('1');
-  await page.waitForTimeout(350);
+  await press('1');
   await page.getByRole('button', { name: 'Custom', exact: true }).click();
   await page.waitForTimeout(250);
   const native = await page.locator('input[type="date"]').count();
@@ -1601,9 +1801,7 @@ async function checkCalendar() {
     failures.push('calendar: the title row has no range trigger');
     return;
   }
-  await trigger.click();
-  await page.waitForTimeout(250);
-  const menu = trigger.locator('xpath=ancestor::div[1]').locator('.menu');
+  const menu = await openMenu(trigger, 250);
   const box = await menu.boundingBox();
   if (!box) {
     failures.push('calendar: the range trigger never opened a panel');
@@ -1623,14 +1821,7 @@ async function checkCalendar() {
     els.map((e) => ({ iso: e.getAttribute('aria-label'), off: e.disabled }))
   );
   const live = cells.filter((c) => !c.off).map((c) => c.iso);
-  const datesIn = () =>
-    page.evaluate(() => {
-      const t = [...document.querySelectorAll('main span')]
-        .map((s) => (s.textContent || '').trim())
-        .find((x) => /^\d+ of \d+ dates$/.test(x));
-      return t ? Number(t.match(/^(\d+)/)[1]) : -1;
-    });
-  const total = await datesIn();
+  const total = await textNum(/^(\d+) of \d+ dates$/);
   // A file that fits in one month must not be able to page into an empty one.
   const months = new Set(live.map((iso) => iso.slice(0, 7)));
   const nav = await menu.locator('button[aria-label$="month"]').evaluateAll((els) => els.map((e) => e.disabled));
@@ -1648,7 +1839,7 @@ async function checkCalendar() {
   await menu.getByRole('button', { name: live[live.length - 1], exact: true }).click();
   await page.waitForTimeout(300);
   const label = (await trigger.innerText()).replace(/\s+/g, ' ').trim();
-  const inRange = await datesIn();
+  const inRange = await textNum(/^(\d+) of \d+ dates$/);
   console.log(`calendar pick  "${label}" dates=${inRange}`);
   if (!label.includes(live[0]) || !label.includes(live[live.length - 1])) {
     failures.push(`calendar: picking ${live[0]} then ${live[live.length - 1]} left the trigger reading "${label}"`);
@@ -1657,8 +1848,7 @@ async function checkCalendar() {
   // Put the range back. Everything measured after this point expects the whole dataset,
   // and a Custom pick left here shrinks their tables without saying so — the sweep used
   // to be rescued by the sample button resetting the range on its way past.
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(200);
+  await press('Escape', 200);
   await page.locator('main').getByRole('button', { name: 'All', exact: true }).first().click();
   await page.waitForTimeout(250);
 }
@@ -1666,8 +1856,7 @@ async function checkCalendar() {
 // The raw CDR report gained the rundown's extension filter. Selecting none has to
 // actually empty the table, or the control is decoration.
 async function checkRawCdrFilter() {
-  await page.keyboard.press('2');
-  await page.waitForTimeout(400);
+  await press('2');
   const readChips = () =>
     page.evaluate(() =>
       [...document.querySelectorAll('main .panel span')]
@@ -1685,22 +1874,14 @@ async function checkRawCdrFilter() {
   }
   // The row count comes from the pager rather than a toolbar chip, so the filter is
   // measured against the table it actually drives.
-  const shown = () =>
-    page.evaluate(() => {
-      const line = [...document.querySelectorAll('main span')]
-        .map((s) => (s.textContent || '').trim())
-        .find((t) => /^\d+ to \d+ of \d+$/.test(t));
-      return line ? Number(line.match(/of (\d+)$/)[1]) : -1;
-    });
+  const shown = () => textNum(/^\d+ to \d+ of (\d+)$/);
   const trigger = page.locator('main button[aria-expanded]').filter({ hasText: /^Agents/ }).first();
   if (!(await trigger.count())) {
     failures.push('rawCdr: the toolbar has no Agents filter, extension filtering never landed here');
     return;
   }
   const before = await shown();
-  await trigger.click();
-  await page.waitForTimeout(280);
-  const menu = trigger.locator('xpath=ancestor::div[1]').locator('.menu');
+  const menu = await openMenu(trigger, 280);
   const agents = await menu.locator('input[type="checkbox"]').count();
   const pick = (name) => menu.getByRole('button', { name, exact: true });
   let emptied = -1;
@@ -1715,8 +1896,7 @@ async function checkRawCdrFilter() {
     await page.waitForTimeout(300);
     refilled = await shown();
   }
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(150);
+  await press('Escape', 150);
   console.log(`rawCdr filter  agents=${agents} rows ${before} -> none:${emptied} -> all:${refilled}`);
   if (agents > 0 && emptied !== 0) {
     failures.push(`rawCdr: deselecting every agent still matches ${emptied} calls, the filter is not applied`);
@@ -1726,32 +1906,27 @@ async function checkRawCdrFilter() {
   }
 }
 
-// The rail names every view in its button aria-label, so the page heading is checked
-// against that rather than a hardcoded list: rename a view in one place and this fails
-// instead of quietly agreeing with itself.
 // The sample file carries one shift date, so a multi-day rundown cannot be reached
 // through it. Seed a three-day fixture into a throwaway context instead of relaxing
 // the assertion to "whatever the demo happens to contain".
 async function checkDayGroups() {
   const DAYS = ['2026-10-05', '2026-10-06', '2026-10-07'];
-  const records = [];
-  DAYS.forEach((day, d) => {
-    ['1042', '1043', '1044'].slice(0, d + 1).forEach((ext, i) => {
-      for (let c = 0; c < 2; c++) {
-        records.push({
-          'CALL DATE (UTC)': `${day} 20:${String(15 + c * 30 + i).padStart(2, '0')}:00`,
-          'END TIME (UTC)': `${day} 20:${String(25 + c * 30 + i).padStart(2, '0')}:00`,
-          EXTENSION: ext,
-          DIRECTION: 'OUT',
-          RESPONSE: 'ANSWERED',
-          DURATION: '600',
-          REGION: 'North',
-          CLID: '15596900000',
-          DESTINATION: '1415000000'
-        });
-      }
-    });
-  });
+  // Day d carries d+1 agents, two calls each, so the bands read 1 / 2 / 3 agents.
+  const records = DAYS.flatMap((day, d) =>
+    ['1042', '1043', '1044'].slice(0, d + 1).flatMap((ext, i) =>
+      [0, 1].map((c) => ({
+        'CALL DATE (UTC)': `${day} 20:${String(15 + c * 30 + i).padStart(2, '0')}:00`,
+        'END TIME (UTC)': `${day} 20:${String(25 + c * 30 + i).padStart(2, '0')}:00`,
+        EXTENSION: ext,
+        DIRECTION: 'OUT',
+        RESPONSE: 'ANSWERED',
+        DURATION: '600',
+        REGION: 'North',
+        CLID: '15596900000',
+        DESTINATION: '1415000000'
+      }))
+    )
+  );
 
   const ctx = await browser.newContext({ viewport: VIEWPORT });
   await signIn(ctx);
@@ -1768,13 +1943,9 @@ async function checkDayGroups() {
     return;
   }
   const p = await ctx.newPage();
-  p.on('console', (m) => {
-    if (m.type() === 'error') failures.push(`console [days]: ${m.text()}`);
-  });
-  p.on('pageerror', (e) => failures.push(`pageerror [days]: ${e.message}`));
+  watch(p, ' [days]');
   await p.goto(BASE, { waitUntil: 'networkidle' });
-  await p.keyboard.press('1');
-  await p.waitForTimeout(700);
+  await press('1', 700, p);
 
   const bands = () => p.locator('main tbody tr td[colspan]').evaluateAll((tds) =>
     tds.map((td) => (td.textContent || '').replace(/\s+/g, ' ').trim())
@@ -1816,10 +1987,15 @@ async function checkDayGroups() {
     await ctx.close();
     return;
   }
+  // The scope panel stays open after a pick, so every visit to it ends with a dismissal.
+  const scopeTo = async (text) => {
+    const menu = await openMenu(trigger, 250, p);
+    await menu.locator('button', { hasText: text }).click();
+    await p.waitForTimeout(350);
+    await press('Escape', 150, p);
+  };
   await shot(p, `${OUT}/rundown-days.png`, { fullPage: true });
-  await trigger.click();
-  await p.waitForTimeout(250);
-  const menu = trigger.locator('xpath=ancestor::div[1]').locator('.menu');
+  const menu = await openMenu(trigger, 250, p);
   const options = await menu.locator('button').evaluateAll((els) =>
     els.map((e) => ({ text: (e.textContent || '').replace(/\s+/g, ' ').trim(), pressed: e.getAttribute('aria-pressed') }))
   );
@@ -1837,34 +2013,14 @@ async function checkDayGroups() {
   if (scopedRows !== 2) failures.push(`days: 2026-10-06 has 2 agent-days, the table shows ${scopedRows} rows`);
   if (!label.includes('2026-10-06')) failures.push(`days: the scope control reads "${label}" after picking 2026-10-06`);
 
-  await p.keyboard.press('Escape');
-  await p.waitForTimeout(150);
+  await press('Escape', 150, p);
   if (await menu.count()) failures.push('days: Escape left the scope panel open');
 
-  await trigger.click();
-  await p.waitForTimeout(250);
-  await menu.locator('button', { hasText: 'All dates' }).click();
-  await p.waitForTimeout(350);
+  await scopeTo('All dates');
   if ((await bands()).length !== 3) failures.push('days: returning to All dates did not restore the per-shift bands');
 
-  // The panel stays open after a pick, so dismiss it before the next view opens its own.
-  await p.keyboard.press('Escape');
-  await p.waitForTimeout(150);
-
-  const scopeTo = async (text) => {
-    const trig = p.locator('main button[aria-expanded]').filter({ hasText: /All dates|2026-10/ }).first();
-    await trig.click();
-    await p.waitForTimeout(250);
-    const m = trig.locator('xpath=ancestor::div[1]').locator('.menu');
-    await m.locator('button', { hasText: text }).click();
-    await p.waitForTimeout(350);
-    await p.keyboard.press('Escape');
-    await p.waitForTimeout(150);
-  };
-
   // Raw CDR: the same split over the call log.
-  await p.keyboard.press('2');
-  await p.waitForTimeout(600);
+  await press('2', 600, p);
   const rawBands = await bands();
   const rawRows = await rowCount();
   console.log(`raw bands      ${rawBands.length} bands · ${rawRows} rows :: ${rawBands.join(' | ')}`);
@@ -1882,8 +2038,7 @@ async function checkDayGroups() {
 
   // Analytics: every chart and tile blends the shifts, so the scope has to reach the
   // aggregate too — otherwise the dropdown filters the table and lies about the rest.
-  await p.keyboard.press('3');
-  await p.waitForTimeout(1000);
+  await press('3', 1000, p);
   const tile = (label) =>
     p.evaluate((text) => {
       const card = [...document.querySelectorAll('main .panel.lift')].find(
@@ -1924,20 +2079,15 @@ async function checkDayGroups() {
 }
 
 async function checkViewTitles() {
-  const rail = await page.evaluate(() =>
-    [...document.querySelectorAll('aside nav li button')].map((b) => b.getAttribute('aria-label') || '')
-  );
-  if (rail.length !== 5) {
-    failures.push(`titles: the rail lists ${rail.length} views, expected 5`);
+  const rows = await navRows();
+  if (rows.length !== VIEWS.length) {
+    failures.push(`titles: the sidebar lists ${rows.length} views, expected ${VIEWS.length}`);
     return;
   }
   let overlapped = 0;
   let shotBar = false;
-  for (const label of rail) {
-    const key = (label.match(/ \(([^)]+)\)$/) || [])[1];
-    const name = key ? label.slice(0, -(key.length + 3)) : label;
-    await page.keyboard.press(key);
-    await page.waitForTimeout(450);
+  for (const { key, name } of rows) {
+    await press(key);
     const t = await page.evaluate(() => {
       const h = document.querySelector('main h2');
       if (!h) return null;
@@ -1953,7 +2103,7 @@ async function checkViewTitles() {
       failures.push(`titles [${name}]: main has no heading, the view never got a title`);
       continue;
     }
-    if (t.text !== name) failures.push(`titles [${name}]: the page is titled "${t.text}", the rail calls it "${name}"`);
+    if (t.text !== name) failures.push(`titles [${name}]: the page is titled "${t.text}", the sidebar calls it "${name}"`);
     if (!t.painted) failures.push(`titles [${name}]: the heading has no box, so it is not on screen`);
     if (t.desc.split(' ').length < 5) failures.push(`titles [${name}]: the subtitle is "${t.desc}", it explains nothing`);
 
@@ -1998,17 +2148,14 @@ async function checkViewTitles() {
 // present with no pointer, the panel not growing, no hover card, and the switcher actually
 // re-pointing the dataset every browser reads.
 async function checkSidebar() {
-  await page.keyboard.press('1');
-  await page.waitForTimeout(350);
-  const items = page.locator('aside nav li button');
-  const total = await items.count();
-  if (total !== VIEWS.length) {
-    failures.push(`sidebar: ${total} nav items, expected ${VIEWS.length}`);
+  await press('1');
+  const rows = await navRows();
+  if (rows.length !== VIEWS.length) {
+    failures.push(`sidebar: ${rows.length} nav items, expected ${VIEWS.length}`);
     return;
   }
   const panel = page.locator('aside');
-  const box = await panel.boundingBox();
-  const idle = box.width;
+  const idle = (await panel.boundingBox()).width;
   if (idle < 200) {
     failures.push(`sidebar: the panel is ${Math.round(idle)}px wide, the labels are collapsed away`);
   }
@@ -2047,32 +2194,17 @@ async function checkSidebar() {
   }
   if (geo.tall < 0.8) failures.push(`sidebar: the panel is only ${Math.round(geo.tall * 100)}% of the window tall, it is meant to span the column`);
 
-  const rows = await items.evaluateAll((nodes) =>
-    nodes.map((btn) => {
-      const box = btn.getBoundingClientRect();
-      const aside = document.querySelector('aside').getBoundingClientRect();
-      return {
-        text: btn.innerText.replace(/\s+/g, ' ').trim(),
-        aria: btn.getAttribute('aria-label') || '',
-        current: btn.getAttribute('aria-current'),
-        icon: !!btn.querySelector('svg'),
-        clipped: box.left < aside.left || box.right > aside.right
-      };
-    })
-  );
+  // The accessible name is the design's own text — "Rundown (1)" — so the visible
+  // label and the hotkey are checked against it, and against the route list for order.
   for (const [i, row] of rows.entries()) {
     const [key, name] = VIEWS[i];
-    // The accessible name is the design's own text — "Rundown (1)" — so the visible
-    // label and the hotkey are checked against it, and against the route list for order.
-    const want = (row.aria || '').match(/^(.*) \((.)\)$/);
-    if (!want) failures.push(`sidebar: row ${i} is named "${row.aria}", which is not "Name (key)"`);
-    else if (want[2] !== key) failures.push(`sidebar: row ${i} is "${row.aria}", expected the ${key} slot`);
+    if (row.key !== key) failures.push(`sidebar: row ${i} is named "${row.label}", expected the ${key} slot`);
     if (!row.icon) failures.push(`sidebar: "${name}" has no icon`);
     if (row.clipped) failures.push(`sidebar: "${name}" is clipped by the panel edge`);
     // Label and key read with no hover at all — that is the whole reason the strip
     // grew into a column.
-    if (row.text !== (want ? `${want[1]} ${want[2]}` : `? ${key}`)) {
-      failures.push(`sidebar: row ${i} reads "${row.text}", its name "${row.aria}" says otherwise`);
+    if (row.text !== `${row.name} ${row.key}`) {
+      failures.push(`sidebar: row ${i} reads "${row.text}", its name "${row.label}" says otherwise`);
     }
   }
   if (rows.filter((r) => r.current === 'page').length !== 1) {
@@ -2080,13 +2212,10 @@ async function checkSidebar() {
   }
   await shot(page, `${OUT}/sidebar-rundown.png`);
 
-  // Hover stays a no-op: the card that used to open beside the rail is gone, and one
-  // reappearing means the labels got collapsed again somewhere.
-  await items.first().hover();
+  // Hover stays a no-op: the card that used to open beside the sidebar is gone, and a
+  // panel that resizes under the pointer means the labels collapsed again.
+  await page.locator('aside nav li button').first().hover();
   await page.waitForTimeout(450);
-  if ((await page.locator('aside .menu').count()) !== 0) {
-    failures.push('sidebar: a hover card opened, the view list is meant to be inline');
-  }
   if ((await panel.boundingBox()).width !== idle) {
     failures.push('sidebar: the panel changed width under the pointer');
   }
@@ -2132,8 +2261,7 @@ async function checkSidebar() {
 // column labels travel off the top. So scroll it and measure.
 async function checkTableRegion() {
   for (const [key, name] of [['1', 'rundown'], ['2', 'rawCdr']]) {
-    await page.keyboard.press(key);
-    await page.waitForTimeout(350);
+    await press(key);
     const measure = () =>
       page.evaluate(() => {
         const tb = document.querySelector('main .panel.flex-wrap').getBoundingClientRect();
@@ -2174,33 +2302,67 @@ async function checkTableRegion() {
   }
 }
 
-// 1024 is the lg breakpoint that hands the view switcher from the header to the rail;
-// 768 is md, where the switcher drops onto its own row; 375 is a real phone.
+// The bottom bar is the only view switcher below lg, so it gets its own pass: every
+// view reachable by a tap, the marker following the tap, and no button clipped off
+// the edge — the exact failure the header row had at 375.
+async function checkBottomNav() {
+  const bar = page.locator('nav[aria-label="Views"]:visible');
+  const shape = await bar.evaluate((el) => {
+    const rects = [...el.querySelectorAll('button')].map((b) => b.getBoundingClientRect());
+    return {
+      count: rects.length,
+      cut: rects.filter((r) => r.left < 0 || r.right > window.innerWidth + 1).length,
+      height: Math.round(Math.min(...rects.map((r) => r.height))),
+      overflow: el.scrollWidth - el.clientWidth
+    };
+  });
+  console.log(`bottom nav   ${shape.count} views · ${shape.height}px tall · ${shape.cut} cut · ${shape.overflow}px overflow`);
+  if (shape.count !== 5) failures.push(`bottom nav: ${shape.count} view buttons, expected 5`);
+  if (shape.cut || shape.overflow > 1) failures.push(`bottom nav: ${shape.cut || shape.overflow}px of the bar runs off the screen, so a view cannot be reached`);
+  if (shape.height < 44) failures.push(`bottom nav: the buttons are ${shape.height}px tall, under the 44px touch target`);
+  for (const label of ['Rundown', 'Raw CDR', 'Analytics', 'Agents', 'Settings']) {
+    await bar.locator('button', { hasText: label }).click();
+    await page.waitForTimeout(700);
+    const current = (await bar.locator('[aria-current="page"]').innerText()).trim();
+    if (current !== label) failures.push(`bottom nav: tapping ${label} left the marker on ${current || 'nothing'}`);
+  }
+  console.log('bottom nav   all five views switch');
+}
+
+// 1024 is the lg breakpoint that hands the view switcher from the bottom bar to the
+// sidebar; 768 and 375 are the widths with no rail, where the bottom bar owns it.
 for (const width of [VIEWPORT.width, 1280, 1024, 768, 375]) {
   await page.setViewportSize({ width, height: VIEWPORT.height });
+  if (width === 375) await checkBottomNav();
   for (const [key, view] of VIEWS) {
-    await page.keyboard.press(key);
-    await page.waitForTimeout(view === 'analytics' ? 1200 : 350);
-    const scroll = await page.evaluate(() => ({
-      overflow: document.documentElement.scrollWidth - window.innerWidth,
-      rows: document.querySelectorAll('main tbody tr').length,
-      rail: getComputedStyle(document.querySelector('aside')).display !== 'none',
-      switcher: getComputedStyle(document.querySelector('header nav[aria-label="Views"]')).display !== 'none'
-    }));
+    await press(key, view === 'analytics' ? 1200 : 500);
+    const scroll = await page.evaluate(() => {
+      // getClientRects() is empty for anything an ancestor has hidden, which reading
+      // the nav's own display would miss (the rail's nav hides with its aside).
+      const shown = (el) => el.getClientRects().length > 0;
+      return {
+        overflow: document.documentElement.scrollWidth - window.innerWidth,
+        rows: document.querySelectorAll('main tbody tr').length,
+        sidebar: shown(document.querySelector('aside')),
+        switchers: [...document.querySelectorAll('nav[aria-label="Views"]')].filter(shown).length
+      };
+    });
     if (scroll.overflow > 1) failures.push(`${width}px ${view}: page is ${scroll.overflow}px wider than the viewport`);
-    // Exactly one of them may own the switcher at any width. Both showing duplicates
-    // the control (and the current-page marker); neither hiding it strands the user
-    // on a view they cannot leave. Either way the failure names the width, not the
-    // component, because the bug is the two breakpoints disagreeing.
-    if (scroll.rail === scroll.switcher) {
-      failures.push(`${width}px ${view}: the view switcher is ${scroll.rail ? 'shown by both the rail and the header' : 'shown by neither'}`);
+    // Exactly one nav may own the switcher at any width. Two on screen duplicating
+    // the control (and the current-page marker); none strands the user on a view they
+    // cannot leave. The failure names the width, not the component, because the bug
+    // is the two breakpoints disagreeing.
+    if (scroll.switchers !== 1) {
+      failures.push(`${width}px ${view}: ${scroll.switchers} view switchers are on screen, expected exactly one`);
     }
     if (width !== VIEWPORT.width) {
-      console.log(`${String(width).padStart(4)}px ${view.padEnd(10)} overflow=${scroll.overflow}px nav=${scroll.rail ? 'rail' : 'header'}`);
+      console.log(`${String(width).padStart(4)}px ${view.padEnd(10)} overflow=${scroll.overflow}px nav=${scroll.sidebar ? 'sidebar' : 'bottom'}`);
       // The phone layout is the one a reviewer cannot check from a desktop run, so
       // the artefact has to exist. Only the narrowest width gets one; 1024 and 768
-      // are the same markup with a different number of columns fitting.
-      if (width === 375) await shot(page, `${OUT}/${view}-375.png`, { fullPage: true });
+      // are the same markup with a different number of columns fitting. Viewport
+      // height, not full page: the bottom bar is fixed, and a full-page shot would
+      // paint it at the foot of a page no phone ever shows.
+      if (width === 375) await shot(page, `${OUT}/${view}-375.png`);
       continue;
     }
     await shot(page, `${OUT}/${view}.png`, { fullPage: true });
@@ -2218,8 +2380,7 @@ for (const width of [VIEWPORT.width, 1280, 1024, 768, 375]) {
 // repaint stays honest and the a11y fixes quietly rot back, because every one of them
 // was invisible to a screenshot.
 async function checkA11y() {
-  await page.keyboard.press('1');
-  await page.waitForTimeout(350);
+  await press('1');
 
   // A native title= answers the mouse and nothing else: no keyboard, no touchscreen,
   // no way to dismiss it, and it fires on the browser's schedule rather than yours.
@@ -2231,7 +2392,7 @@ async function checkA11y() {
   console.log(`titles   native=${natives.length}`);
   if (natives.length) failures.push(`tooltips: ${natives.length} native title= left in the page (${natives.slice(0, 3).join(', ')})`);
 
-  // The rail's sample button was the app's only focusable tooltip trigger, so the
+  // The sidebar's sample button was the app's only focusable tooltip trigger, so the
   // no-mouse path is now the click that `Tip` also answers. The panel still has to be
   // wired to aria-describedby while it is up, and still has to go away on Escape.
   const stamp = page.locator('main tbody td > .flex-col > span').first();
@@ -2245,8 +2406,12 @@ async function checkA11y() {
   console.log(`tip click     ${byClick ? `"${byClick.text}" described=${byClick.wired}` : 'NOTHING'}`);
   if (!byClick) failures.push('tooltips: clicking a break stamp paints no tooltip, so nothing but a mouse can read it');
   else if (!byClick.wired) failures.push('tooltips: the panel on screen is not the node aria-describedby points at');
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(140);
+  // The same click is a copy. Not a defect to route around: a stamp is one value, and the
+  // panel and the clipboard are two readings of it.
+  const stamped = await page.getByText(/^Copied \d\d:/).count();
+  console.log(`copy tip     stamp click copies too=${stamped > 0}`);
+  if (!stamped) failures.push('copy: clicking a break stamp opened its panel but put nothing on the clipboard');
+  await press('Escape', 140);
   if (await page.locator('[role="tooltip"]').count())
     failures.push('tooltips: Escape leaves the panel up, it is not dismissible (WCAG 1.4.13)');
   // The click parked the pointer on the stamp, and `pointerenter` does not fire for a
@@ -2254,9 +2419,10 @@ async function checkA11y() {
   await page.mouse.move(0, 0);
   await page.waitForTimeout(140);
 
-  // The panel floats above its anchor, and flips below when there is no room — the head
-  // of the table is where that happens, since the sticky toolbar owns the space above it.
-  for (const [what, trigger] of [['stamp', stamp]]) {
+  // The break stamp's panel floats above its anchor, and flips below when there is no
+  // room — the head of the table is where that happens, since the sticky toolbar owns
+  // the space above it.
+  {
     // Count panel *mounts* inside the page rather than sampling from outside: a fast
     // strobe can slip between two polls 60ms apart, and it cannot slip past a
     // MutationObserver. One observer at a time — two live observers both see the same
@@ -2269,7 +2435,7 @@ async function checkA11y() {
       });
       window.__tipObs.observe(document.body, { childList: true });
     });
-    const box = await trigger.boundingBox();
+    const box = await stamp.boundingBox();
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.waitForTimeout(200);
     const panel = await page.evaluate(() => {
@@ -2288,17 +2454,24 @@ async function checkA11y() {
       };
     });
     const adds = await page.evaluate(() => window.__tipAdds);
-    console.log(`tip ${what.padEnd(6)} ${panel ? `"${panel.text}" inside=${panel.inside} mounts=${adds}` : 'NOTHING'}`);
-    if (!panel) failures.push(`tooltips: hovering the ${what} paints nothing, the hover path went with the native title`);
+    console.log(`tip stamp    ${panel ? `"${panel.text}" inside=${panel.inside} mounts=${adds}` : 'NOTHING'}`);
+    if (!panel) failures.push('tooltips: hovering the break stamp paints nothing, the hover path went with the native title');
     else {
-      if (!panel.inside) failures.push(`tooltips: the ${what} tooltip is cut off by the viewport (${panel.text})`);
-      if (panel.steals) failures.push(`tooltips: the ${what} panel answers the pointer at its own centre, so moving onto it to read it dismisses it (WCAG 1.4.13)`);
+      if (!panel.inside) failures.push(`tooltips: the break stamp tooltip is cut off by the viewport (${panel.text})`);
+      if (panel.steals) failures.push('tooltips: the break stamp panel answers the pointer at its own centre, so moving onto it to read it dismisses it (WCAG 1.4.13)');
     }
-    if (adds !== 1) failures.push(`tooltips: the ${what} panel mounted ${adds} times under a still cursor — it is flickering`);
+    if (adds !== 1) failures.push(`tooltips: the break stamp panel mounted ${adds} times under a still cursor — it is flickering`);
     await page.mouse.move(0, 0);
     await page.waitForTimeout(140);
   }
 
+  // Clicking a stamp also copies it, so the region is not empty on arrival — it is empty
+  // once that toast has lived out its 3.2s, which is the thing worth measuring here.
+  const cleared = await page
+    .waitForFunction(() => !document.querySelector('[aria-live]')?.children.length, null, { timeout: 8000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!cleared) failures.push('toasts: something parked in the live region and never left');
   const idle = await page.evaluate(() => {
     const r = document.querySelector('[aria-live]');
     return r ? { kids: r.children.length, text: r.textContent.trim() } : null;
@@ -2326,16 +2499,14 @@ async function checkA11y() {
   // 70% alpha over a role tint at 10%, which no single computed value betrays.
   const cells = await read({ sel: 'main tbody tr:first-child td > *', all: true });
   const weak = [];
-  let floors = 0;
   for (const c of cells || []) {
     // An icon plate carries a glyph, not text, so it answers to 3:1 (SC 1.4.11) and a
     // label answers to 4.5. Empty cells are a dash rendered by another column's probe.
     const cr = between(c.text, fillOf(c));
     const floor = c.label ? 4.5 : 3;
-    floors++;
     if (cr < floor) weak.push(`"${c.label.slice(0, 12) || '[glyph]'}" ${cr.toFixed(2)}:1 needs ${floor} (${c.text} on ${fillOf(c).map(Math.round)})`);
   }
-  console.log(`cells       ${floors} composited · below floor=${weak.length}`);
+  console.log(`cells       ${(cells || []).length} composited · below floor=${weak.length}`);
   if (weak.length) failures.push(`contrast: ${weak.join(' | ')}`);
 
   // SC 2.5.8: 24x24. A control may be smaller only when something bigger takes the same
@@ -2370,8 +2541,7 @@ async function checkA11y() {
   if (unjust.length)
     failures.push(`targets: ${unjust.map((t) => `"${t.label}" ${t.w}x${t.h}`).join(', ')} sit under 576px2 with no larger control taking the same input`);
 
-  await page.keyboard.press('4');
-  await page.waitForTimeout(400);
+  await press('4');
   await page.locator('button', { hasText: 'Add mapping' }).first().click();
   await page.waitForTimeout(300);
   await page.locator('[role="dialog"] button[type="submit"]').click();
@@ -2389,8 +2559,7 @@ async function checkA11y() {
   if (!form.text) failures.push('forms: an empty submit produces no error message in the dialog');
   else if (form.invalid !== 'true') failures.push('forms: the rejected field does not say so with aria-invalid');
   else if (!form.same) failures.push('forms: the error is not the node the field points at with aria-describedby');
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(250);
+  await press('Escape', 250);
 }
 
 await browser.close();
