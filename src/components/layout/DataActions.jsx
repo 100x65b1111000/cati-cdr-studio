@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowUploadRegular as UploadSimple, CodeRegular as BracketsCurly, DocumentCsvRegular as FileCsv, DocumentExcelRegular as FileXls } from '@fluentui/react-icons';
+import { ArrowUploadRegular as UploadSimple, CodeRegular as BracketsCurly, DocumentCsvRegular as FileCsv, DocumentExcelRegular as FileXls, PrintRegular as Printer } from '@fluentui/react-icons';
 import { useCdr } from '../../context/CdrContext';
 import { rangeDates } from '../../utils/dateRange';
 import { defaultVisibleColumns } from '../rundown/columns';
@@ -81,6 +81,16 @@ export default function DataActions({ className = 'grid-cols-1', compact = false
             <Icon style={{ fontSize: 16 }} className={hue} />
           </button>
         ))}
+        {/* Collapsed, the rail is the only sidebar, so Print rides along as a glyph. */}
+        <button
+          type="button"
+          onClick={() => window.print()}
+          aria-label="Print"
+          style={{ '--tone': 'var(--k-danger)' }}
+          className="hoverable flex h-7 w-full items-center justify-center rounded"
+        >
+          <Printer style={{ fontSize: 16 }} className="text-k-danger" />
+        </button>
       </div>
     );
   }
@@ -109,6 +119,18 @@ export default function DataActions({ className = 'grid-cols-1', compact = false
           ))}
         </div>
       </FilterPopover>
+
+      {/* Print is the third way data leaves the app, and unlike the two above it goes
+          to the paper the browser is showing, so the cluster keeps them together. */}
+      <button
+        type="button"
+        onClick={() => window.print()}
+        style={{ '--tone': 'var(--k-danger)' }}
+        className="hoverable inline-flex h-7 w-full items-center justify-center gap-1.5 rounded border border-k-hairline bg-k-surface-hover/50 px-2.5 text-xs font-medium text-k-ink-muted active:translate-y-[1px]"
+      >
+        <Printer style={{ fontSize: 15 }} className="text-k-danger" />
+        <span>Print</span>
+      </button>
     </div>
   );
 }

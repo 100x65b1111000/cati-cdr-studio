@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { DeleteRegular as Trash, PrintRegular as Printer, SaveRegular as FloppyDisk, TimerRegular as Timer } from '@fluentui/react-icons';
+import { DeleteRegular as Trash, SaveRegular as FloppyDisk, TimerRegular as Timer } from '@fluentui/react-icons';
 import { useCdr } from '../../context/CdrContext';
 import { DEFAULT_SHIFT_CONFIG } from '../../constants/defaultData';
 import ExtensionFilter from '../ui/ExtensionFilter';
@@ -122,7 +122,7 @@ export default function RundownToolbar({
 
       {/* The stepper lives inside the field, stacked on the right the way a native
           number input does it. Flanking buttons cost the pill 40px, and this row has
-          no room to spare: at 1440px a wrap drops Print below the panel. */}
+          no room to spare: at 1440px a wrap drops the row below the panel. */}
       {/* One hue, one hover surface. This control is about breaks, so it owns the same
           token the Timer glyph and the Break metric use: `--tone` is what the stylesheet
           hands to the edge, the glow and the stepper hovers, and leaving it unset made
@@ -135,7 +135,7 @@ export default function RundownToolbar({
           the type scale moved this one control and nothing else. */}
       <div
         style={{ '--tone': 'var(--k-break-time)' }}
-        className={`field flex h-[30px] flex-none items-center gap-1 rounded px-2 text-meta focus-within:border-k-break-time/70 ${
+        className={`field ml-auto flex h-[30px] flex-none items-center gap-1 rounded px-2 text-meta focus-within:border-k-break-time/70 ${
           thresholdDirty ? 'border-k-break-time/70 text-k-ink' : 'text-k-ink-muted'
         }`}
       >
@@ -225,20 +225,6 @@ export default function RundownToolbar({
           </div>
         </div>
       </FilterPopover>
-
-      <div className="ml-auto flex flex-none items-center gap-2">
-        <button
-          type="button"
-          onClick={() => window.print()}
-          aria-label="Print"
-          style={{ '--tone': 'var(--k-danger)' }}
-          className="hoverable inline-flex items-center gap-1.5 rounded border border-k-hairline bg-k-surface-hover/60 px-2 py-1.5 text-xs font-medium text-k-ink-muted active:translate-y-[1px] sm:px-3"
-        >
-          <Printer style={{ fontSize: 15 }} className="text-k-danger" />
-          {/* The glyph alone buys this button a place on the Break row at 375px. */}
-          <span className="hidden sm:inline">Print</span>
-        </button>
-      </div>
     </div>
   );
 }
