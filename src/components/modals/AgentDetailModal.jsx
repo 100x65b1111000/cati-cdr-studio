@@ -64,12 +64,12 @@ export default function AgentDetailModal() {
           <h3 className="mb-3 text-xs font-bold text-k-ink-muted">Idle breaks log</h3>
           <div className="max-h-60 overflow-y-auto rounded-md border border-k-hairline">
             <table className="w-full text-left text-xs text-k-ink-muted">
-              <thead className="sticky top-0 border-b border-k-hairline thead text-2xs font-semibold">
+              <thead className="sticky top-0 border-b border-k-hairline thead text-meta font-bold">
                 <tr>
-                  <th className="w-10 px-3.5 py-2 font-semibold">#</th>
-                  <th className="px-3.5 py-2 font-semibold">Start</th>
-                  <th className="px-3.5 py-2 font-semibold">End</th>
-                  <th className="px-3.5 py-2 text-right font-semibold">Duration</th>
+                  <th className="w-10 px-3.5 py-2">#</th>
+                  <th className="px-3.5 py-2">Start</th>
+                  <th className="px-3.5 py-2">End</th>
+                  <th className="px-3.5 py-2 text-right">Duration</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-k-hairline/60">

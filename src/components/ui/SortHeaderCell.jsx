@@ -16,7 +16,7 @@ export default function SortHeaderCell({
     <th
       scope="col"
       aria-sort={active ? (sortAsc ? 'ascending' : 'descending') : 'none'}
-      className={`font-semibold ${alignClass} ${className}`}
+      className={`${alignClass} ${className}`}
     >
       {/* The cell's padding lives on the button, not on the th, so the whole header
           cell is the sort target rather than a two-word glyph floating in the middle

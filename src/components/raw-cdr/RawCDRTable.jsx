@@ -234,7 +234,7 @@ export default function RawCDRTable() {
       <div className="panel report-panel overflow-hidden rounded-md">
         <div aria-busy={isParsing || undefined} className="report-region overflow-auto">
           <table className="w-full text-left text-xs text-k-ink-muted">
-            <thead className="sticky top-0 z-[25] border-b border-k-hairline thead text-2xs">
+            <thead className="sticky top-0 z-[25] border-b border-k-hairline thead text-meta font-bold">
               <tr>
                 {COLUMNS.map((col) => (
                   <SortHeaderCell

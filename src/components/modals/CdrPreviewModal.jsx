@@ -85,15 +85,15 @@ export default function CdrPreviewModal() {
           </div>
           <div className="max-h-60 overflow-y-auto rounded-md border border-k-hairline">
             <table className="w-full text-left text-xs">
-              <thead className="sticky top-0 border-b border-k-hairline thead text-2xs text-k-ink-muted">
+              <thead className="sticky top-0 border-b border-k-hairline thead text-meta font-bold text-k-ink-muted">
                 <tr>
-                  <th className="w-10 px-3 py-2 font-semibold">#</th>
-                  <th className="px-3 py-2 font-semibold">Ext</th>
-                  <th className="px-3 py-2 font-semibold">Call start</th>
-                  <th className="px-3 py-2 font-semibold">Destination</th>
-                  <th className="px-3 py-2 font-semibold">Response</th>
-                  <th className="px-3.5 py-2 text-right font-semibold">Duration</th>
-                  <th className="px-3 py-2 font-semibold">Region</th>
+                  <th className="w-10 px-3 py-2">#</th>
+                  <th className="px-3 py-2">Ext</th>
+                  <th className="px-3 py-2">Call start</th>
+                  <th className="px-3 py-2">Destination</th>
+                  <th className="px-3 py-2">Response</th>
+                  <th className="px-3.5 py-2 text-right">Duration</th>
+                  <th className="px-3 py-2">Region</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-k-hairline/60">
