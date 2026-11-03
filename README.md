@@ -19,6 +19,22 @@ A colleague on the same network opens the printed Network URL instead. In dev th
 has to be listed in `allowedDevOrigins` in `next.config.mjs`: Next serves dev chunks only to
 origins it knows, and it is a DHCP lease, so it changes with the machine's address.
 
+`npm run start:https` puts plain-node TLS in front of that on `https://<this machine>:3443`,
+so the password and the session cookie stop crossing the office network in the clear. It reads
+`certs/`, which is not committed; make it once with
+
+```bash
+mkdir -p certs && MSYS_NO_PATHCONV=1 openssl req -x509 -newkey rsa:2048 \
+  -keyout certs/key.pem -out certs/cert.pem -days 390 -nodes -subj "/CN=cati-cdr-studio" \
+  -addext "subjectAltName=IP:192.168.5.98,DNS:localhost"
+```
+
+The certificate names the address it was made for, so a new DHCP lease means regenerating it.
+A self-signed issuer is not in any browser's trust list, so each device gets one warning to
+click through, or imports `certs/cert.pem` into Windows' Trusted Root Certification Authorities
+to silence it permanently. The cookie's `Secure` flag follows `x-forwarded-proto`, which the
+front sets, so sign-in over TLS stores it and sign-in over plain `npm start` does not ask for it.
+
 `APP_PASSWORD` gates the whole app and `SESSION_SECRET` signs the 12-hour session cookie, so
 a request with a hand-written cookie is rejected. Signing out revokes the token itself, not
 just the browser's copy of it, in a table beside the data it protects — a value left on a
