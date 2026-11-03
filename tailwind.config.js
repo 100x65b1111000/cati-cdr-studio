@@ -21,23 +21,25 @@ export default {
           ])
         )
       },
+      // Fluent's own stacks (webLightTheme.fontFamilyBase / fontFamilyMonospace). Native
+      // system faces, so nothing is shipped: Segoe UI on Windows, the platform sans
+      // elsewhere. The old Fira webfonts are gone with the Fira palette.
       fontFamily: {
-        sans: ['Fira Sans', 'Segoe UI', 'sans-serif'],
-        mono: ['Fira Mono', 'monospace']
+        sans: ["'Segoe UI'", "'Segoe UI Web (West European)'", '-apple-system', 'BlinkMacSystemFont', 'Roboto', "'Helvetica Neue'", 'sans-serif'],
+        mono: ['Consolas', "'Courier New'", 'Courier', 'monospace']
       },
-      // Tighter than the defaults everywhere at once. This is a dense data tool;
-      // 12-16px corners on every plate made the tables read as a marketing page.
-      // `full` stays for dots, avatars and region pills.
+      // Fluent's radius scale, not Tailwind's. 4px is Fluent's `borderRadiusMedium` and
+      // the default for every plate and control; 2px is for the small chips, 6-8 for
+      // popovers, and `full` only for dots, avatars and region pills. The old 3px default
+      // was a hand-tuned compromise for the Fira-era density.
       borderRadius: {
         none: '0',
         sm: '2px',
-        DEFAULT: '3px',
-        md: '4px',
-        lg: '6px',
-        xl: '8px',
-        '2xl': '10px',
-        '3xl': '14px',
-        '4xl': '18px',
+        DEFAULT: '4px',
+        md: '6px',
+        lg: '8px',
+        xl: '12px',
+        '2xl': '16px',
         full: '9999px'
       }
     },

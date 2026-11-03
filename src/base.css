@@ -1,0 +1,17 @@
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: brand · redesign: full
+ * paper: oklch(21% 0.005 240) · accent: oklch(62% 0.18 245) · display: Segoe UI · body: Segoe UI
+ * nav: kept · signature: kept · states: loading, empty, error
+ * axes: dark/grotesk-sans/cool · posture: restrained · contrast: pass · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H4 E4 S4 R4 V4 · weakest: E, tightened table headers and states */
+/* Only what Tailwind preflight and index.css do not already cover: the box-sizing, margin
+   zeroing, form-control font, img/svg display, [hidden] and tabular-nums here were all
+   duplicates, and the reduced-motion clamp fought index.css's in-app data-motion override. */
+html { scrollbar-color: var(--color-muted) var(--color-paper); scroll-padding-top: var(--space-3xl); }
+body { background: var(--color-paper); color: var(--color-ink); font-family: var(--font-body); font-size: var(--text-md); line-height: 1.55; -webkit-font-smoothing: antialiased; caret-color: var(--color-accent); }
+::selection { background: color-mix(in oklab, var(--color-accent) 22%, transparent); color: var(--color-ink); }
+button:active, [role='button']:active { transform: translateY(1px); }
+a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 0.16em; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: var(--display-weight, 700); font-synthesis: none; letter-spacing: var(--tracking-display); line-height: 1.05; overflow-wrap: break-word; min-width: 0; text-wrap: balance; }
+h1 { max-width: 20ch; font-size: var(--text-display); } h2 { max-width: 30ch; font-size: var(--text-section); } h3 { max-width: 40ch; font-size: var(--text-title); line-height: 1.2; }
+p { text-wrap: pretty; }
+p:not([class]) { max-width: 65ch; }

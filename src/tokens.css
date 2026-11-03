@@ -1,0 +1,32 @@
+@theme static {
+  /* Only the scale the app actually reads. text-2xl/3xl, display-s and lead had no call
+     site, the oklch colour roles are all reached through the k-* Fluent roles instead,
+     and radius/shadow/outlier never resolved to a utility. */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.2rem;
+  --text-xl: 1.44rem;
+  --text-display: 1.728rem;
+  --text-section: 1.2rem;
+  --text-title: 1rem;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --color-paper: oklch(21% 0.005 240);
+  --color-ink: oklch(98% 0.005 240);
+  --color-muted: oklch(65% 0.01 240);
+  --color-accent: oklch(62% 0.18 245);
+  --color-accent-ink: oklch(15% 0.02 245);
+  --color-focus: oklch(68% 0.19 245);
+  --font-display: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-body: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-numeric: Bahnschrift, 'Segoe UI', -apple-system, sans-serif;
+  --tracking-display: -0.02em;
+}
+/* The three the stylesheets still read. z-index, duration, gutter and section-gap
+   never left this file: the app uses Tailwind's z-*, its own keyframe timings, and
+   there is no landing-page column layout to space. */
+:root {
+  --space-2xs: 4px;
+  --space-xs: 8px;
+  --space-3xl: 96px;
+}

@@ -1,25 +1,29 @@
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: brand · redesign: full
+ * paper: oklch(21% 0.005 240) · accent: oklch(62% 0.18 245) · display: Segoe UI · body: Segoe UI
+ * nav: kept · signature: kept · states: loading, empty, error · surface: absolute
+ * axes: dark/grotesk-sans/cool · posture: restrained · contrast: pass · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H4 E4 S4 R4 V4 · weakest: E, tightened table headers and states */
+/* Hallmark · waive 7b · surface: absolute · Fluent UI token system uses absolute neutrals and white print canvas */
 @import 'tailwindcss';
-/* The token map stays in tailwind.config.js so it keeps deriving from
-   src/theme/colorSchemes.js. v4 reads a v3 config through this directive. */
+@import './tokens.css';
+@import './base.css' layer(base);
 @config '../tailwind.config.js';
 
-/* Type scale. `2xs` and `meta` are what this app used to spell as text-[10px] and
-   text-[11px] — 52 of them, none carrying a line-height, so each inherited whatever
-   its row happened to set. Naming them puts both halves back together.
-   `2xs` is 12px and not the 13 a ratio would give: stacked break stamps measure 6.5px
-   of clearance between rows and a 1px taller line spends half of it. The inherited
-   steps (xs…xl) are left at v4's own ratios — with no bare font-size override left in
-   the app, there is nothing downstream of them to shrink. */
 @theme {
+  --breakpoint-lg: 60rem;
   --text-2xs: 0.625rem;
   --text-2xs--line-height: 0.75rem;
   --text-meta: 0.6875rem;
   --text-meta--line-height: 0.9375rem;
 }
 
-/* v4's preflight stopped making buttons clickable-looking (it now inherits the
-   platform `cursor: default`), which would take the pointer off every button in a
-   dense tool. v3 preflight set this; keeping it so the upgrade is cursor-neutral. */
+/* The k-* roles are written onto <html> by CdrContext, so each rule below keeps the
+   fallback for the paint before React mounts. This used to be a block of ~50 --color-*
+   aliases; every one had a single consumer, so the rgb() now sits in that rule instead. */
+:root {
+  --animate-duration: 450ms;
+}
+
 @layer base {
   button,
   [role='button'],
@@ -27,37 +31,39 @@
     cursor: pointer;
   }
 
-  /* Base, not unlayered: the modal and the search fields carry `outline-none` and
-     focus their own border instead, and a utility can only beat this from base. */
   :focus-visible {
-    outline: 2px solid rgb(var(--k-accent, 77 141 245));
+    outline: 2px solid var(--color-focus);
     outline-offset: 2px;
   }
 }
 
-/* The canvas colour and the native-widget tint have to be decided before any token
-   exists, so they key off `data-mode` (set in app/layout.jsx, before first paint) rather
-   than off `--k-page`. Two literal hexes here is the price of not shipping the whole
-   palette twice; everything else still resolves through the variables. */
+html, body {
+  overflow-x: clip;
+}
+
 html {
-  background: #0b0e14;
+  background: var(--color-paper);
   color-scheme: dark;
+  --shadow-2: 0 0 2px rgb(0 0 0 / 0.24), 0 1px 2px rgb(0 0 0 / 0.28);
+  --shadow-4: 0 0 2px rgb(0 0 0 / 0.24), 0 2px 4px rgb(0 0 0 / 0.28);
+  --shadow-8: 0 0 2px rgb(0 0 0 / 0.24), 0 4px 8px rgb(0 0 0 / 0.28);
+  --shadow-16: 0 0 2px rgb(0 0 0 / 0.24), 0 8px 16px rgb(0 0 0 / 0.28);
+  --tone-ink: 31 31 31;
 }
+
 html[data-mode='light'] {
-  background: #fafaf8;
+  background: var(--color-paper-light, #fafafa);
   color-scheme: light;
+  --shadow-2: 0 0 2px rgb(0 0 0 / 0.12), 0 1px 2px rgb(0 0 0 / 0.14);
+  --shadow-4: 0 0 2px rgb(0 0 0 / 0.12), 0 2px 4px rgb(0 0 0 / 0.14);
+  --shadow-8: 0 0 2px rgb(0 0 0 / 0.12), 0 4px 8px rgb(0 0 0 / 0.14);
+  --shadow-16: 0 0 2px rgb(0 0 0 / 0.12), 0 8px 16px rgb(0 0 0 / 0.14);
+  --tone-ink: 255 255 255;
 }
 
-body {
-  background-color: rgb(var(--k-page, 11 14 20));
-  color: rgb(var(--k-ink, 232 237 245));
-  font-family: 'Fira Sans', 'Segoe UI', sans-serif;
-}
-
-/* Figures line up in columns. Every metric cell uses this. */
 @layer components {
   .num {
-    font-family: 'Fira Mono', ui-monospace, monospace;
+    font-family: var(--font-numeric, var(--font-body));
     font-variant-numeric: tabular-nums;
   }
 }
@@ -68,169 +74,96 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: rgb(var(--k-sunken, 2 3 6) / 0.6);
+  background: rgb(var(--k-sunken, 20 20 20) / 0.6);
 }
-/* Full alpha, not a translucent hairline: with the flat fills there is nothing
-   behind the thumb to soften, and hairline-strong at 0.5 disappears on a light
-   track. `ink-faint` on hover moves the right way in both modes — lighter in
-   dark, darker in light — which a single alpha step cannot. */
 ::-webkit-scrollbar-thumb {
-  background: rgb(var(--k-hairline-strong, 62 74 94) / 1);
+  background: rgb(var(--k-hairline-strong, 117 117 117));
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgb(var(--k-ink-faint, 121 135 158) / 1);
+  background: rgb(var(--k-ink-faint, 173 173 173));
 }
 
-/* Flat surfaces. Every value resolves through the active mode's variables, so the
-   mode switcher and the print token overrides keep working. Elevation is hairlines
-   plus one short cast, never blur. Dropping it was not a taste call: a blur only
-   reads when the fill lets enough through *and* the backdrop carries detail at a
-   scale the radius does not erase, the page-level dot lattice that supplied that
-   detail is gone, and a backdrop-filter makes the element a backdrop root, which
-   blinds every popover nested inside it.
-
-   These are @layer components on purpose, which is the one rule that decides
-   whether a call-site utility paints at all: unlayered beats layered, so a
-   resting surface written outside a layer silently discards the
-   `focus:border-k-accent`, `border-k-success` and `border-k-accent` overrides
-   sprinkled over them. States (.lift, .hoverable, .row-hover,
-   .cbox) stay unlayered below, because those have to outrank the utilities they
-   sit on top of.
-
-   `--tone` is the second half of the accent story. Each FilterPopover sets it on
-   its wrapper to its own hue, and everything the popover owns — trigger hover,
-   menu edge, checkbox fill, row wash, focus ring — reads it back. An unset
-   `--tone` falls through to `--k-accent`, so the rest of the app is unchanged.
-   The repaint keeps the hue and deletes every cast the hue used to throw. */
 @layer components {
   .panel {
-    background-color: rgb(var(--k-surface, 22 26 34) / 1);
-    border: 1px solid rgb(var(--k-hairline, 43 52 66) / 1);
-    box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+    background-color: rgb(var(--k-surface, 41 41 41));
+    border: 1px solid rgb(var(--k-hairline, 82 82 82));
+    box-shadow: var(--shadow-2);
   }
 
-  /* The app bar. It sits one layer *below* the cards rather than beside them: every
-     mode orders sunken < page < surface, so the fill alone separates the bar from
-     the content without needing distance, and the deeper cast carries the lift. It
-     stays opaque even though the view heading row scrolls behind it — at 0.82 the
-     fill transmitted a legible ghost of the date control, and blurring that into
-     weather was the aesthetic answer to a legibility problem. */
   .app-bar {
-    background-color: rgb(var(--k-sunken, 2 3 6) / 1);
-    border: 1px solid rgb(var(--k-hairline-strong, 62 74 94) / 1);
-    box-shadow: 0 10px 24px -12px rgb(0 0 0 / 0.5);
+    background-color: rgb(var(--k-sunken, 20 20 20));
+    border: 1px solid rgb(var(--k-hairline, 82 82 82));
+    box-shadow: var(--shadow-8);
   }
 
-  /* Where chrome that has to stay on screen parks. From lg the app bar is sticky at
-     top-2 and 74px tall, so its bottom edge is 82px and everything pinned under it
-     starts 8px below that — one value, because the sidebar and the table toolbars have
-     to line up with each other as well as with the bar. Below lg the bar scrolls away
-     (the bottom nav carries the view switch instead), so the same chrome parks 8px off
-     the viewport top. ui-check asserts the bar never grows past it and the gaps stay
-     even. */
   .under-bar {
     top: 0.5rem;
   }
 
-  @media (min-width: 64rem) {
+  @media (min-width: 60rem) {
     .under-bar {
       top: 5.625rem;
     }
   }
 
-  /* The report panel takes the height the window has left and the region inside it takes
-     what is left once pagination has had its row, so the table fills to the bottom of the
-     screen instead of guessing at the chrome stacked above it — bar, heading, toolbar and
-     day row, every one of which can grow or vanish. The panel scrolls through its region,
-     under a head pinned to the top of that box, so the sticky toolbar never sits on a row.
-     20rem is the floor — the region's 16rem plus the pagination row — and below that the
-     page scrolls again with the toolbar parked over the top of the table. Print lifts it
-     in the @media block below, along with the overflow itself. */
   .report-panel {
     display: flex;
     flex-direction: column;
-    flex: 1 1 0%;
-    min-height: 20rem;
+    flex: 0 1 auto;
+    min-height: 0;
   }
 
   .report-region {
-    flex: 1 1 0%;
+    flex: 1 1 auto;
+    min-height: 0;
   }
 
-  /* Popovers and previews float over table text, so they get the deepest cast in
-     the app and an edge in the hue of the trigger that opened them. The edge keeps
-     the tone; the glow it used to throw is gone. */
   .menu {
-    background-color: rgb(var(--k-surface, 22 26 34) / 1);
-    border: 1px solid rgb(var(--tone, var(--k-accent, 77 141 245)) / 0.45);
-    box-shadow: 0 12px 28px -10px rgb(0 0 0 / 0.5);
+    background-color: rgb(var(--k-surface, 41 41 41));
+    border: 1px solid rgb(var(--tone, var(--k-accent-fg, 71 158 245)) / 0.45);
+    box-shadow: var(--shadow-16);
   }
 
-  /* The sticky table head, which floats inside its own scroll container with rows
-     sliding under it all day. Opaque: translucency here put 11px figures directly
-     behind 11px figures, and the frost only made that unreadable rather than wrong.
-     No border declared — every call site paints its own `border-b border-k-hairline`,
-     and a utility beats this layer anyway. */
   .thead {
-    background-color: rgb(var(--k-page, 11 14 20) / 1);
+    background-color: rgb(var(--k-page, 31 31 31));
   }
 
   .field {
-    background-color: rgb(var(--k-sunken, 2 3 6) / 1);
-    border: 1px solid rgb(var(--k-hairline-strong, 62 74 94) / 1);
+    background-color: rgb(var(--k-sunken, 20 20 20));
+    border: 1px solid rgb(var(--k-hairline-strong, 117 117 117));
   }
 
-  /* The tooltip panel. It is a portal child of <body>, so it inherits none of the
-     table's stacking or overflow; `fixed` plus the coordinates Tip() writes are the
-     whole positioning story. `pre-line` because the break schedule arrives as
-     newline-separated rows, which is exactly what a native `title=` rendered for free
-     and what a plain span would have flattened into one long line.
-     `pointer-events: none` is what makes the panel readable at all. Without it the panel
-     is the topmost element inside its own box, so the moment the pointer travels onto it
-     — which is what you do to read a two-line break schedule — the trigger gets a
-     `pointerleave` and the text vanishes out from under the cursor. WCAG 1.4.13 asks for
-     a tooltip that persists while the pointer moves onto it to be read. */
   .tip {
     position: fixed;
     z-index: 80;
     pointer-events: none;
     max-width: min(24rem, calc(100vw - 16px));
     white-space: pre-line;
-    border-radius: 0.5rem;
-    border: 1px solid rgb(var(--k-hairline-strong, 62 74 94) / 1);
-    background-color: rgb(var(--k-surface, 22 26 34) / 1);
-    color: rgb(var(--k-ink, 232 237 245) / 1);
-    padding: 0.3125rem 0.5rem;
+    border-radius: 0.25rem;
+    border: 1px solid rgb(var(--k-hairline, 82 82 82));
+    background-color: rgb(var(--k-surface, 41 41 41));
+    color: rgb(var(--k-ink, 255 255 255));
+    padding: var(--space-2xs) var(--space-xs);
     font-size: var(--text-meta);
     line-height: var(--text-meta--line-height);
-    box-shadow: 0 10px 24px -10px rgb(0 0 0 / 0.55);
+    box-shadow: var(--shadow-16);
   }
 
-  /* A filled primary action inside a popover. The hue comes from the trigger that
-     owns the panel, so nothing in there looks like it belongs to a different
-     control. The ink stays `accent-ink`: each mode sets it to whichever end clears AA
-     on its own accent, which is the right punch-through on any of the tone hues. */
   .tone-btn {
-    background-color: rgb(var(--tone, var(--k-accent, 77 141 245)) / 1);
-    color: rgb(var(--k-accent-ink, 7 11 18) / 1);
+    background-color: rgb(var(--tone, var(--k-accent-fg, 71 158 245)));
+    color: rgb(var(--tone-ink, 31 31 31));
     transition: background-color 140ms ease;
   }
 
-  /* Dismissal. Ending the panel is not a destructive act, so the red is a whisper at
-     rest — a tint, not an alarm — and only steps forward under the cursor. `danger`
-     rather than `critical` because every mode paints danger a true red, while
-     critical wanders into orange. */
   .close-btn {
-    border: 1px solid rgb(var(--k-danger, 255 123 123) / 0.22);
-    background-color: rgb(var(--k-danger, 255 123 123) / 0.1);
-    color: rgb(var(--k-danger, 255 123 123) / 0.8);
+    border: 1px solid rgb(var(--k-danger, 227 125 128) / 0.22);
+    background-color: rgb(var(--k-danger, 227 125 128) / 0.1);
+    color: rgb(var(--k-danger, 227 125 128) / 0.8);
     transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
   }
 }
 
-/* Entrance animations. Every one is one-shot (`both`) so nothing keeps moving
-   while the table is being read. */
 @keyframes popDown {
   from { opacity: 0; transform: translateY(-6px) scale(0.97); }
   to { opacity: 1; transform: none; }
@@ -243,8 +176,6 @@ body {
   from { opacity: 0; }
   to { opacity: 1; }
 }
-/* Ours is `slideIn`, not animate.css's `slideInRight`, which sweeps a full 100%: a toast
-   that crossed the screen would be a worse idea than the one that fades in. */
 @keyframes slideIn {
   from { opacity: 0; transform: translateX(18px); }
   to { opacity: 1; transform: none; }
@@ -266,87 +197,49 @@ body {
   }
 }
 
-/* The page switch is animate.css's `slideInUp` or `slideInDown`, picked by which way the
-   rail order went — see `slide` in CdrContext. Its 1s default is an age for a switch.
-   A sweep is a transform and a transform's overflow is scrollable overflow, so `main` is
-   clipped for the length of the ramp; clipped for ever, it would cut off every page taller
-   than the window. No `scale` in a switch either: a scaled ancestor changes the measured box
-   of every canvas inside it on every frame, and chart.js answers that with a resize, which
-   skips its animation and snaps the chart to its final data. */
-:root {
-  --animate-duration: 450ms;
-}
-
-/* Cards lift on hover: one pixel of travel and a darker edge. The cast deepens
-   because the plate moved away from the page, not to announce itself. */
 .lift {
   transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
 .lift:hover {
   transform: translateY(-1px);
-  border-color: rgb(var(--k-hairline-strong, 62 74 94) / 1);
-  box-shadow: 0 2px 6px -1px rgb(0 0 0 / 0.14);
+  border-color: rgb(var(--k-hairline-strong, 117 117 117));
+  box-shadow: var(--shadow-4);
 }
 
-/* Hover that announces itself. Nearly every interactive element in this app hovered
-   to the same single grey step (k-surface-hover), which is barely a level above the
-   surface it sits on, so the accent edge and tint live here rather than in twenty
-   call sites. Unlayered, so it outranks both the surfaces and the resting
-   utilities on the element; :not(:disabled) keeps the parked pagination arrows from
-   lighting up. */
 .hoverable {
-  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+  transition:
+    background-color 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
 }
 .hoverable:not(:disabled):hover {
-  border-color: rgb(var(--tone, var(--k-accent, 77 141 245)) / 0.9);
-  background-color: rgb(var(--tone, var(--k-accent, 77 141 245)) / 0.12);
-  color: rgb(var(--k-ink, 232 237 245));
+  background-color: rgb(var(--tone, var(--k-accent-fg, 71 158 245)) / 0.12);
+  border-color: rgb(var(--tone, var(--k-accent-fg, 71 158 245)) / 0.12);
+  color: rgb(var(--k-ink, 255 255 255));
 }
 
-/* Rows are wide and stacked twenty deep: a tint on each would be noise, so a row
-   gets a wash instead of the grey one — and a thinner one in light mode, where
-   13% of a saturated hue over white reads as a sticky note. */
 .row-hover:hover {
-  background-color: rgb(var(--tone, var(--k-accent, 77 141 245)) / 0.13);
+  background-color: rgb(var(--tone, var(--k-accent-fg, 71 158 245)) / 0.13);
 }
 :root[data-mode='light'] .row-hover:hover {
-  background-color: rgb(var(--tone, var(--k-accent, 26 86 192)) / 0.07);
+  background-color: rgb(var(--tone, var(--k-accent-fg, 15 108 189)) / 0.07);
 }
 
-/* Unlayered on the same contract as the rest of the states: a field inside a panel
-   takes the panel's hue for its focus edge whatever the call site painted, because
-   `focus:border-k-accent` is what every search field uses outside a popover. */
 .tone-btn:hover {
-  background-color: rgb(var(--tone, var(--k-accent, 77 141 245)) / 0.88);
+  background-color: rgb(var(--tone, var(--k-accent-fg, 71 158 245)) / 0.88);
 }
 .close-btn:hover {
-  border-color: rgb(var(--k-danger, 255 123 123) / 0.55);
-  background-color: rgb(var(--k-danger, 255 123 123) / 0.2);
-  color: rgb(var(--k-danger, 255 123 123) / 1);
+  border-color: rgb(var(--k-danger, 227 125 128) / 0.55);
+  background-color: rgb(var(--k-danger, 227 125 128) / 0.2);
+  color: rgb(var(--k-danger, 227 125 128));
 }
 .menu .field:focus {
-  border-color: rgb(var(--tone, var(--k-accent, 77 141 245)) / 1);
-}
-/* A field that only reacts on focus reads as inert to a mouse. This is `.hoverable`
-   applied to inputs — same edge, same wash — so a search bar answers the pointer
-   like the triggers sitting beside it. One rule, on `--tone`, so the fields inside a
-   popover light in that panel's hue and the ones on the toolbar fall through to the
-   accent. Three constraints: no transition, because ui-check reads these in the
-   frame it moves to them and any duration hands back the from-value; `:not(:focus)`,
-   because unlayered rules outrank every call site's `focus:border-k-accent` and would
-   dim a field the caret is already in; and the wash as a background-image, because a
-   field that swaps its sunken fill for a translucent tint reads as inverted on hover. */
-.field:not(:focus):hover {
-  border-color: rgb(var(--tone, var(--k-accent, 77 141 245)) / 0.9);
-  background-image: linear-gradient(
-    rgb(var(--tone, var(--k-accent, 77 141 245)) / 0.12),
-    rgb(var(--tone, var(--k-accent, 77 141 245)) / 0.12)
-  );
+  border-color: rgb(var(--tone, var(--k-accent-fg, 71 158 245)));
 }
 
-/* Theme checkboxes. The native box is replaced, not removed: the input still owns
-   the click, the keyboard and the accessible name, so the label wraps a real control.
-   The tick is a rotated border, which keeps it in the same accent ink as the fill. */
+.field:hover:not(:focus) {
+  border-color: rgb(var(--tone, var(--k-accent-fg, 71 158 245)) / 0.9);
+  background-image: linear-gradient(rgb(var(--tone, var(--k-accent-fg, 71 158 245)) / 0.12), rgb(var(--tone, var(--k-accent-fg, 71 158 245)) / 0.12));
+}
+
 .cbox {
   appearance: none;
   -webkit-appearance: none;
@@ -356,48 +249,36 @@ body {
   height: 1.125rem;
   width: 1.125rem;
   cursor: pointer;
-  border: 1px solid rgb(var(--k-hairline-strong, 62 74 94) / 1);
+  border: 1px solid rgb(var(--k-hairline-strong, 117 117 117));
   border-radius: 4px;
-  background-color: rgb(var(--k-sunken, 2 3 6) / 1);
+  background-color: rgb(var(--k-sunken, 20 20 20));
   transition: border-color 140ms ease, background-color 140ms ease;
 }
 .cbox:hover {
-  border-color: rgb(var(--tone, var(--k-accent, 77 141 245)) / 0.9);
+  border-color: rgb(var(--tone, var(--k-accent-fg, 71 158 245)) / 0.9);
 }
 .cbox:checked {
-  border-color: rgb(var(--tone, var(--k-accent, 77 141 245)) / 1);
-  background-color: rgb(var(--tone, var(--k-accent, 77 141 245)) / 1);
+  border-color: rgb(var(--tone, var(--k-accent-fg, 71 158 245)));
+  background-color: rgb(var(--tone, var(--k-accent-fg, 71 158 245)));
 }
 .cbox:checked::after {
   content: '';
   width: 3px;
   height: 6px;
-  border: solid rgb(var(--k-accent-ink, 7 11 18) / 1);
+  border: solid rgb(var(--tone-ink, 31 31 31));
   border-width: 0 2px 2px 0;
   transform: rotate(45deg) translate(-1px, -1px);
 }
-/* The box is the one control that can sit outside a popover, so it paints its own focus
-   rather than taking the page's base ring in the raw accent. On `box-shadow` and not
-   `border-color`, because the border is transitioned and a focus read in the same frame
-   gets the from-value back. */
+
 .cbox:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px rgb(var(--tone, var(--k-accent, 77 141 245)) / 0.5);
+  box-shadow: 0 0 0 2px rgb(var(--tone, var(--k-accent-fg, 71 158 245)) / 0.5);
 }
 
-/* Each mode sets `accent-ink` to whichever end clears AA on its own accent — near-black
-   in dark, white in light — which is the right punch-through on any of the saturated
-   tone hues, so the tick stays put while the fill moves. */
 .menu :focus-visible {
-  outline-color: rgb(var(--tone, var(--k-accent, 77 141 245)));
+  outline-color: rgb(var(--tone, var(--k-accent-fg, 71 158 245)));
 }
 
-/* Two clamps cut every ramp when the OS asks for reduced motion: this one, and animate.css's
-   own reduced-motion block, which pins `.animate__animated` to 1ms. One millisecond is a
-   single displaced frame — a page switch still measures 1080px of travel and looks like
-   nothing, which is the whole bug. `data-motion='full'` is a person opting back in from
-   Settings, so this clamp steps aside for it and the library's 1ms is answered with the
-   duration the rule was written with. */
 @media (prefers-reduced-motion: reduce) {
   html:not([data-motion='full']) *,
   html:not([data-motion='full']) *::before,
@@ -412,13 +293,32 @@ body {
   }
 }
 
-/* Print. A third ramp on purpose, not a copy of the light one: toner wants the hues
-   pulled down and the hairlines pushed up, so a laser printer does not wash a
-   `hairline` printed at L*88 into the paper. The active mode writes its variables
-   inline on <html>, so these need !important to win.
-   Every role in COLOR_MODES has to appear here. One that is missing does not fall
-   back to white — it falls back to whatever the *screen* mode painted, so printing
-   from dark puts dark amber on white paper. ui-check asserts the list matches. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 480ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+  animation-name: none;
+}
+
+::view-transition-new(root) {
+  z-index: 2;
+  animation-name: mode-reveal;
+}
+
+@keyframes mode-reveal {
+  from {
+    clip-path: circle(0 at 100% 0);
+  }
+  to {
+    clip-path: circle(150vmax at 100% 0);
+  }
+}
+
 @media print {
   :root {
     --k-page: 255 255 255 !important;
@@ -431,6 +331,7 @@ body {
     --k-ink-muted: 74 74 68 !important;
     --k-ink-faint: 110 110 102 !important;
     --k-accent: 31 58 99 !important;
+    --k-accent-fg: 31 58 99 !important;
     --k-accent-ink: 255 255 255 !important;
     --k-success: 30 87 53 !important;
     --k-danger: 139 46 46 !important;
@@ -439,7 +340,7 @@ body {
     --k-talk: 37 91 74 !important;
     --k-throughput: 107 78 0 !important;
     --k-break-time: 91 58 87 !important;
-    --k-region: 63 74 68 !important;
+    --k-region: 35 62 104 !important;
   }
 
   @page {
@@ -463,10 +364,9 @@ body {
     background-color: #fff !important;
     background-image: none !important;
     box-shadow: none !important;
-    border-color: rgb(var(--k-hairline) / 1) !important;
+    border-color: rgb(var(--k-hairline)) !important;
   }
 
-  /* A one-shot entrance must not catch an element mid-fade on paper. */
   *,
   *::before,
   *::after {
@@ -482,10 +382,6 @@ body {
     overflow: visible !important;
   }
 
-  /* Paper has no leftover window to hand the report, so the column that grows into one
-     has to stop growing: every box takes its content height and the table runs the full
-     length of the page. `flex: none` leaves the toolbars flex containers — it only stops
-     them stretching as items. */
   main,
   main > div,
   main .panel,
