@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { ColumnTripleRegular as Columns, DeleteRegular as Trash, PrintRegular as Printer, SaveRegular as FloppyDisk, TimerRegular as Timer } from '@fluentui/react-icons';
+import { DeleteRegular as Trash, PrintRegular as Printer, SaveRegular as FloppyDisk, TimerRegular as Timer } from '@fluentui/react-icons';
 import { useCdr } from '../../context/CdrContext';
 import { DEFAULT_SHIFT_CONFIG } from '../../constants/defaultData';
-import ExtensionFilter, { Checkbox } from '../ui/ExtensionFilter';
+import ExtensionFilter from '../ui/ExtensionFilter';
+import ColumnFilter from '../ui/ColumnFilter';
 import FilterPopover from '../ui/FilterPopover';
 import SearchInput from '../ui/SearchInput';
 import Segmented from '../ui/Segmented';
@@ -65,9 +66,6 @@ export default function RundownToolbar({
     updateShiftConfig({ ...shiftConfig, breakThresholdMinutes: next });
   };
 
-  const toggleColumn = (id) => setVisibleColumns({ ...visibleColumns, [id]: !visibleColumns[id] });
-  const shownColumns = FILTERABLE_COLUMN_IDS.filter((id) => visibleColumns[id]).length;
-
   const saveCurrentView = () => {
     const name = viewName.trim();
     if (!name) {
@@ -104,18 +102,12 @@ export default function RundownToolbar({
       {/* On a phone the table scrolls sideways and the column picker is the one
           control whose job a narrow screen cannot show anyway. */}
       <div className="hidden sm:block">
-        <FilterPopover label="Columns" icon={Columns} tone="region" badge={`${shownColumns}/${FILTERABLE_COLUMN_IDS.length}`}>
-          <div className="space-y-0.5 p-2">
-            {FILTERABLE_COLUMN_IDS.map((id) => (
-              <Checkbox key={id} checked={!!visibleColumns[id]} onChange={() => toggleColumn(id)}>
-                {COLUMN_BY_ID[id]?.label || id}
-              </Checkbox>
-            ))}
-            <p className="px-2 pt-1.5 text-2xs text-k-ink-muted">
-              Excel writes the columns that are visible here.
-            </p>
-          </div>
-        </FilterPopover>
+        <ColumnFilter
+          options={FILTERABLE_COLUMN_IDS.map((id) => ({ id, label: COLUMN_BY_ID[id].label }))}
+          visible={visibleColumns}
+          setVisible={setVisibleColumns}
+          note="Print writes exactly the columns you see here."
+        />
       </div>
 
       <Segmented

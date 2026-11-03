@@ -3,11 +3,13 @@ import { useCdr } from '../../context/CdrContext';
 import { createShiftDateResolver } from '../../services/shiftCalculator';
 import { inDateRange, rangeDates } from '../../utils/dateRange';
 import { loadFromStorage } from '../../utils/storage';
+import { mergeOrder } from '../../utils/columnOrder';
 import useDebouncedSave from '../../hooks/useDebouncedSave';
 import Pagination from '../common/Pagination';
 import DayScopeSelect from '../ui/DayScopeSelect';
 import SearchInput from '../ui/SearchInput';
 import ExtensionFilter from '../ui/ExtensionFilter';
+import ColumnFilter from '../ui/ColumnFilter';
 import Segmented from '../ui/Segmented';
 import SkeletonRows from '../ui/SkeletonRows';
 import SortHeaderCell from '../ui/SortHeaderCell';
@@ -33,6 +35,8 @@ const COLUMNS = [
 const FLEX_COLUMN = 'destination';
 const colWidth = (id) => (id === FLEX_COLUMN ? 'w-full' : 'w-1');
 
+const COLUMN_IDS = COLUMNS.map((c) => c.id);
+
 const collator = new Intl.Collator(undefined, { numeric: true });
 
 const RESPONSES = [
@@ -46,6 +50,10 @@ export default function RawCDRTable() {
 
   const restoredRef = useRef(loadFromStorage('raw_view_state', null));
   const [search, setSearch] = useState(() => restoredRef.current?.search || '');
+  const [order, setOrder] = useState(() => mergeOrder(restoredRef.current?.order, COLUMN_IDS));
+  const [visibleColumns, setVisibleColumns] = useState(() =>
+    Object.fromEntries(COLUMNS.map((c) => [c.id, restoredRef.current?.visibleColumns?.[c.id] !== false]))
+  );
   const [selectedExts, setSelectedExts] = useState([]);
   const [response, setResponse] = useState(() =>
     RESPONSES.some((r) => r.id === restoredRef.current?.response) ? restoredRef.current.response : 'ALL'
@@ -171,13 +179,19 @@ export default function RawCDRTable() {
       // The effective scope, not the raw pick: a resurrected day the saved range no
       // longer covers would leave the table empty for a reason you cannot see.
       dayScope: scope,
+      visibleColumns,
+      order,
       sort: { field: sortField, asc: sortAsc },
       pageSize
     }),
-    [search, selectedExts, response, scope, sortField, sortAsc, pageSize]
+    [search, selectedExts, response, scope, visibleColumns, order, sortField, sortAsc, pageSize]
   );
 
   useDebouncedSave('raw_view_state', viewState);
+
+  const shownColumns = order
+    .map((id) => COLUMNS.find((c) => c.id === id))
+    .filter((col) => col && visibleColumns[col.id]);
 
   return (
     <div className={`animate__animated ${slide} flex min-h-0 flex-1 flex-col space-y-4`}>
@@ -214,6 +228,10 @@ export default function RawCDRTable() {
           }}
         />
 
+        <div className="hidden sm:block">
+          <ColumnFilter options={COLUMNS} visible={visibleColumns} setVisible={setVisibleColumns} />
+        </div>
+
         {/* The zero-row filter still reads the same table, so the tallies only ride
             along where the toolbar has a spare corner. */}
         <div className="ml-auto hidden items-center gap-1.5 sm:flex">
@@ -236,7 +254,7 @@ export default function RawCDRTable() {
           <table className="w-full text-left text-xs text-k-ink-muted">
             <thead className="sticky top-0 z-[25] border-b border-k-hairline thead text-meta font-bold">
               <tr>
-                {COLUMNS.map((col) => (
+                {shownColumns.map((col) => (
                   <SortHeaderCell
                     key={col.id}
                     label={col.label}
@@ -246,16 +264,35 @@ export default function RawCDRTable() {
                     onSort={handleSort}
                     align={col.align}
                     className={colWidth(col.id)}
+                    reorder={{ order, setOrder }}
                   />
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-k-hairline/60">
               {isParsing ? (
-                <SkeletonRows cols={COLUMNS.length} />
+                <SkeletonRows cols={shownColumns.length || 1} />
+              ) : shownColumns.length === 0 ? (
+                <tr>
+                  <td colSpan={1}>
+                    <EmptyState
+                      title="Every column is hidden"
+                      body="Turn fields back on in the Columns menu."
+                      action={
+                        <button
+                          type="button"
+                          onClick={() => setVisibleColumns(Object.fromEntries(COLUMN_IDS.map((id) => [id, true])))}
+                          className="rounded bg-k-accent px-3.5 py-2 text-xs font-medium text-k-accent-ink transition-colors hover:bg-k-accent/90 active:translate-y-[1px]"
+                        >
+                          Show all columns
+                        </button>
+                      }
+                    />
+                  </td>
+                </tr>
               ) : pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COLUMNS.length}>
+                  <td colSpan={shownColumns.length}>
                     <EmptyState
                       title={rawCalls.length === 0 ? 'No calls loaded' : 'No call matches'}
                       body={
@@ -274,7 +311,7 @@ export default function RawCDRTable() {
                     <Fragment key={`${call.extension}_${call.start_time.getTime()}_${idx}`}>
                       {grouped && firstOfDay && (
                         <tr>
-                          <td colSpan={COLUMNS.length} className="bg-k-sunken/70 px-3 py-1.5">
+                          <td colSpan={shownColumns.length} className="bg-k-sunken/70 px-3 py-1.5">
                             <span className="num text-2xs font-medium text-k-ink-muted">
                               {day}
                             </span>
@@ -285,7 +322,7 @@ export default function RawCDRTable() {
                         </tr>
                       )}
                       <tr className="row-hover h-[34px]">
-                        {COLUMNS.map((col) => (
+                        {shownColumns.map((col) => (
                           <td
                             key={col.id}
                             className={`num whitespace-nowrap px-3 align-middle ${colWidth(col.id)} ${

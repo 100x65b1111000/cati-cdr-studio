@@ -2,6 +2,7 @@ import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useCdr } from '../../context/CdrContext';
 import { rangeDates } from '../../utils/dateRange';
 import { loadFromStorage } from '../../utils/storage';
+import { mergeOrder } from '../../utils/columnOrder';
 import useDebouncedSave from '../../hooks/useDebouncedSave';
 import DayScopeSelect from '../ui/DayScopeSelect';
 import Pagination from '../common/Pagination';
@@ -13,6 +14,8 @@ import { COLUMNS, COLUMN_BY_ID, defaultVisibleColumns } from './columns';
 
 const collator = new Intl.Collator(undefined, { numeric: true });
 const numeric = (a, b) => collator.compare(a, b);
+
+const COLUMN_IDS = COLUMNS.map((c) => c.id);
 
 // `navigator.clipboard` exists only in a secure context, and the team browses this app
 // over plain http on the LAN, where it is undefined. The textarea path is the old
@@ -67,6 +70,7 @@ export default function RundownTable() {
   const restoredRef = useRef(loadFromStorage('view_state', null));
   const [searchQuery, setSearchQuery] = useState(() => restoredRef.current?.search || '');
   const [visibleColumns, setVisibleColumns] = useState(() => mergeVisibleColumns(restoredRef.current?.visibleColumns));
+  const [order, setOrder] = useState(() => mergeOrder(restoredRef.current?.order, COLUMN_IDS));
   const [connView, setConnView] = useState(() => (restoredRef.current?.connView === 'split' ? 'split' : 'total'));
   const [sortField, setSortField] = useState(() => {
     const saved = restoredRef.current?.sort?.field;
@@ -184,11 +188,12 @@ export default function RundownTable() {
       // that the saved range no longer covers.
       dayScope: scope,
       visibleColumns,
+      order,
       connView,
       sort: { field: sortField, asc: sortAsc },
       pageSize
     }),
-    [dateRange, searchQuery, selectedExtensions, scope, visibleColumns, connView, sortField, sortAsc, pageSize]
+    [dateRange, searchQuery, selectedExtensions, scope, visibleColumns, order, connView, sortField, sortAsc, pageSize]
   );
 
   useDebouncedSave('view_state', filters);
@@ -200,6 +205,7 @@ export default function RundownTable() {
     setSelectedExtensions((saved.extensions || []).filter((e) => extensionsInRange.includes(e)));
     setDayScope(typeof saved.dayScope === 'string' ? saved.dayScope : '');
     setVisibleColumns(mergeVisibleColumns(saved.visibleColumns));
+    setOrder(mergeOrder(saved.order, COLUMN_IDS));
     setConnView(saved.connView === 'split' ? 'split' : 'total');
     if (COLUMN_BY_ID[saved.sort?.field]) {
       setSortField(saved.sort.field);
@@ -240,7 +246,9 @@ export default function RundownTable() {
       .catch(() => addToast('The browser refused the copy.', 'error'));
   };
 
-  const shownColumns = COLUMNS.filter((c) => visibleColumns[c.id]);
+  // Dragging a handle reorders `order`, the full id list; visibility is applied on top
+  // of it, so a hidden column keeps its slot and reappears where it was put.
+  const shownColumns = order.map((id) => COLUMN_BY_ID[id]).filter((col) => col && visibleColumns[col.id]);
   const ctx = { connView, setOverride, openDetail };
 
   const noData = Object.keys(analysis).length === 0;
@@ -278,32 +286,20 @@ export default function RundownTable() {
           <table className="w-full text-left text-xs text-k-ink-muted">
             <thead className="sticky top-0 z-[25] border-b border-k-hairline thead text-meta font-bold">
               <tr>
-                {shownColumns.map((col) =>
-                  col.value ? (
-                    <SortHeaderCell
-                      key={col.id}
-                      label={col.label}
-                      field={col.id}
-                      sortField={sortField}
-                      sortAsc={sortAsc}
-                      onSort={handleSort}
-                      align={col.align}
-                      className={colWidth(col.id)}
-                    />
-                  ) : (
-                    <th
-                      key={col.id}
-                      scope="col"
-                      className={`px-3 py-3.5 text-k-ink-muted ${colWidth(
-                        col.id
-                      )} ${
-                        col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
-                      }`}
-                    >
-                      {col.label}
-                    </th>
-                  )
-                )}
+                {shownColumns.map((col) => (
+                  <SortHeaderCell
+                    key={col.id}
+                    label={col.label}
+                    field={col.id}
+                    sortField={sortField}
+                    sortAsc={sortAsc}
+                    onSort={handleSort}
+                    align={col.align}
+                    className={colWidth(col.id)}
+                    sortable={!!col.value}
+                    reorder={{ order, setOrder }}
+                  />
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-k-hairline/60">
