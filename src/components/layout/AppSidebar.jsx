@@ -68,9 +68,10 @@ export default function AppSidebar() {
     // both ends of the vertical run (`under-bar` parks it clear of the bar). `app-bar`
     // rather than `panel` so it is the same sunken layer as the bar instead of a card
     // lifted out of the content. Collapsed it keeps the nav icons and nothing else;
-    // the content padding in App.jsx moves with it.
+    // the content padding in App.jsx moves with it — and it already transitions, so the
+    // rail has to use the same ramp or the content glides while the panel snaps.
     <aside
-      className={`app-bar no-print fixed bottom-2 left-2 under-bar z-40 hidden flex-col overflow-hidden rounded-lg lg:flex ${
+      className={`app-bar no-print fixed bottom-2 left-2 under-bar z-40 hidden flex-col overflow-hidden rounded-lg transition-[width] duration-200 lg:flex ${
         sidebarCollapsed ? 'w-16' : 'w-72'
       }`}
     >
