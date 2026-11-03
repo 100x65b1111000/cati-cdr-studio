@@ -7,22 +7,21 @@ import React from 'react';
 const SIZE = { sm: 'text-2xs', md: 'text-meta' };
 
 const TONE = {
-  accent: 'ring-k-accent/35 text-k-accent',
+  accent: 'ring-k-accent-fg/35 text-k-accent-fg',
   success: 'ring-k-success/35 text-k-success',
   danger: 'ring-k-danger/35 text-k-danger',
-  warning: 'ring-k-warning/35 text-k-warning',
   talk: 'ring-k-talk/35 text-k-talk',
   throughput: 'ring-k-throughput/35 text-k-throughput',
   'break-time': 'ring-k-break-time/35 text-k-break-time',
   region: 'ring-k-region/35 text-k-region',
-  neutral: 'ring-k-hairline-strong/50 text-k-ink-muted'
+  neutral: 'ring-k-hairline text-k-ink-muted'
 };
 
 export default function Chip({ tone = 'accent', size = 'sm', className = '', children, ...rest }) {
   return (
     <span
       {...rest}
-      className={`num whitespace-nowrap rounded-md bg-k-sunken/70 px-2 py-0.5 font-medium ring-1 ring-inset ${SIZE[size]} ${TONE[tone]} ${className}`}
+      className={`num whitespace-nowrap rounded bg-k-sunken/70 px-2 py-0.5 font-medium ring-1 ring-inset ${SIZE[size]} ${TONE[tone]} ${className}`}
     >
       {children}
     </span>

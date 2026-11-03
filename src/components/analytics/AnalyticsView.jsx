@@ -13,7 +13,7 @@ import {
   Filler
 } from 'chart.js';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
-import { ChartBar, ChartDonut, ChartLine, Timer } from '@phosphor-icons/react';
+import { DataBarVerticalRegular as ChartBar, DataLineRegular as ChartLine, DataPieRegular as ChartDonut, TimerRegular as Timer } from '@fluentui/react-icons';
 import { useCdr } from '../../context/CdrContext';
 import { DEFAULT_SHIFT_CONFIG } from '../../constants/defaultData';
 import { themeColor, themeSeries } from '../../theme/colorSchemes';
@@ -39,18 +39,34 @@ ChartJS.register(
   Filler
 );
 
-function Chart({ icon: Icon, title, note, empty, children }) {
+function ChartSkeleton() {
   return (
-    <section className="panel overflow-hidden rounded-2xl">
+    <div className="flex h-full items-end gap-3" role="status" aria-label="Recalculating charts">
+      {[45, 70, 30, 60, 85, 40, 65, 50, 75, 35].map((h, i) => (
+        <div
+          key={i}
+          className="animate-pulse rounded bg-k-hairline"
+          style={{ height: `${h}%`, width: '10%' }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function Chart({ icon: Icon, title, note, empty, loading, children }) {
+  return (
+    <section className="panel overflow-hidden rounded-lg">
       <header className="flex items-center justify-between gap-3 border-b border-k-hairline px-5 py-4">
         <h3 className="flex items-center gap-2 text-sm font-semibold text-k-ink">
-          <Icon size={16} className="text-k-accent" />
+          <Icon style={{ fontSize: 16 }} className="text-k-accent-fg" />
           {title}
         </h3>
         <span className="num text-meta text-k-ink-muted">{note}</span>
       </header>
       <div className="h-72 p-5">
-        {empty ? (
+        {loading ? (
+          <ChartSkeleton />
+        ) : empty ? (
           <div className="flex h-full items-center justify-center">
             <EmptyState title={empty} />
           </div>
@@ -63,7 +79,7 @@ function Chart({ icon: Icon, title, note, empty, children }) {
 }
 
 export default function AnalyticsView() {
-  const { analysis, extNameMap, rawCalls, shiftConfig, dateRange, colorScheme, slide } = useCdr();
+  const { analysis, extNameMap, rawCalls, shiftConfig, dateRange, colorScheme, slide, isParsing } = useCdr();
   const [dayScope, setDayScope] = useState('');
 
   // Every chart here blends the shifts in range, which is exactly what you do not
@@ -230,7 +246,7 @@ export default function AnalyticsView() {
 
   if (agentDays === 0) {
     return (
-      <div className="panel rounded-2xl">
+      <div className="panel rounded-lg">
         <EmptyState
           title="Nothing to chart"
           body="Upload a CDR CSV from the sidebar, then widen the date range above."
@@ -246,7 +262,7 @@ export default function AnalyticsView() {
       <MetricsStrip dayScope={scope} />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <Chart icon={ChartBar} title="Calls per agent-day" note={`${agentDays} agent-days`}>
+        <Chart icon={ChartBar} title="Calls per agent-day" note={`${agentDays} agent-days`} loading={isParsing}>
           <Bar data={volumeData} options={{ ...options, scales }} />
         </Chart>
 
@@ -255,6 +271,7 @@ export default function AnalyticsView() {
           title="Calls by region"
           note={regions > 0 ? `${regions} ${regions === 1 ? 'region' : 'regions'}` : 'no region column'}
           empty={regions === 0 ? 'No region recorded' : null}
+          loading={isParsing}
         >
           <Doughnut
             data={regionalData}
@@ -262,11 +279,11 @@ export default function AnalyticsView() {
           />
         </Chart>
 
-        <Chart icon={Timer} title="Talk against break" note="minutes">
+        <Chart icon={Timer} title="Talk against break" note="minutes" loading={isParsing}>
           <Bar data={timeData} options={{ ...options, scales }} />
         </Chart>
 
-        <Chart icon={ChartLine} title="Call intensity by hour" note={hours > 0 ? `${hours} calls` : 'no calls'} empty={hours === 0 ? 'No calls in this date range' : null}>
+        <Chart icon={ChartLine} title="Call intensity by hour" note={hours > 0 ? `${hours} calls` : 'no calls'} empty={hours === 0 ? 'No calls in this date range' : null} loading={isParsing}>
           <Line data={hourlyData} options={{ ...options, scales }} />
         </Chart>
       </div>

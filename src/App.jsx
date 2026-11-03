@@ -17,14 +17,15 @@ import DropzoneOverlay from './components/modals/DropzoneOverlay';
 const VIEW_BY_KEY = Object.fromEntries(NAV.map((n) => [n.hotkey, n.id]));
 
 function focusSearch() {
-  const el = document.querySelector('main [data-search-primary]');
+  const el = document.querySelector('main input[type="search"]');
   if (!el) return false;
   el.focus();
   return true;
 }
 
 export default function App({ children }) {
-  const { activeTab, setActiveTab, slide, parseError, clearParseError, analysis, dateRange } = useCdr();
+  const { activeTab, setActiveTab, slide, parseError, clearParseError, analysis, dateRange, sidebarCollapsed } =
+    useCdr();
 
   const wantsSearchRef = useRef(false);
 
@@ -66,7 +67,7 @@ export default function App({ children }) {
           accent-on-accent. */}
       <a
         href="#view"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[70] focus:rounded-lg focus:bg-k-accent focus:px-3.5 focus:py-2 focus:text-xs focus:font-medium focus:text-k-accent-ink focus:outline-2 focus:outline-k-ink focus:outline-offset-2"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[70] focus:rounded focus:bg-k-accent focus:px-3.5 focus:py-2 focus:text-xs focus:font-medium focus:text-k-accent-ink focus:outline-2 focus:outline-k-ink focus:outline-offset-2"
       >
         Skip to content
       </a>
@@ -75,7 +76,11 @@ export default function App({ children }) {
       <MobileNav />
       <AppSidebar />
 
-      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col lg:pl-[19.5rem]">
+      <div
+        className={`relative flex min-h-0 min-w-0 flex-1 flex-col transition-[padding] duration-200 ${
+          sidebarCollapsed ? 'lg:pl-[5.5rem]' : 'lg:pl-[19.5rem]'
+        }`}
+      >
         <header className="hidden print:block print:pb-2">
           <h2 className="text-sm font-semibold text-k-ink">{view.label}</h2>
           <p className="num text-meta text-k-ink-muted">
@@ -110,8 +115,8 @@ export default function App({ children }) {
               <div key={activeTab} className={`animate__animated ${slide} flex min-w-0 items-center gap-3`}>
                 {/* A phone knows its view from the bottom bar; the plate and the
                     description are the first thing to cost it a row of content. */}
-                <span className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-k-accent/25 bg-k-accent/10 text-k-accent sm:flex">
-                  <view.Icon size={18} />
+                <span className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-md border border-k-accent-fg/25 bg-k-accent-fg/10 text-k-accent-fg sm:flex">
+                  <view.Icon style={{ fontSize: 18 }} />
                 </span>
                 <div className="min-w-0">
                   <h2 className="text-base font-bold leading-tight tracking-tight text-k-ink sm:text-lg">{view.label}</h2>
@@ -124,10 +129,10 @@ export default function App({ children }) {
             </div>
             {/* Digits and Ctrl+K are desktop habits; a phone has neither. */}
             <p className="hidden text-xs text-k-ink-muted md:block">
-              <kbd className="num rounded-md border border-k-hairline px-1">1</kbd> to{' '}
-              <kbd className="num rounded-md border border-k-hairline px-1">5</kbd> switch views,{' '}
-              <kbd className="num rounded-md border border-k-hairline px-1">Ctrl</kbd>+
-              <kbd className="num rounded-md border border-k-hairline px-1">K</kbd> searches
+              <kbd className="num rounded border border-k-hairline px-1">1</kbd> to{' '}
+              <kbd className="num rounded border border-k-hairline px-1">5</kbd> switch views,{' '}
+              <kbd className="num rounded border border-k-hairline px-1">Ctrl</kbd>+
+              <kbd className="num rounded border border-k-hairline px-1">K</kbd> searches
             </p>
           </div>
 

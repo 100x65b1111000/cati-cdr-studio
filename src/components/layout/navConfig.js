@@ -1,11 +1,5 @@
 import { lazy } from 'react';
-import {
-  Table,
-  ListBullets,
-  ChartBar,
-  IdentificationCard,
-  Sliders
-} from '@phosphor-icons/react';
+import { ContactCardRegular as IdentificationCard, DataBarVerticalRegular as ChartBar, ListRegular as ListBullets, OptionsRegular as Sliders, TableSimpleRegular as Table } from '@fluentui/react-icons';
 
 // Shared by the sidebar, the narrow-screen header, the print title and the route in
 // app/(app)/[view]/page.jsx, so the view list has exactly one source. `id` is

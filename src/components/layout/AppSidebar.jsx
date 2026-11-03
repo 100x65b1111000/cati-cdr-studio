@@ -1,4 +1,5 @@
 import React from 'react';
+import { ChevronDoubleLeftRegular as CaretDoubleLeft, ChevronDoubleRightRegular as CaretDoubleRight } from '@fluentui/react-icons';
 import { useCdr } from '../../context/CdrContext';
 import { NAV } from './navConfig';
 import DataActions from './DataActions';
@@ -17,13 +18,13 @@ function DatasetCard() {
     [skipped, 'skipped'],
     [Object.keys(extNameMap).length, 'extensions'],
     [availableDates(analysis).length, 'shift days'],
-    [activeUpload?.source === 'demo' ? 'sample' : activeUpload?.source || '—', 'source']
+    [activeUpload?.source === 'demo' ? 'sample' : activeUpload?.source || '-', 'source']
   ];
 
   return (
     // One step up from the panel's `sunken`, so it reads as a plate on the dark column
     // rather than a hole in it: the panel is now the deepest layer the sidebar owns.
-    <div className="flex flex-col gap-3 rounded-xl border border-k-hairline bg-k-page/60 p-3">
+    <div className="flex flex-col gap-3 rounded-md border border-k-hairline bg-k-page/60 p-3">
       <div className="flex flex-col gap-1.5">
         <span className="text-2xs font-medium uppercase tracking-wide text-k-ink-faint">Active dataset</span>
         {/* One native select does the whole job: the live upload is the selected
@@ -33,12 +34,12 @@ function DatasetCard() {
           value={activeUpload?.id ?? ''}
           onChange={(event) => event.target.value && restoreUpload(Number(event.target.value))}
           disabled={isParsing || uploadHistory.length === 0}
-          className="field w-full rounded-lg px-2 py-1.5 text-meta text-k-ink disabled:opacity-60"
+          className="field w-full rounded px-2 py-1.5 text-meta text-k-ink disabled:opacity-60"
         >
           <option value={activeUpload?.id ?? ''}>{activeUpload ? activeUpload.filename : 'No upload stored'}</option>
           {uploadHistory.map((upload) => (
             <option key={upload.id} value={upload.id}>
-              {upload.filename} — {upload.rowCount} rows
+              {upload.filename} - {upload.rowCount} rows
             </option>
           ))}
         </select>
@@ -57,7 +58,7 @@ function DatasetCard() {
 }
 
 export default function AppSidebar() {
-  const { activeTab, setActiveTab, shiftConfig } = useCdr();
+  const { activeTab, setActiveTab, shiftConfig, sidebarCollapsed, setSidebarCollapsed } = useCdr();
   const shift = `${shiftConfig.shiftStartTime} → ${shiftConfig.shiftEndTime}${
     shiftConfig.shiftEndDay > shiftConfig.shiftStartDay ? ' +1' : ''
   }`;
@@ -66,11 +67,35 @@ export default function AppSidebar() {
     // The app bar's own geometry, repeated: 8px off the left edge and 8px of air at
     // both ends of the vertical run (`under-bar` parks it clear of the bar). `app-bar`
     // rather than `panel` so it is the same sunken layer as the bar instead of a card
-    // lifted out of the content. It costs the content 19.5rem.
-    <aside className="app-bar no-print fixed bottom-2 left-2 under-bar z-40 hidden w-72 flex-col overflow-hidden rounded-2xl lg:flex">
+    // lifted out of the content. Collapsed it keeps the nav icons and nothing else;
+    // the content padding in App.jsx moves with it.
+    <aside
+      className={`app-bar no-print fixed bottom-2 left-2 under-bar z-40 hidden flex-col overflow-hidden rounded-lg lg:flex ${
+        sidebarCollapsed ? 'w-16' : 'w-72'
+      }`}
+    >
       {/* The scroll is on the inside, never on the aside itself: a panel that both
           clips and paints is where a focus ring or an overflowed label disappears. */}
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+      {/* The rail carries a smaller inset than the panel: at `p-4` its 30px column left
+          7px of dead air on each side of a 16px glyph, which reads as a gap rather than a
+          margin. `p-3` keeps the icon on the same centre line it had before. */}
+      <div className={`flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto ${sidebarCollapsed ? 'p-3' : 'p-4'}`}>
+        {/* Left-parked in the panel so the button stays under the cursor when the rail
+            widens to meet it; centred in the rail's 38px column, because at 36px wide the
+            two states want different offsets to land the glyph on the nav glyphs below it.
+            `grid` centering rather than padding around the icon, because an SVG is an
+            inline-level box and padding alone leaves it sitting on the text baseline. */}
+        <div className={`flex ${sidebarCollapsed ? 'justify-center' : ''}`}>
+          <button
+            type="button"
+            onClick={() => setSidebarCollapsed((v) => !v)}
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-pressed={sidebarCollapsed}
+            className="hoverable grid h-7 w-9 shrink-0 place-items-center rounded border border-k-hairline bg-k-surface/70 text-k-ink-faint hover:border-k-accent-fg hover:text-k-accent-fg"
+          >
+            {sidebarCollapsed ? <CaretDoubleRight style={{ fontSize: 16 }} /> : <CaretDoubleLeft style={{ fontSize: 16 }} />}
+          </button>
+        </div>
         <nav aria-label="Views">
           <ul className="flex flex-col gap-0.5">
             {NAV.map((item) => {
@@ -82,19 +107,23 @@ export default function AppSidebar() {
                     onClick={() => setActiveTab(item.id)}
                     aria-current={active ? 'page' : undefined}
                     aria-label={`${item.label} (${item.hotkey})`}
-                    className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-meta font-medium transition-colors ${
-                      active ? 'bg-k-accent/15 text-k-accent' : 'hoverable text-k-ink-muted'
+                    className={`flex w-full items-center gap-2.5 rounded px-2.5 py-2 text-meta font-medium transition-colors ${
+                      sidebarCollapsed ? 'justify-center px-0' : ''
+                    } ${
+                      active ? 'bg-k-accent-fg/15 text-k-accent-fg' : 'hoverable text-k-ink-muted'
                     }`}
                   >
-                    <item.Icon size={16} weight={active ? 'fill' : 'regular'} className="shrink-0" />
-                    <span className="truncate">{item.label}</span>
-                    <kbd
-                      className={`num ml-auto shrink-0 rounded-[4px] border px-1.5 text-2xs ${
-                        active ? 'border-k-accent/40 text-k-accent' : 'border-k-hairline text-k-ink-muted'
-                      }`}
-                    >
-                      {item.hotkey}
-                    </kbd>
+                    <item.Icon style={{ fontSize: 16 }} className="shrink-0" />
+                    {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                    {!sidebarCollapsed && (
+                      <kbd
+                        className={`num ml-auto shrink-0 rounded border px-1.5 text-2xs ${
+                          active ? 'border-k-accent-fg/40 text-k-accent-fg' : 'border-k-hairline text-k-ink-muted'
+                        }`}
+                      >
+                        {item.hotkey}
+                      </kbd>
+                    )}
                   </button>
                 </li>
               );
@@ -103,14 +132,19 @@ export default function AppSidebar() {
         </nav>
 
         {/* `mt-auto` lives here rather than on the card so the whole data cluster — load,
-            switch, read — travels to the foot together. */}
-        <DataActions className="mt-auto grid-cols-1" />
+            switch, read — travels to the foot together. Collapsed, only the actions
+            survive at rail width; the card's figures and the shift note do not. */}
+        <DataActions className="mt-auto grid-cols-1" compact={sidebarCollapsed} />
 
-        <DatasetCard />
+        {!sidebarCollapsed && (
+          <>
+            <DatasetCard />
 
-        <p className="text-2xs leading-relaxed text-k-ink-faint">
-          break {shiftConfig.breakThresholdMinutes} min · {shift}
-        </p>
+            <p className="text-2xs leading-relaxed text-k-ink-faint">
+              break {shiftConfig.breakThresholdMinutes} min · {shift}
+            </p>
+          </>
+        )}
       </div>
     </aside>
   );

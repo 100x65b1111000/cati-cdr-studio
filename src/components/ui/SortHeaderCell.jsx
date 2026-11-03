@@ -1,5 +1,5 @@
 import React from 'react';
-import { CaretUp, CaretDown } from '@phosphor-icons/react';
+import { ChevronDownRegular as CaretDown, ChevronUpRegular as CaretUp } from '@fluentui/react-icons';
 
 export default function SortHeaderCell({
   label,
@@ -24,13 +24,13 @@ export default function SortHeaderCell({
       <button
         type="button"
         onClick={() => onSort(field)}
-        className={`inline-flex items-center gap-1 whitespace-nowrap px-3 py-3.5 uppercase tracking-wider transition-colors ${
-          active ? 'text-k-accent' : 'text-k-ink-muted hover:text-k-ink'
+        className={`inline-flex items-center gap-1 whitespace-nowrap px-3 py-3.5 transition-colors ${
+          active ? 'text-k-accent-fg' : 'text-k-ink-muted hover:text-k-ink'
         }`}
       >
         {label}
         {active &&
-          (sortAsc ? <CaretUp size={12} weight="bold" /> : <CaretDown size={12} weight="bold" />)}
+          (sortAsc ? <CaretUp style={{ fontSize: 12 }} /> : <CaretDown style={{ fontSize: 12 }} />)}
       </button>
     </th>
   );

@@ -1,7 +1,8 @@
 import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useCdr } from '../../context/CdrContext';
 import { rangeDates } from '../../utils/dateRange';
-import { loadFromStorage, saveToStorage } from '../../utils/storage';
+import { loadFromStorage } from '../../utils/storage';
+import useDebouncedSave from '../../hooks/useDebouncedSave';
 import DayScopeSelect from '../ui/DayScopeSelect';
 import Pagination from '../common/Pagination';
 import EmptyState from '../ui/EmptyState';
@@ -190,10 +191,7 @@ export default function RundownTable() {
     [dateRange, searchQuery, selectedExtensions, scope, visibleColumns, connView, sortField, sortAsc, pageSize]
   );
 
-  useEffect(() => {
-    const id = setTimeout(() => saveToStorage('view_state', filters), 400);
-    return () => clearTimeout(id);
-  }, [filters]);
+  useDebouncedSave('view_state', filters);
 
   const applyFilters = (saved) => {
     if (!saved) return;
@@ -275,10 +273,10 @@ export default function RundownTable() {
         onChange={pickDay}
       />
 
-      <div className="panel report-panel overflow-hidden rounded-xl">
+      <div className="panel report-panel overflow-hidden rounded-md">
         <div aria-busy={isParsing || undefined} className="report-region overflow-auto">
           <table className="w-full text-left text-xs text-k-ink-muted">
-            <thead className="sticky top-0 z-[25] border-b border-k-hairline thead text-2xs uppercase tracking-wider">
+            <thead className="sticky top-0 z-[25] border-b border-k-hairline thead text-2xs">
               <tr>
                 {shownColumns.map((col) =>
                   col.value ? (
@@ -296,7 +294,7 @@ export default function RundownTable() {
                     <th
                       key={col.id}
                       scope="col"
-                      className={`px-3 py-3.5 text-2xs font-semibold uppercase tracking-wider text-k-ink-muted ${colWidth(
+                      className={`px-3 py-3.5 text-2xs font-semibold text-k-ink-muted ${colWidth(
                         col.id
                       )} ${
                         col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
@@ -321,7 +319,7 @@ export default function RundownTable() {
                         <button
                           type="button"
                           onClick={() => setVisibleColumns(defaultVisibleColumns())}
-                          className="rounded-lg bg-k-accent px-3.5 py-2 text-xs font-medium text-k-accent-ink transition-colors hover:bg-k-accent/90 active:translate-y-[1px]"
+                          className="rounded bg-k-accent px-3.5 py-2 text-xs font-medium text-k-accent-ink transition-colors hover:bg-k-accent/90 active:translate-y-[1px]"
                         >
                           Show default columns
                         </button>
@@ -348,7 +346,7 @@ export default function RundownTable() {
                     {grouped && (i === 0 || pageRows[i - 1].date !== row.date) && (
                       <tr>
                         <td colSpan={shownColumns.length} className="bg-k-sunken/70 px-3 py-1.5">
-                          <span className="num text-2xs font-medium uppercase tracking-wider text-k-ink-muted">
+                          <span className="num text-2xs font-medium text-k-ink-muted">
                             {row.date}
                           </span>
                           <span className="num ml-2 text-2xs text-k-ink-muted">

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye } from '@phosphor-icons/react';
+import { EyeRegular as Eye } from '@fluentui/react-icons';
 import EditCell from './EditCell';
 import Chip from '../ui/Chip';
 import Tip from '../ui/Tip';
@@ -40,7 +40,7 @@ export const COLUMNS = [
     value: (row) => row.extension,
     // Plain text, not a control: a click takes the figure to the clipboard, and the
     // Details column stays the only way into the panel.
-    cell: (row) => <span className="num font-medium text-k-accent">{row.extension}</span>
+    cell: (row) => <span className="num font-medium text-k-accent-fg">{row.extension}</span>
   },
   {
     id: 'name',
@@ -202,9 +202,9 @@ export const COLUMNS = [
         type="button"
         aria-label={`Breakdown for ${row.extension} on ${row.date}`}
         onClick={() => openDetail(row)}
-        className="inline-flex items-center gap-1 rounded-md bg-k-accent/20 px-2.5 py-1 text-meta font-medium text-k-accent transition-colors hover:bg-k-accent hover:text-k-accent-ink"
+        className="inline-flex items-center gap-1 rounded bg-k-accent-fg/20 px-2.5 py-1 text-meta font-medium text-k-accent-fg transition-colors hover:bg-k-accent hover:text-k-accent-ink"
       >
-        <Eye size={14} />
+        <Eye style={{ fontSize: 14 }} />
       </button>
     )
   }

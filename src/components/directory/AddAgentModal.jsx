@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useCdr } from '../../context/CdrContext';
 import Modal from '../ui/Modal';
 
-const field = 'field w-full rounded-lg px-3 py-2 text-xs text-k-ink focus:border-k-accent focus:outline-none';
+const field = 'field w-full rounded px-3 py-2 text-xs text-k-ink focus:border-k-accent-fg focus:outline-none';
 
 export default function AddAgentModal() {
   const { isAddAgentOpen, setIsAddAgentOpen, extNameMap, updateExtMapping, addToast } = useCdr();
@@ -87,13 +87,13 @@ export default function AddAgentModal() {
           <button
             type="button"
             onClick={close}
-            className="hoverable rounded-lg border border-k-hairline-strong bg-k-surface-hover/60 px-3.5 py-2 text-xs font-medium text-k-ink active:translate-y-[1px]"
+            className="hoverable rounded border border-k-hairline bg-k-surface-hover/60 px-3.5 py-2 text-xs font-medium text-k-ink active:translate-y-[1px]"
           >
             Cancel
           </button>
           <button
             type="submit"
-            className="rounded-lg bg-k-accent px-3.5 py-2 text-xs font-semibold text-k-accent-ink transition-opacity hover:opacity-90 active:translate-y-[1px]"
+            className="rounded bg-k-accent px-3.5 py-2 text-xs font-semibold text-k-accent-ink transition-colors hover:bg-k-accent/90 active:translate-y-[1px]"
           >
             Add mapping
           </button>

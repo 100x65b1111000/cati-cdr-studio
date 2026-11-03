@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ClockCounterClockwise } from '@phosphor-icons/react';
+import { HistoryRegular as ClockCounterClockwise } from '@fluentui/react-icons';
 import { useCdr } from '../../context/CdrContext';
 import { SHIFT_PRESETS, DEFAULT_SHIFT_CONFIG } from '../../constants/defaultData';
 import Modal from '../ui/Modal';
 
-const field = 'field w-full rounded-xl px-3 py-2 text-xs text-k-ink focus:border-k-accent focus:outline-none';
+const field = 'field w-full rounded-md px-3 py-2 text-xs text-k-ink focus:border-k-accent-fg focus:outline-none';
 
 const D = DEFAULT_SHIFT_CONFIG;
 
@@ -64,14 +64,14 @@ export default function ShiftSettingsModal() {
       <button
         type="button"
         onClick={close}
-        className="hoverable rounded-lg border border-k-hairline-strong bg-k-surface-hover/60 px-3.5 py-2 text-xs font-medium text-k-ink active:translate-y-[1px]"
+        className="hoverable rounded border border-k-hairline bg-k-surface-hover/60 px-3.5 py-2 text-xs font-medium text-k-ink active:translate-y-[1px]"
       >
         Cancel
       </button>
       <button
         type="button"
         onClick={handleSave}
-        className="rounded-lg bg-k-accent px-3.5 py-2 text-xs font-semibold text-k-accent-ink transition-opacity hover:opacity-90 active:translate-y-[1px]"
+        className="rounded bg-k-accent px-3.5 py-2 text-xs font-semibold text-k-accent-ink transition-colors hover:bg-k-accent/90 active:translate-y-[1px]"
       >
         Apply and recalculate
       </button>
@@ -88,17 +88,17 @@ export default function ShiftSettingsModal() {
     >
       <div className="space-y-4 text-xs">
         <div>
-          <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-k-ink-muted">Presets</h3>
+          <h3 className="mb-2 text-xs font-bold text-k-ink-muted">Presets</h3>
           {['Same Day', 'Multi Day'].map((group) => (
             <div key={group} className="mb-2">
-              <p className="mb-1 text-2xs uppercase tracking-wide text-k-ink-muted">{group}</p>
+              <p className="mb-1 text-2xs text-k-ink-muted">{group}</p>
               <div className="grid grid-cols-4 gap-1.5">
                 {SHIFT_PRESETS.filter((p) => p.group === group).map((preset) => (
                   <button
                     key={preset.name}
                     type="button"
                     onClick={() => applyPreset(preset)}
-                    className="num rounded-lg border border-k-hairline-strong bg-k-surface/60 px-2 py-1.5 text-meta text-k-ink transition-colors hover:border-k-accent hover:text-k-accent active:translate-y-[1px]"
+                    className="num rounded border border-k-hairline bg-k-surface/60 px-2 py-1.5 text-meta text-k-ink transition-colors hover:border-k-accent-fg hover:text-k-accent-fg active:translate-y-[1px]"
                   >
                     {preset.name}
                   </button>
@@ -163,10 +163,10 @@ export default function ShiftSettingsModal() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between rounded-xl border border-k-hairline bg-k-sunken/60 px-4 py-3 text-meta">
+        <div className="flex items-center justify-between rounded-md border border-k-hairline bg-k-sunken/60 px-4 py-3 text-meta">
           <span className="inline-flex items-center gap-1.5 text-k-ink">
-            <ClockCounterClockwise size={14} className="text-k-accent" />
-            Shift duration <b className="num text-k-accent">{durHours}h {durMins}m</b>
+            <ClockCounterClockwise style={{ fontSize: 14 }} className="text-k-accent-fg" />
+            Shift duration <b className="num text-k-accent-fg">{durHours}h {durMins}m</b>
           </span>
           <span className="num text-k-ink-muted">
             {dayDiff > 0 ? `Rollover +${dayDiff} day${dayDiff > 1 ? 's' : ''}` : 'Rollover none'}

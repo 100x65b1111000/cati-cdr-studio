@@ -75,6 +75,12 @@ export function CdrProvider({ children }) {
 
   const [savedViews, setSavedViews] = useState(() => loadFromStorage('saved_views', []));
 
+  // Chrome, not data — but it persists for the same reason the mode does: the
+  // collapse is a workspace choice, and it should survive a reload.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
+    loadFromStorage('sidebar_collapsed', false)
+  );
+
   // 2. Runtime State
   const [rawRecords, setRawRecords] = useState([]);
   const [activeUpload, setActiveUpload] = useState(null);
@@ -215,6 +221,10 @@ export function CdrProvider({ children }) {
   useEffect(() => {
     saveToStorage('saved_views', savedViews);
   }, [savedViews]);
+
+  useEffect(() => {
+    saveToStorage('sidebar_collapsed', sidebarCollapsed);
+  }, [sidebarCollapsed]);
 
   // 5. Parse calls whenever rawRecords change (derived, avoids an extra render cycle)
   const rawCalls = useMemo(() => {
@@ -428,6 +438,8 @@ export function CdrProvider({ children }) {
     setColorScheme,
     motion,
     setMotion,
+    sidebarCollapsed,
+    setSidebarCollapsed,
     isParsing,
     parseError,
     clearParseError,

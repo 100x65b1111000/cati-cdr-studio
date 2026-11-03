@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UserFocus } from '@phosphor-icons/react';
+import { PersonRegular as UserFocus } from '@fluentui/react-icons';
 import FilterPopover, { menuItem } from './FilterPopover';
 import SearchInput from './SearchInput';
 
@@ -36,14 +36,14 @@ export default function ExtensionFilter({ extensions, names = {}, selected, onCh
               both to the accent hover. */}
           <button
             type="button"
-            className="hoverable min-h-6 rounded-md px-2 py-1 font-medium [--tone:var(--k-accent)]"
+            className="hoverable min-h-6 rounded px-2 py-1 font-medium [--tone:var(--k-accent-fg)]"
             onClick={() => onChange([...extensions])}
           >
             All
           </button>
           <button
             type="button"
-            className="hoverable min-h-6 rounded-md px-2 py-1 font-medium [--tone:var(--k-danger)]"
+            className="hoverable min-h-6 rounded px-2 py-1 font-medium [--tone:var(--k-danger)]"
             onClick={() => onChange([])}
           >
             None

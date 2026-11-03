@@ -1,17 +1,20 @@
 import { useEffect, useRef } from 'react';
 
-// Close overlay popups on Escape or on mousedown on the overlay backdrop
-// (target === overlay itself, clicks inside the panel are ignored).
-export default function useDismissOverlay(onClose, active) {
-  const overlayRef = useRef(null);
+// Escape, or a mousedown outside `ref`, closes the popup: the dialog panel for a modal,
+// the trigger-and-menu wrapper for an anchored popover. onClose is read through a ref so
+// the owner re-rendering never re-subscribes the listeners.
+export default function useDismissOverlay(onClose, active, ref) {
+  const latest = useRef(onClose);
+  latest.current = onClose;
 
   useEffect(() => {
     if (!active) return undefined;
     function onKey(e) {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') latest.current();
     }
     function onMouseDown(e) {
-      if (overlayRef.current && e.target === overlayRef.current) onClose();
+      const el = ref.current;
+      if (!el || !el.contains(e.target)) latest.current();
     }
     document.addEventListener('keydown', onKey);
     document.addEventListener('mousedown', onMouseDown);
@@ -19,7 +22,5 @@ export default function useDismissOverlay(onClose, active) {
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('mousedown', onMouseDown);
     };
-  }, [active, onClose]);
-
-  return overlayRef;
+  }, [active, ref]);
 }

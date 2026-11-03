@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { CaretLeft, CaretRight } from '@phosphor-icons/react';
+import { ChevronLeftRegular as CaretLeft, ChevronRightRegular as CaretRight } from '@fluentui/react-icons';
 import { key, pickRange, todayKey } from '../../utils/dateRange';
 
 const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const pad = (n) => String(n).padStart(2, '0');
+const MONTH = new Intl.DateTimeFormat('en', { month: 'long' });
 
 // The browser's own picker is a different application: system-chrome the theme cannot
 // reach, and it lets you land on a date the loaded file has no rows for. This is the
@@ -32,32 +31,32 @@ export default function DateRangePicker({ dates, from, to, onPick }) {
 
   const pick = (iso) => onPick(...pickRange(from, to, iso));
 
-  const nav = 'hoverable rounded-md border border-k-hairline-strong p-1 text-k-ink-muted disabled:cursor-not-allowed disabled:opacity-30 active:translate-y-[1px]';
+  const nav = 'hoverable rounded border border-k-hairline p-1 text-k-ink-muted disabled:cursor-not-allowed disabled:opacity-30 active:translate-y-[1px]';
 
   return (
     <div className="p-2">
       <div className="flex items-center justify-between gap-2 px-1 pb-1.5">
         <button type="button" className={nav} disabled={!canPrev} onClick={() => step(-1)} aria-label="Previous month">
-          <CaretLeft size={13} />
+          <CaretLeft style={{ fontSize: 13 }} />
         </button>
         <span className="text-xs font-semibold text-k-ink">
-          {MONTHS[month.m]} <span className="num text-k-ink-muted">{month.y}</span>
+          {MONTH.format(new Date(month.y, month.m, 1))} <span className="num text-k-ink-muted">{month.y}</span>
         </span>
         <button type="button" className={nav} disabled={!canNext} onClick={() => step(1)} aria-label="Next month">
-          <CaretRight size={13} />
+          <CaretRight style={{ fontSize: 13 }} />
         </button>
       </div>
 
       <div className="grid grid-cols-7 gap-px">
         {WEEKDAYS.map((d) => (
-          <span key={d} className="pb-1 text-center text-2xs uppercase tracking-wider text-k-ink-muted">
+          <span key={d} className="pb-1 text-center text-2xs text-k-ink-muted">
             {d}
           </span>
         ))}
         {Array.from({ length: lead + days }, (_, i) => {
           if (i < lead) return <span key={`lead${i}`} />;
           const day = i - lead + 1;
-          const iso = `${month.y}-${pad(month.m + 1)}-${pad(day)}`;
+          const iso = key(new Date(month.y, month.m, day));
           const off = have.size > 0 && !have.has(iso);
           const endpoint = iso === from || iso === to;
           const inside = !endpoint && (from || to) && (!from || iso > from) && (!to || iso < to);
@@ -69,14 +68,14 @@ export default function DateRangePicker({ dates, from, to, onPick }) {
               onClick={() => pick(iso)}
               aria-label={iso}
               aria-pressed={endpoint || undefined}
-              className={`num h-7 rounded-md text-meta leading-none ${
+              className={`num h-7 rounded text-meta leading-none ${
                 off
                   ? 'cursor-not-allowed text-k-ink-muted opacity-25'
                   : endpoint
                     ? 'bg-k-accent font-semibold text-k-accent-ink'
                     : inside
-                      ? 'bg-k-accent/15 text-k-ink'
-                      : `hover:bg-k-surface-hover text-k-ink-muted ${iso === today ? 'ring-1 ring-inset ring-k-accent/60' : ''}`
+                      ? 'bg-k-accent-fg/15 text-k-ink'
+                      : `hover:bg-k-surface-hover text-k-ink-muted ${iso === today ? 'ring-1 ring-inset ring-k-accent-fg/60' : ''}`
               }`}
             >
               {day}

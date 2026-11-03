@@ -1,11 +1,11 @@
 import React from 'react';
-import { CheckCircle, XCircle, Info } from '@phosphor-icons/react';
+import { CheckmarkCircleRegular as CheckCircle, DismissCircleRegular as XCircle, InfoRegular as Info } from '@fluentui/react-icons';
 import { useCdr } from '../../context/CdrContext';
 
 const BY_TYPE = {
-  success: { Icon: CheckCircle, tone: 'border-k-success text-k-success' },
-  error: { Icon: XCircle, tone: 'border-k-danger text-k-danger' },
-  info: { Icon: Info, tone: 'border-k-accent text-k-accent' }
+  success: { Icon: CheckCircle, tone: 'border-k-success text-k-success', hue: 'var(--k-success)' },
+  error: { Icon: XCircle, tone: 'border-k-danger text-k-danger', hue: 'var(--k-danger)' },
+  info: { Icon: Info, tone: 'border-k-accent-fg text-k-accent-fg', hue: 'var(--k-accent-fg)' }
 };
 
 export default function ToastContainer() {
@@ -22,15 +22,16 @@ export default function ToastContainer() {
       className="no-print pointer-events-none fixed bottom-20 right-4 z-[60] flex flex-col gap-2 lg:bottom-4"
     >
       {(toasts || []).map((toast) => {
-        const { Icon, tone } = BY_TYPE[toast.type] || BY_TYPE.info;
+        const { Icon, tone, hue } = BY_TYPE[toast.type] || BY_TYPE.info;
         return (
           <button
             key={toast.id}
             type="button"
             onClick={() => removeToast(toast.id)}
-            className={`panel animate-slide-in pointer-events-auto flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-left text-xs font-medium ${tone}`}
+            style={{ '--tone': hue }}
+            className={`panel hoverable animate-slide-in pointer-events-auto flex items-center gap-2 rounded-md px-3.5 py-2.5 text-left text-xs font-medium active:translate-y-[1px] ${tone}`}
           >
-            <Icon size={16} className="shrink-0" />
+            <Icon style={{ fontSize: 16 }} className="shrink-0" />
             <span>{toast.message}</span>
           </button>
         );

@@ -8,7 +8,7 @@ export default async function LoginPage({ searchParams }) {
       <form
         method="post"
         action="/api/auth/login"
-        className="w-full max-w-xs space-y-4 rounded-xl border border-k-hairline bg-k-surface p-6"
+        className="w-full max-w-xs space-y-4 rounded-md border border-k-hairline bg-k-surface p-6"
       >
         <div className="space-y-1">
           <h1 className="text-base font-bold tracking-tight text-k-ink">CATI CDR Studio</h1>
@@ -23,7 +23,7 @@ export default async function LoginPage({ searchParams }) {
             required
             autoFocus
             autoComplete="current-password"
-            className="w-full rounded-lg border border-k-hairline-strong bg-k-sunken px-3 py-2 text-sm text-k-ink outline-none focus:border-k-accent"
+            className="w-full rounded border border-k-hairline-strong bg-k-sunken px-3 py-2 text-sm text-k-ink outline-none focus:border-k-accent-fg"
           />
         </label>
 
@@ -35,7 +35,7 @@ export default async function LoginPage({ searchParams }) {
 
         <button
           type="submit"
-          className="w-full rounded-lg bg-k-accent px-3 py-2 text-sm font-medium text-k-accent-ink transition-colors hover:bg-k-accent/90 active:translate-y-[1px]"
+          className="w-full rounded bg-k-accent px-3 py-2 text-sm font-medium text-k-accent-ink transition-colors hover:bg-k-accent/90 active:translate-y-[1px]"
         >
           Sign in
         </button>

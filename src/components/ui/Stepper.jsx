@@ -1,5 +1,5 @@
 import React from 'react';
-import { CaretDown, CaretUp } from '@phosphor-icons/react';
+import { ChevronDownRegular as CaretDown, ChevronUpRegular as CaretUp } from '@fluentui/react-icons';
 
 /* The up/down pair that rides the right edge of a numeric field. Two copies of this
    existed — one in EditCell, one in the break-threshold pill — down to a byte-identical
@@ -13,17 +13,17 @@ import { CaretDown, CaretUp } from '@phosphor-icons/react';
    typed into the field beside them, which is a >=24px equivalent control. */
 export default function Stepper({ onUp, onDown, upLabel, downLabel, upDisabled, downDisabled }) {
   const btn =
-    'hoverable flex h-1/2 w-[13px] items-center justify-center rounded-[3px] leading-none text-k-ink-muted disabled:cursor-not-allowed disabled:opacity-35';
+    'hoverable flex h-1/2 w-[13px] items-center justify-center rounded leading-none text-k-ink-muted disabled:cursor-not-allowed disabled:opacity-35';
   // A caret click is already a decision, so it must not steal the field's focus and
   // leave the draft mid-edit between clicks. The action stays on onClick.
   const noFocus = (e) => e.preventDefault();
   return (
     <span className="absolute inset-y-0 right-0 flex w-[13px] flex-col items-center">
       <button type="button" aria-label={upLabel} disabled={upDisabled} onMouseDown={noFocus} onClick={onUp} className={btn}>
-        <CaretUp size={8} weight="bold" />
+        <CaretUp style={{ fontSize: 12 }} />
       </button>
       <button type="button" aria-label={downLabel} disabled={downDisabled} onMouseDown={noFocus} onClick={onDown} className={btn}>
-        <CaretDown size={8} weight="bold" />
+        <CaretDown style={{ fontSize: 12 }} />
       </button>
     </span>
   );

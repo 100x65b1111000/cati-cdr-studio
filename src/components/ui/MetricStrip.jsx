@@ -2,13 +2,12 @@ import React from 'react';
 import Chip from './Chip';
 
 const TILE = {
-  accent: 'border-k-accent/25 bg-k-accent/10 text-k-accent',
+  accent: 'border-k-accent-fg/25 bg-k-accent-fg/10 text-k-accent-fg',
   success: 'border-k-success/25 bg-k-success/10 text-k-success',
   talk: 'border-k-talk/25 bg-k-talk/10 text-k-talk',
   'break-time': 'border-k-break-time/25 bg-k-break-time/10 text-k-break-time',
   throughput: 'border-k-throughput/25 bg-k-throughput/10 text-k-throughput',
-  region: 'border-k-region/25 bg-k-region/10 text-k-region',
-  danger: 'border-k-danger/25 bg-k-danger/10 text-k-danger'
+  region: 'border-k-region/25 bg-k-region/10 text-k-region'
 };
 
 export default function MetricStrip({ items }) {
@@ -17,7 +16,7 @@ export default function MetricStrip({ items }) {
       {items.map(({ label, value, chips = [], Icon, role = 'accent' }) => (
         <div
           key={label}
-          className="panel lift relative flex flex-col overflow-hidden rounded-2xl border border-k-hairline p-4 sm:p-5"
+          className="panel lift relative flex flex-col overflow-hidden rounded-lg border border-k-hairline p-4 sm:p-5"
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -26,9 +25,9 @@ export default function MetricStrip({ items }) {
             </div>
             {Icon && (
               <div
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${TILE[role]}`}
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md border ${TILE[role]}`}
               >
-                <Icon size={20} />
+                <Icon style={{ fontSize: 20 }} />
               </div>
             )}
           </div>

@@ -1,14 +1,14 @@
 import React, { useEffect, useRef } from 'react';
-import { X } from '@phosphor-icons/react';
+import { DismissRegular as X } from '@fluentui/react-icons';
 import useDismissOverlay from '../../hooks/useDismissOverlay';
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export default function Modal({ title, subtitle, onClose, children, footer, width = 'max-w-3xl' }) {
-  const overlayRef = useDismissOverlay(onClose, true);
   const panelRef = useRef(null);
   const openerRef = useRef(null);
+  useDismissOverlay(onClose, true, panelRef);
 
   useEffect(() => {
     openerRef.current = document.activeElement;
@@ -45,7 +45,6 @@ export default function Modal({ title, subtitle, onClose, children, footer, widt
 
   return (
     <div
-      ref={overlayRef}
       className="animate-fade-in fixed inset-0 z-50 overflow-y-auto bg-k-page/80 px-4 py-10 sm:px-6"
     >
       <div
@@ -54,7 +53,7 @@ export default function Modal({ title, subtitle, onClose, children, footer, widt
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className={`panel animate-pop-up mx-auto w-full ${width} rounded-2xl outline-none`}
+        className={`panel animate-pop-up mx-auto w-full ${width} rounded-lg outline-none`}
       >
         <div className="flex items-start justify-between gap-4 border-b border-k-hairline px-6 py-4">
           <div>
@@ -65,9 +64,9 @@ export default function Modal({ title, subtitle, onClose, children, footer, widt
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="close-btn rounded-lg p-1.5"
+            className="close-btn rounded p-1.5"
           >
-            <X size={18} />
+            <X style={{ fontSize: 16 }} />
           </button>
         </div>
         <div className="px-6 py-5">{children}</div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Columns, FloppyDisk, Printer, Timer, Trash } from '@phosphor-icons/react';
+import { ColumnTripleRegular as Columns, DeleteRegular as Trash, PrintRegular as Printer, SaveRegular as FloppyDisk, TimerRegular as Timer } from '@fluentui/react-icons';
 import { useCdr } from '../../context/CdrContext';
 import { DEFAULT_SHIFT_CONFIG } from '../../constants/defaultData';
 import ExtensionFilter, { Checkbox } from '../ui/ExtensionFilter';
@@ -84,7 +84,7 @@ export default function RundownToolbar({
     // the z-[25] table head, whose rows slide behind it. A phone stacks these controls
     // four rows deep, so there the bar scrolls with the page instead of parking a third
     // of the viewport over the table.
-    <div className="no-print panel under-bar z-30 flex flex-wrap items-center gap-2 rounded-xl px-3 py-2.5 sm:sticky">
+    <div className="no-print panel under-bar z-30 flex flex-wrap items-center gap-2 rounded-md px-3 py-2.5 sm:sticky">
       <SearchInput
         value={searchQuery}
         onChange={setSearchQuery}
@@ -143,11 +143,11 @@ export default function RundownToolbar({
           the type scale moved this one control and nothing else. */}
       <div
         style={{ '--tone': 'var(--k-break-time)' }}
-        className={`field flex h-[30px] flex-none items-center gap-1 rounded-lg px-2 text-meta focus-within:border-k-break-time/70 ${
+        className={`field flex h-[30px] flex-none items-center gap-1 rounded px-2 text-meta focus-within:border-k-break-time/70 ${
           thresholdDirty ? 'border-k-break-time/70 text-k-ink' : 'text-k-ink-muted'
         }`}
       >
-        <Timer size={14} className="text-k-break-time" />
+        <Timer style={{ fontSize: 14 }} className="text-k-break-time" />
         <span>Break &gt;</span>
         <span className="relative inline-flex">
           <input
@@ -160,7 +160,7 @@ export default function RundownToolbar({
               if (e.key === 'Enter') applyThreshold();
             }}
             onBlur={applyThreshold}
-            className="num h-[18px] w-[2.6rem] rounded-md border border-k-break-time/25 bg-k-surface/70 px-0 text-center text-k-ink focus:outline-none"
+            className="num h-[18px] w-[2.6rem] rounded border border-k-break-time/25 bg-k-surface/70 px-0 text-center text-k-ink focus:outline-none"
           />
           <Stepper
             upLabel="Increase the break threshold by one minute"
@@ -184,29 +184,29 @@ export default function RundownToolbar({
             </p>
           ) : (
             savedViews.map((view) => (
-              <div key={view.id} className="row-hover flex items-center gap-1 rounded-md px-1 py-0.5">
-                <button type="button" className="hoverable flex-1 truncate rounded-md border border-transparent px-1 py-0.5 text-left text-xs text-k-ink" onClick={() => onApplyFilters(view.filters)}>
+              <div key={view.id} className="row-hover flex items-center gap-1 rounded px-1 py-0.5">
+                <button type="button" className="hoverable flex-1 truncate rounded border border-transparent px-1 py-0.5 text-left text-xs text-k-ink" onClick={() => onApplyFilters(view.filters)}>
                   {view.name}
                 </button>
                 <span className="num text-2xs text-k-ink-muted">{view.createdAt}</span>
                 <button
                   type="button"
                   aria-label={`Overwrite ${view.name} with the current filters`}
-                  className="hoverable rounded-md p-1 text-k-ink-muted"
+                  className="hoverable rounded p-1 text-k-ink-muted"
                   onClick={() => {
                     replaceSavedView(view.id, filters);
                     addToast(`View "${view.name}" overwritten`, 'info');
                   }}
                 >
-                  <FloppyDisk size={13} />
+                  <FloppyDisk style={{ fontSize: 15 }} />
                 </button>
                 <button
                   type="button"
                   aria-label={`Delete ${view.name}`}
-                  className="rounded-md p-1 text-k-ink-muted hover:bg-k-critical/15 hover:text-k-critical"
+                  className="rounded p-1 text-k-ink-muted hover:bg-k-critical/15 hover:text-k-critical"
                   onClick={() => deleteSavedView(view.id)}
                 >
-                  <Trash size={13} />
+                  <Trash style={{ fontSize: 15 }} />
                 </button>
               </div>
             ))
@@ -221,12 +221,12 @@ export default function RundownToolbar({
               }}
               placeholder="Name this view"
               aria-label="New view name"
-              className="field min-w-0 flex-1 rounded-lg px-2 py-1 text-xs text-k-ink placeholder:text-k-ink-muted focus:border-k-accent focus:outline-none"
+              className="field min-w-0 flex-1 rounded px-2 py-1 text-xs text-k-ink placeholder:text-k-ink-muted focus:border-k-accent-fg focus:outline-none"
             />
             <button
               type="button"
               onClick={saveCurrentView}
-              className="tone-btn rounded-lg px-2.5 py-1 text-meta font-semibold active:translate-y-[1px]"
+              className="tone-btn rounded px-2.5 py-1 text-meta font-semibold active:translate-y-[1px]"
             >
               Save
             </button>
@@ -240,9 +240,9 @@ export default function RundownToolbar({
           onClick={() => window.print()}
           aria-label="Print"
           style={{ '--tone': 'var(--k-danger)' }}
-          className="hoverable inline-flex items-center gap-1.5 rounded-lg border border-k-hairline-strong bg-k-surface-hover/60 px-2 py-1.5 text-xs font-medium text-k-ink-muted active:translate-y-[1px] sm:px-3"
+          className="hoverable inline-flex items-center gap-1.5 rounded border border-k-hairline bg-k-surface-hover/60 px-2 py-1.5 text-xs font-medium text-k-ink-muted active:translate-y-[1px] sm:px-3"
         >
-          <Printer size={15} className="text-k-danger" />
+          <Printer style={{ fontSize: 15 }} className="text-k-danger" />
           {/* The glyph alone buys this button a place on the Break row at 375px. */}
           <span className="hidden sm:inline">Print</span>
         </button>

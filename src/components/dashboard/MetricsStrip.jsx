@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Phone, CheckCircle, Timer, Coffee, Pulse, Gauge } from '@phosphor-icons/react';
+import { CallRegular as Phone, CheckmarkCircleRegular as CheckCircle, DrinkCoffeeRegular as Coffee, GaugeRegular as Gauge, PulseRegular as Pulse, TimerRegular as Timer } from '@fluentui/react-icons';
 import { useCdr } from '../../context/CdrContext';
 import { deriveMetrics } from '../../services/metrics';
 import { formatDurationCompact } from '../../utils/timeFormatter';

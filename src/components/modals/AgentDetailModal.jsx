@@ -4,7 +4,7 @@ import Modal from '../ui/Modal';
 
 function Metric({ label, value, tone }) {
   return (
-    <div className="rounded-xl border border-k-hairline bg-k-sunken/60 p-3">
+    <div className="rounded-md border border-k-hairline bg-k-sunken/60 p-3">
       <span className="block text-2xs font-semibold uppercase text-k-ink-muted">{label}</span>
       <span className={`num mt-1 block text-sm font-bold ${tone}`}>{value}</span>
     </div>
@@ -43,7 +43,7 @@ export default function AgentDetailModal() {
         </div>
 
         <div>
-          <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-k-ink-muted">Calls by region</h3>
+          <h3 className="mb-3 text-xs font-bold text-k-ink-muted">Calls by region</h3>
           {regions.length === 0 ? (
             <p className="text-k-ink-muted">No region recorded for this shift.</p>
           ) : (
@@ -61,10 +61,10 @@ export default function AgentDetailModal() {
         </div>
 
         <div>
-          <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-k-ink-muted">Idle breaks log</h3>
-          <div className="max-h-60 overflow-y-auto rounded-xl border border-k-hairline">
+          <h3 className="mb-3 text-xs font-bold text-k-ink-muted">Idle breaks log</h3>
+          <div className="max-h-60 overflow-y-auto rounded-md border border-k-hairline">
             <table className="w-full text-left text-xs text-k-ink-muted">
-              <thead className="sticky top-0 border-b border-k-hairline thead text-2xs uppercase tracking-wider">
+              <thead className="sticky top-0 border-b border-k-hairline thead text-2xs font-semibold">
                 <tr>
                   <th className="w-10 px-3.5 py-2 font-semibold">#</th>
                   <th className="px-3.5 py-2 font-semibold">Start</th>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash, Sliders } from '@phosphor-icons/react';
+import { DeleteRegular as Trash, OptionsRegular as Sliders } from '@fluentui/react-icons';
 import { useCdr } from '../../context/CdrContext';
 import { availableDates } from '../../utils/dateRange';
 
@@ -25,7 +25,7 @@ export default function SettingsView() {
 
   return (
     <div className={`animate__animated ${slide} grid grid-cols-1 gap-6 lg:grid-cols-3`}>
-      <section className="panel space-y-3 rounded-2xl p-5 lg:col-span-2">
+      <section className="panel space-y-3 rounded-lg p-5 lg:col-span-2">
         <h2 className="border-b border-k-hairline pb-3 text-sm font-bold text-k-ink">Data</h2>
         <p className="num text-xs text-k-ink-muted">
           {rawCalls.length} calls across {dates.length} {dates.length === 1 ? 'date' : 'dates'}
@@ -58,14 +58,14 @@ export default function SettingsView() {
         <button
           type="button"
           onClick={() => setIsSettingsOpen(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-k-accent px-4 py-2 text-xs font-medium text-k-accent-ink transition-opacity hover:opacity-90 active:translate-y-[1px]"
+          className="inline-flex items-center gap-2 rounded bg-k-accent px-4 py-2 text-xs font-medium text-k-accent-ink transition-colors hover:bg-k-accent/90 active:translate-y-[1px]"
         >
-          <Sliders size={15} />
+          <Sliders style={{ fontSize: 15 }} />
           Edit shift rules
         </button>
       </section>
 
-      <section className="panel rounded-2xl p-5">
+      <section className="panel rounded-lg p-5">
         <h2 className="border-b border-k-hairline pb-3 text-sm font-bold text-k-ink">Session</h2>
         <p className="mt-3 text-xs text-k-ink-muted">
           The team password signs every browser in on a 12-hour session. Sign out here if this
@@ -76,7 +76,7 @@ export default function SettingsView() {
         <form method="post" action="/api/auth/logout" className="mt-3">
           <button
             type="submit"
-            className="rounded-lg border border-k-hairline-strong px-4 py-2 text-xs font-medium text-k-ink-muted transition-colors hover:bg-k-danger/10 hover:text-k-critical active:translate-y-[1px]"
+            className="rounded border border-k-hairline px-4 py-2 text-xs font-medium text-k-ink-muted transition-colors hover:bg-k-danger/10 hover:text-k-critical active:translate-y-[1px]"
           >
             Sign out
           </button>
@@ -88,8 +88,8 @@ export default function SettingsView() {
             rather than asking anyone to go digging in Windows settings. */}
         <h2 className="mt-5 border-t border-k-hairline pt-4 text-sm font-bold text-k-ink">Motion</h2>
         <p className="mt-3 text-xs text-k-ink-muted">
-          If Windows has animation effects switched off, every transition in this app — the
-          view switch included — is cut to about a millisecond, which looks like the page
+          If Windows has animation effects switched off, every transition in this app
+          (the view switch included) is cut to about a millisecond, which looks like the page
           snapping into place. Run them at full length in this browser instead.
         </p>
         <label className="mt-3 flex items-center gap-2.5 text-xs text-k-ink">
@@ -103,14 +103,14 @@ export default function SettingsView() {
         </label>
       </section>
 
-      <section className="panel rounded-2xl p-5 lg:col-span-3">
+      <section className="panel rounded-lg p-5 lg:col-span-3">
         <h2 className="border-b border-k-hairline pb-3 text-sm font-bold text-k-ink">Saved views</h2>
         {savedViews.length === 0 ? (
           <p className="mt-3 text-xs text-k-ink-muted">
             No saved views. Save one from the Rundown toolbar.
           </p>
         ) : (
-          <ul className="mt-3 max-h-72 divide-y divide-k-hairline/60 overflow-y-auto rounded-xl border border-k-hairline">
+          <ul className="mt-3 max-h-72 divide-y divide-k-hairline/60 overflow-y-auto rounded-md border border-k-hairline">
             {savedViews.map(view => (
               <li key={view.id} className="row-hover flex items-center justify-between gap-4 px-4 py-2.5">
                 <span className="min-w-0">
@@ -123,9 +123,9 @@ export default function SettingsView() {
                   type="button"
                   onClick={() => deleteSavedView(view.id)}
                   aria-label={`Delete ${view.name}`}
-                  className="shrink-0 rounded-lg p-1.5 text-k-ink-muted transition-colors hover:bg-k-danger/10 hover:text-k-critical"
+                  className="shrink-0 rounded p-1.5 text-k-ink-muted transition-colors hover:bg-k-danger/10 hover:text-k-critical"
                 >
-                  <Trash size={15} />
+                  <Trash style={{ fontSize: 15 }} />
                 </button>
               </li>
             ))}
@@ -134,13 +134,13 @@ export default function SettingsView() {
       </section>
 
       {uploadHistory.length > 0 && (
-        <section className="panel rounded-2xl p-5 lg:col-span-3">
+        <section className="panel rounded-lg p-5 lg:col-span-3">
           <h2 className="border-b border-k-hairline pb-3 text-sm font-bold text-k-ink">Earlier uploads</h2>
           <p className="mt-3 text-xs text-k-ink-muted">
             Every browser shares this dataset, so a wrong upload is fixed here rather than by
             re-dropping the file. The five most recent uploads are kept.
           </p>
-          <ul className="mt-3 max-h-72 divide-y divide-k-hairline/60 overflow-y-auto rounded-xl border border-k-hairline">
+          <ul className="mt-3 max-h-72 divide-y divide-k-hairline/60 overflow-y-auto rounded-md border border-k-hairline">
             {uploadHistory.map(upload => (
               <li key={upload.id} className="row-hover flex items-center justify-between gap-4 px-4 py-2.5">
                 <span className="min-w-0">
@@ -154,7 +154,7 @@ export default function SettingsView() {
                   onClick={() => restoreUpload(upload.id)}
                   disabled={isParsing}
                   aria-label={`Restore ${upload.filename}`}
-                  className="hoverable shrink-0 rounded-lg border border-k-hairline-strong px-3 py-1.5 text-xs font-medium text-k-ink disabled:opacity-50"
+                  className="hoverable shrink-0 rounded border border-k-hairline px-3 py-1.5 text-xs font-medium text-k-ink disabled:opacity-50"
                 >
                   Restore
                 </button>

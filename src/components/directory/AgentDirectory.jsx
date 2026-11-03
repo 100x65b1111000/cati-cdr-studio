@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { UsersThree, Trash, CaretUp, CaretDown } from '@phosphor-icons/react';
+import { ChevronDownRegular as CaretDown, ChevronUpRegular as CaretUp, DeleteRegular as Trash, PeopleRegular as UsersThree } from '@fluentui/react-icons';
 import { useCdr } from '../../context/CdrContext';
 import AddAgentModal from './AddAgentModal';
 import EmptyState from '../ui/EmptyState';
@@ -31,8 +31,8 @@ function AgentCard({ ext, name, onRename, onDelete }) {
   };
 
   return (
-    <div className="panel lift flex items-center gap-2 rounded-lg px-2 py-1.5">
-      <span className="num w-14 flex-none rounded-md bg-k-accent/15 py-1 text-center text-meta font-medium text-k-accent">
+    <div className="panel lift flex items-center gap-2 rounded px-2 py-1.5">
+      <span className="num w-14 flex-none rounded bg-k-accent-fg/15 py-1 text-center text-meta font-medium text-k-accent-fg">
         {ext}
       </span>
       <input
@@ -46,17 +46,17 @@ function AgentCard({ ext, name, onRename, onDelete }) {
           if (e.key === 'Enter') e.currentTarget.blur();
           if (e.key === 'Escape') setDraft(name);
         }}
-        className={`field min-w-0 flex-1 rounded-lg px-2.5 py-1.5 text-xs text-k-ink placeholder:text-k-ink-muted focus:border-k-accent focus:outline-none ${
-          dirty ? 'border-k-accent' : 'hover:border-k-accent/50'
+        className={`field min-w-0 flex-1 rounded px-2.5 py-1.5 text-xs text-k-ink placeholder:text-k-ink-muted focus:border-k-accent-fg focus:outline-none ${
+          dirty ? 'border-k-accent-fg' : 'hover:border-k-accent-fg/50'
         }`}
       />
       <button
         type="button"
         onClick={() => onDelete(ext)}
         aria-label={`Remove the mapping for ${ext}`}
-        className="flex-none rounded-lg p-1.5 text-k-ink-muted transition-colors hover:bg-k-critical/15 hover:text-k-critical"
+        className="flex-none rounded p-1.5 text-k-ink-muted transition-colors hover:bg-k-critical/15 hover:text-k-critical"
       >
-        <Trash size={14} />
+        <Trash style={{ fontSize: 15 }} />
       </button>
     </div>
   );
@@ -85,10 +85,10 @@ export default function AgentDirectory() {
   const mapped = Object.keys(extNameMap).length;
 
   return (
-    <div className={`animate__animated ${slide} panel overflow-hidden rounded-xl`}>
+    <div className={`animate__animated ${slide} panel overflow-hidden rounded-md`}>
       <div className="no-print flex flex-wrap items-center gap-2 border-b border-k-hairline bg-k-surface/50 px-4 py-3">
         <h3 className="mr-1 flex items-center gap-2 text-xs font-semibold text-k-ink">
-          <UsersThree size={16} className="text-k-talk" />
+          <UsersThree style={{ fontSize: 16 }} className="text-k-talk" />
           Extension mapping
           <Chip tone="talk">{mapped}</Chip>
         </h3>
@@ -114,14 +114,14 @@ export default function AgentDirectory() {
             type="button"
             onClick={() => setSortAsc((v) => !v)}
             aria-label={sortAsc ? 'Sort descending' : 'Sort ascending'}
-            className="hoverable flex h-[30px] w-[30px] flex-none items-center justify-center rounded-lg border border-k-hairline-strong text-k-ink-muted"
+            className="hoverable flex h-[30px] w-[30px] flex-none items-center justify-center rounded border border-k-hairline text-k-ink-muted"
           >
-            {sortAsc ? <CaretUp size={14} /> : <CaretDown size={14} />}
+            {sortAsc ? <CaretUp style={{ fontSize: 14 }} /> : <CaretDown style={{ fontSize: 14 }} />}
           </button>
           <button
             type="button"
             onClick={() => setIsAddAgentOpen(true)}
-            className="inline-flex h-[30px] items-center rounded-lg bg-k-accent px-3.5 text-xs font-medium text-k-accent-ink transition-colors hover:bg-k-accent/90 active:translate-y-[1px]"
+            className="inline-flex h-[30px] items-center rounded bg-k-accent px-3.5 text-xs font-medium text-k-accent-ink transition-colors hover:bg-k-accent/90 active:translate-y-[1px]"
           >
             Add mapping
           </button>
@@ -141,7 +141,7 @@ export default function AgentDirectory() {
               <button
                 type="button"
                 onClick={() => setIsAddAgentOpen(true)}
-                className="rounded-lg bg-k-accent px-3.5 py-2 text-xs font-medium text-k-accent-ink transition-colors hover:bg-k-accent/90 active:translate-y-[1px]"
+                className="rounded bg-k-accent px-3.5 py-2 text-xs font-medium text-k-accent-ink transition-colors hover:bg-k-accent/90 active:translate-y-[1px]"
               >
                 Add a mapping
               </button>

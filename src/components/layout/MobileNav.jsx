@@ -11,7 +11,7 @@ export default function MobileNav() {
   return (
     <nav
       aria-label="Views"
-      className="app-bar no-print fixed inset-x-2 bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-40 rounded-2xl p-1 lg:hidden"
+      className="app-bar no-print fixed inset-x-2 bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-40 rounded-lg p-1 lg:hidden"
     >
       <ul className="flex">
         {NAV.map(({ id, label, Icon }) => {
@@ -22,11 +22,11 @@ export default function MobileNav() {
                 type="button"
                 onClick={() => setActiveTab(id)}
                 aria-current={active ? 'page' : undefined}
-                className={`flex w-full flex-col items-center gap-0.5 rounded-xl px-1 py-1.5 text-2xs font-medium ${
-                  active ? 'bg-k-accent/15 text-k-accent' : 'hoverable text-k-ink-muted'
+                className={`flex w-full flex-col items-center gap-0.5 rounded-md px-1 py-1.5 text-2xs font-medium ${
+                  active ? 'bg-k-accent-fg/15 text-k-accent-fg' : 'hoverable text-k-ink-muted'
                 }`}
               >
-                <Icon size={20} weight={active ? 'fill' : 'regular'} />
+                <Icon style={{ fontSize: 20 }} />
                 <span className="max-w-full truncate">{label}</span>
               </button>
             </li>

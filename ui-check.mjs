@@ -312,7 +312,7 @@ function checkPalette() {
   // Every role that carries text, against the card it actually sits on. `page` and the
   // hairlines are excluded: they are surfaces and separators, never glyphs, and holding
   // them to 4.5 would just force the ramp apart.
-  const TEXT = ['ink', 'ink-muted', 'ink-faint', 'accent', 'success', 'danger', 'critical', 'warning', 'talk', 'throughput', 'break-time', 'region'];
+  const TEXT = ['ink', 'ink-muted', 'ink-faint', 'accent-fg', 'success', 'danger', 'critical', 'warning', 'talk', 'throughput', 'break-time', 'region'];
   for (const [id, mode] of Object.entries(COLOR_MODES)) {
     const c = mode.colors;
     for (const role of TEXT) {
@@ -321,6 +321,14 @@ function checkPalette() {
     }
     const punch = between(toRgbArr(c.accent), toRgbArr(c['accent-ink']));
     if (punch < 4.5) failures.push(`palette [${id}]: accent-ink on an accent fill is ${punch.toFixed(2)}:1, so the active tab is unreadable`);
+    // A control's edge is how an editable cell is found, so WCAG 1.4.11 wants 3:1 for it;
+    // hairline-strong is the only thing that draws one.
+    const edge = between(toRgbArr(c['hairline-strong']), toRgbArr(c.surface));
+    if (edge < 3) failures.push(`palette [${id}]: a control border is ${edge.toFixed(2)}:1 on its card, under the 3:1 a boundary owes`);
+    // The hover wash is the app's only hover cue on a row, and a wash one step off the card
+    // does not paint at twenty rows a screen.
+    const wash = Math.abs(toLab(toRgbArr(c.surface))[0] - toLab(toRgbArr(c['surface-hover']))[0]);
+    if (wash < 5) failures.push(`palette [${id}]: the hover wash is ${wash.toFixed(1)} L* from the card, so a hovered row reads unhovered`);
     // The pairs that share a word in the UI, and the six series hues that share a chart.
     for (const [a, b, floor, why] of [
       ['danger', 'critical', 20, 'a bad call and a blocked action must not be one colour'],
@@ -551,7 +559,7 @@ async function checkTone() {
     }
     const r = await menu.evaluate((el) => {
       const p = document.createElement('span');
-      p.style.color = 'rgb(var(--tone, var(--k-accent)) / 1)';
+      p.style.color = 'rgb(var(--tone, var(--k-accent-fg)) / 1)';
       el.appendChild(p);
       const tone = getComputedStyle(p).color;
       p.remove();
@@ -732,7 +740,7 @@ async function checkThreshold() {
 async function checkDetail() {
   await press('1');
 
-  const accent = await cssColor('rgb(var(--k-accent))');
+  const accent = await cssColor('rgb(var(--k-accent-fg))');
   const chip = await page.evaluate(() => {
     const el = document.querySelector('main tbody tr td:nth-child(3) > span');
     if (!el) return null;
@@ -795,7 +803,7 @@ async function checkCellSteppers() {
   // threshold pill had.
   const cells = await page.evaluate(() => {
     const probe = document.createElement('span');
-    probe.style.color = 'rgb(var(--k-accent))';
+    probe.style.color = 'rgb(var(--k-accent-fg))';
     document.body.appendChild(probe);
     const accent = getComputedStyle(probe).color;
     probe.remove();
@@ -2329,9 +2337,9 @@ async function checkBottomNav() {
   console.log('bottom nav   all five views switch');
 }
 
-// 1024 is the lg breakpoint that hands the view switcher from the bottom bar to the
-// sidebar; 768 and 375 are the widths with no rail, where the bottom bar owns it.
-for (const width of [VIEWPORT.width, 1280, 1024, 768, 375]) {
+// 980 is a phone's "desktop site" layout viewport; since lg moved to 60rem it gets
+// the sidebar. 768 and 375 are the widths with no rail, where the bottom bar owns it.
+for (const width of [VIEWPORT.width, 1280, 980, 768, 375]) {
   await page.setViewportSize({ width, height: VIEWPORT.height });
   if (width === 375) await checkBottomNav();
   for (const [key, view] of VIEWS) {
@@ -2358,7 +2366,7 @@ for (const width of [VIEWPORT.width, 1280, 1024, 768, 375]) {
     if (width !== VIEWPORT.width) {
       console.log(`${String(width).padStart(4)}px ${view.padEnd(10)} overflow=${scroll.overflow}px nav=${scroll.sidebar ? 'sidebar' : 'bottom'}`);
       // The phone layout is the one a reviewer cannot check from a desktop run, so
-      // the artefact has to exist. Only the narrowest width gets one; 1024 and 768
+      // the artefact has to exist. Only the narrowest width gets one; 980 and 768
       // are the same markup with a different number of columns fitting. Viewport
       // height, not full page: the bottom bar is fixed, and a full-page shot would
       // paint it at the foot of a page no phone ever shows.

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar } from '@phosphor-icons/react';
+import { CalendarRegular as Calendar } from '@fluentui/react-icons';
 import FilterPopover from './FilterPopover';
 
 // A range that covers several shifts is ambiguous the moment a view aggregates it,
@@ -36,8 +36,8 @@ function Option({ active, onClick, label, hint }) {
       onClick={onClick}
       aria-pressed={active}
       aria-label={`${label}, ${hint}`}
-      className={`flex w-full items-center justify-between gap-3 rounded-md border px-2.5 py-1.5 text-left text-xs transition-colors active:translate-y-[1px] ${
-        active ? 'border-k-accent/70 bg-k-accent/10 text-k-accent' : 'hoverable border-transparent text-k-ink'
+      className={`flex w-full items-center justify-between gap-3 rounded border px-2.5 py-1.5 text-left text-xs transition-colors active:translate-y-[1px] ${
+        active ? 'border-k-accent-fg/70 bg-k-accent-fg/10 text-k-accent-fg' : 'hoverable border-transparent text-k-ink'
       }`}
     >
       <span className="num">{label}</span>

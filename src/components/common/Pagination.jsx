@@ -1,17 +1,12 @@
 import React from 'react';
-import { CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight } from '@phosphor-icons/react';
+import { ChevronDoubleLeftRegular as CaretDoubleLeft, ChevronDoubleRightRegular as CaretDoubleRight, ChevronLeftRegular as CaretLeft, ChevronRightRegular as CaretRight } from '@fluentui/react-icons';
 
 const btn =
-  'hoverable rounded-lg border border-k-hairline px-2 py-1 text-k-ink-muted active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-40';
+  'hoverable rounded border border-k-hairline px-2 py-1 text-k-ink-muted active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-40';
 
-export default function Pagination({
-  currentPage,
-  totalItems,
-  pageSize,
-  onPageChange,
-  onPageSizeChange,
-  pageSizeOptions = [10, 25, 50, 100]
-}) {
+const PAGE_SIZES = [10, 25, 50, 100];
+
+export default function Pagination({ currentPage, totalItems, pageSize, onPageChange, onPageSizeChange }) {
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const startItem = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endItem = Math.min(totalItems, currentPage * pageSize);
@@ -36,9 +31,9 @@ export default function Pagination({
                 onPageSizeChange(Number(e.target.value));
                 onPageChange(1);
               }}
-              className="num field rounded-lg px-2 py-1 text-k-ink focus:border-k-accent focus:outline-none"
+              className="num field rounded px-2 py-1 text-k-ink focus:border-k-accent-fg focus:outline-none"
             >
-              {pageSizeOptions.map((opt) => (
+              {PAGE_SIZES.map((opt) => (
                 <option key={opt} value={opt}>
                   {opt}
                 </option>
@@ -50,19 +45,19 @@ export default function Pagination({
 
       <div className="flex items-center gap-1">
         <button type="button" className={btn} onClick={() => onPageChange(1)} disabled={currentPage === 1} aria-label="First page">
-          <CaretDoubleLeft size={12} />
+          <CaretDoubleLeft style={{ fontSize: 12 }} />
         </button>
         <button type="button" className={btn} onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1} aria-label="Previous page">
-          <CaretLeft size={12} />
+          <CaretLeft style={{ fontSize: 12 }} />
         </button>
         <span className="num px-2 text-k-ink">
           {currentPage} / {totalPages}
         </span>
         <button type="button" className={btn} onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages} aria-label="Next page">
-          <CaretRight size={12} />
+          <CaretRight style={{ fontSize: 12 }} />
         </button>
         <button type="button" className={btn} onClick={() => onPageChange(totalPages)} disabled={currentPage === totalPages} aria-label="Last page">
-          <CaretDoubleRight size={12} />
+          <CaretDoubleRight style={{ fontSize: 12 }} />
         </button>
       </div>
     </div>

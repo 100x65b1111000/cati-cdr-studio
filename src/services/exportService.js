@@ -22,24 +22,20 @@ const EXCEL_COLUMN_WIDTHS = {
 const EXCEL_TEXT_COLUMNS = new Set(['Extension', 'Agent Name', 'Shift Date', 'Calls by Region', 'Breaks']);
 const EXCEL_INT_COLUMNS = new Set(['Total Calls', 'Connected', 'Not Connected', 'Half Done(s)', 'Survey(s)', 'Total Breaks']);
 
-const EXCEL_THIN_BORDER = {
-  top: { style: 'thin', color: { rgb: 'D6D6D6' } },
-  bottom: { style: 'thin', color: { rgb: 'D6D6D6' } },
-  left: { style: 'thin', color: { rgb: 'D6D6D6' } },
-  right: { style: 'thin', color: { rgb: 'D6D6D6' } }
+// xlsx names all four sides; one thin side object serves the whole box.
+const borderBox = (rgb) => {
+  const side = { style: 'thin', color: { rgb } };
+  return { top: side, bottom: side, left: side, right: side };
 };
+
+const EXCEL_THIN_BORDER = borderBox('D6D6D6');
 
 function excelHeaderStyle() {
   return {
     font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } },
     fill: { patternType: 'solid', fgColor: { rgb: '2D4F67' } },
     alignment: { horizontal: 'center', vertical: 'center' },
-    border: {
-      top: { style: 'thin', color: { rgb: '1F1F28' } },
-      bottom: { style: 'thin', color: { rgb: '1F1F28' } },
-      left: { style: 'thin', color: { rgb: '1F1F28' } },
-      right: { style: 'thin', color: { rgb: '1F1F28' } }
-    }
+    border: borderBox('1F1F28')
   };
 }
 

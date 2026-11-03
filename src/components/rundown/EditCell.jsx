@@ -60,7 +60,7 @@ export default function EditCell({ value, onCommit, label, tone = 'text-k-ink' }
             ref.current?.blur();
           }
         }}
-        className={`num h-7 w-12 rounded-md border border-current/25 bg-transparent py-0 pl-0 pr-[14px] text-center ${tone} hover:border-current/70 hover:bg-current/10 focus:border-current focus:bg-k-sunken focus:outline-none`}
+        className={`num h-7 w-12 rounded border border-current/25 bg-transparent py-0 pl-0 pr-[14px] text-center ${tone} hover:border-current/70 hover:bg-current/10 focus:border-current focus:bg-k-sunken focus:outline-none`}
       />
       <Stepper
         upLabel={`Increase ${label}`}

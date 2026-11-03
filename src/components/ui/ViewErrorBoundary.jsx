@@ -25,7 +25,7 @@ export default class ViewErrorBoundary extends React.Component {
   render() {
     if (!this.state.failed) return this.props.children;
     return (
-      <div className="panel rounded-2xl">
+      <div className="panel rounded-lg">
         <EmptyState
           title="This view did not load"
           body="The rest of the app is still working. Pick another view from the rail, or reload to fetch the files again."
@@ -33,7 +33,7 @@ export default class ViewErrorBoundary extends React.Component {
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="hoverable rounded-md border border-k-hairline-strong px-3 py-1.5 text-xs text-k-ink"
+              className="hoverable rounded border border-k-hairline px-3 py-1.5 text-xs text-k-ink"
             >
               Reload
             </button>

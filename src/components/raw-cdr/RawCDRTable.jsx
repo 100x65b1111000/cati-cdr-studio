@@ -2,7 +2,8 @@ import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } fr
 import { useCdr } from '../../context/CdrContext';
 import { createShiftDateResolver } from '../../services/shiftCalculator';
 import { inDateRange, rangeDates } from '../../utils/dateRange';
-import { loadFromStorage, saveToStorage } from '../../utils/storage';
+import { loadFromStorage } from '../../utils/storage';
+import useDebouncedSave from '../../hooks/useDebouncedSave';
 import Pagination from '../common/Pagination';
 import DayScopeSelect from '../ui/DayScopeSelect';
 import SearchInput from '../ui/SearchInput';
@@ -176,14 +177,11 @@ export default function RawCDRTable() {
     [search, selectedExts, response, scope, sortField, sortAsc, pageSize]
   );
 
-  useEffect(() => {
-    const id = setTimeout(() => saveToStorage('raw_view_state', viewState), 400);
-    return () => clearTimeout(id);
-  }, [viewState]);
+  useDebouncedSave('raw_view_state', viewState);
 
   return (
     <div className={`animate__animated ${slide} flex min-h-0 flex-1 flex-col space-y-4`}>
-      <div className="no-print panel under-bar z-30 flex flex-wrap items-center gap-2 rounded-xl px-3 py-2.5 sm:sticky">
+      <div className="no-print panel under-bar z-30 flex flex-wrap items-center gap-2 rounded-md px-3 py-2.5 sm:sticky">
         <SearchInput
           value={search}
           onChange={(q) => {
@@ -233,10 +231,10 @@ export default function RawCDRTable() {
         }}
       />
 
-      <div className="panel report-panel overflow-hidden rounded-xl">
+      <div className="panel report-panel overflow-hidden rounded-md">
         <div aria-busy={isParsing || undefined} className="report-region overflow-auto">
           <table className="w-full text-left text-xs text-k-ink-muted">
-            <thead className="sticky top-0 z-[25] border-b border-k-hairline thead text-2xs uppercase tracking-wider">
+            <thead className="sticky top-0 z-[25] border-b border-k-hairline thead text-2xs">
               <tr>
                 {COLUMNS.map((col) => (
                   <SortHeaderCell
@@ -277,7 +275,7 @@ export default function RawCDRTable() {
                       {grouped && firstOfDay && (
                         <tr>
                           <td colSpan={COLUMNS.length} className="bg-k-sunken/70 px-3 py-1.5">
-                            <span className="num text-2xs font-medium uppercase tracking-wider text-k-ink-muted">
+                            <span className="num text-2xs font-medium text-k-ink-muted">
                               {day}
                             </span>
                             <span className="num ml-2 text-2xs text-k-ink-muted">
@@ -294,7 +292,7 @@ export default function RawCDRTable() {
                               col.align === 'right' ? 'text-right' : 'text-left'
                             } ${
                               col.id === 'extension'
-                                ? 'font-semibold text-k-accent'
+                                ? 'font-semibold text-k-accent-fg'
                                 : col.id === 'duration'
                                   ? 'text-k-throughput'
                                   : col.id === 'start_time' || col.id === 'region' || col.id === 'direction' || col.id === 'response'

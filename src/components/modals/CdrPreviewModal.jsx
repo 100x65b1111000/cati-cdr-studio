@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { FileCsv, Play } from '@phosphor-icons/react';
+import { DocumentCsvRegular as FileCsv, PlayFilled as Play } from '@fluentui/react-icons';
 import { useCdr } from '../../context/CdrContext';
 import Modal from '../ui/Modal';
 
@@ -34,7 +34,7 @@ export default function CdrPreviewModal() {
       <button
         type="button"
         onClick={cancelPendingUpload}
-        className="hoverable rounded-lg border border-k-hairline-strong bg-k-surface-hover/60 px-3.5 py-2 text-xs font-medium text-k-ink active:translate-y-[1px]"
+        className="hoverable rounded border border-k-hairline bg-k-surface-hover/60 px-3.5 py-2 text-xs font-medium text-k-ink active:translate-y-[1px]"
       >
         Cancel
       </button>
@@ -42,9 +42,9 @@ export default function CdrPreviewModal() {
         type="button"
         onClick={confirmPendingUpload}
         disabled={isParsing}
-        className="inline-flex items-center gap-1.5 rounded-lg bg-k-accent px-3.5 py-2 text-xs font-semibold text-k-accent-ink transition-opacity hover:opacity-90 active:translate-y-[1px] disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 rounded bg-k-accent px-3.5 py-2 text-xs font-semibold text-k-accent-ink transition-colors hover:bg-k-accent/90 active:translate-y-[1px] disabled:opacity-50"
       >
-        <Play size={14} weight="fill" />
+        <Play style={{ fontSize: 14 }} />
         Generate rundown
       </button>
     </>
@@ -59,16 +59,16 @@ export default function CdrPreviewModal() {
     >
       <div className="space-y-4 text-xs">
         <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-xl border border-k-hairline bg-k-sunken/60 p-3">
-            <span className="block text-2xs font-semibold uppercase text-k-ink-muted">Call records</span>
-            <span className="num mt-1 block text-lg font-bold text-k-accent">{preview.totalRows}</span>
+          <div className="rounded-md border border-k-hairline bg-k-sunken/60 p-3">
+            <span className="block text-2xs font-semibold text-k-ink-muted">Call records</span>
+            <span className="num mt-1 block text-lg font-bold text-k-accent-fg">{preview.totalRows}</span>
           </div>
-          <div className="rounded-xl border border-k-hairline bg-k-sunken/60 p-3">
-            <span className="block text-2xs font-semibold uppercase text-k-ink-muted">Extensions</span>
+          <div className="rounded-md border border-k-hairline bg-k-sunken/60 p-3">
+            <span className="block text-2xs font-semibold text-k-ink-muted">Extensions</span>
             <span className="num mt-1 block text-lg font-bold text-k-throughput">{preview.extCount}</span>
           </div>
-          <div className="rounded-xl border border-k-hairline bg-k-sunken/60 p-3">
-            <span className="block text-2xs font-semibold uppercase text-k-ink-muted">Break threshold</span>
+          <div className="rounded-md border border-k-hairline bg-k-sunken/60 p-3">
+            <span className="block text-2xs font-semibold text-k-ink-muted">Break threshold</span>
             <span className="num mt-1 block text-lg font-bold text-k-success">
               {shiftConfig.breakThresholdMinutes} min
             </span>
@@ -79,13 +79,13 @@ export default function CdrPreviewModal() {
           <div className="mb-2 flex items-baseline justify-between">
             <h3 className="text-xs font-semibold text-k-ink">First 8 rows</h3>
             <span className="inline-flex items-center gap-1.5 text-meta text-k-ink-muted">
-              <FileCsv size={14} />
+              <FileCsv style={{ fontSize: 14 }} />
               Check the column mapping before generating
             </span>
           </div>
-          <div className="max-h-60 overflow-y-auto rounded-xl border border-k-hairline">
+          <div className="max-h-60 overflow-y-auto rounded-md border border-k-hairline">
             <table className="w-full text-left text-xs">
-              <thead className="sticky top-0 border-b border-k-hairline thead text-2xs uppercase tracking-wider text-k-ink-muted">
+              <thead className="sticky top-0 border-b border-k-hairline thead text-2xs text-k-ink-muted">
                 <tr>
                   <th className="w-10 px-3 py-2 font-semibold">#</th>
                   <th className="px-3 py-2 font-semibold">Ext</th>
@@ -109,7 +109,7 @@ export default function CdrPreviewModal() {
                   return (
                     <tr key={i} className="row-hover">
                       <td className="num px-3 py-1.5 text-k-ink-muted">{i + 1}</td>
-                      <td className="num px-3 py-1.5 font-medium text-k-accent">{ext}</td>
+                      <td className="num px-3 py-1.5 font-medium text-k-accent-fg">{ext}</td>
                       <td className="num px-3 py-1.5 text-k-ink">{date}</td>
                       <td className="num px-3 py-1.5 text-k-ink-muted">{dest}</td>
                       <td
