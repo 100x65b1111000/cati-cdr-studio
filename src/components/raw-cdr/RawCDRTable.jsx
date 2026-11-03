@@ -51,7 +51,7 @@ export default function RawCDRTable() {
   const restoredRef = useRef(loadFromStorage('raw_view_state', null));
   const [search, setSearch] = useState(() => restoredRef.current?.search || '');
   const [order, setOrder] = useState(() => mergeOrder(restoredRef.current?.order, COLUMN_IDS));
-  const [dragCol, setDragCol] = useState(null);
+  const [litCol, setLitCol] = useState(null);
   const [visibleColumns, setVisibleColumns] = useState(() =>
     Object.fromEntries(COLUMNS.map((c) => [c.id, restoredRef.current?.visibleColumns?.[c.id] !== false]))
   );
@@ -275,8 +275,8 @@ export default function RawCDRTable() {
                     order={order}
                     setOrder={setOrder}
                     shownIds={shownIds}
-                    dragging={dragCol}
-                    setDragging={setDragCol}
+                    lit={litCol}
+                    setLit={setLitCol}
                   />
                 ))}
               </tr>
@@ -347,7 +347,7 @@ export default function RawCDRTable() {
                                   : col.id === 'start_time' || col.id === 'region' || col.id === 'direction' || col.id === 'response'
                                     ? 'text-k-ink-muted'
                                     : 'text-k-talk'
-                            } ${dragCol === col.id ? 'bg-k-accent-fg/15' : ''}`}
+                            } ${litCol === col.id ? 'bg-k-accent-fg/15' : ''}`}
                           >
                             {col.cell(call)}
                           </td>

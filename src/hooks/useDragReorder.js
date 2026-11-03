@@ -1,27 +1,28 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { moveById, stepById } from '../utils/columnOrder';
 
 // One drag source (the handle) and one landing pad (the row it sits in), shared by the
 // table head and the Columns menu so both drag exactly the same way.
 //
-// `dragging` is the id the surface currently has in flight, lifted out of here because
-// the head needs it too: the highlight has to cover every cell of the column, not just
-// the header the handle lives in. `axis` is the direction that surface runs in, and
-// `shownIds` is the sequence the user can see, which the keyboard steps over.
-export default function useDragReorder({
-  id,
-  label,
-  order,
-  setOrder,
-  shownIds,
-  axis,
-  dragging,
-  setDragging
-}) {
+// `lit` is the id the surface has under its cursor or in flight, lifted out of here
+// because the head needs it too: the highlight has to cover every cell of the column,
+// not just the header the handle lives in. `axis` is the direction that surface runs in,
+// and `shownIds` is the sequence the user can see, which the keyboard steps over.
+export default function useDragReorder({ id, label, order, setOrder, shownIds, axis, lit, setLit }) {
   const [land, setLand] = useState(null);
-  const moving = dragging === id;
+  // A drag owns the highlight from dragstart to dragend. The pointer leaves the handle
+  // the moment the drag image takes over, so a hover leaving must not clear what the
+  // drag just set.
+  const inFlight = useRef(false);
+  const moving = lit === id;
+  const idle = () => {
+    if (inFlight.current) return;
+    setLit(null);
+    setLand(null);
+  };
   const clear = () => {
-    setDragging(null);
+    inFlight.current = false;
+    setLit(null);
     setLand(null);
   };
 
@@ -43,8 +44,16 @@ export default function useDragReorder({
       tabIndex: 0,
       'aria-label': `Reorder ${label} column. Arrow keys move it.`,
       draggable: true,
+      // Hovering the handle lights the column it would move, so the gesture names its
+      // subject before it starts. Focus does the same for the keyboard route, which
+      // otherwise moves a column you cannot tell from its neighbours.
+      onMouseEnter: () => setLit(id),
+      onMouseLeave: idle,
+      onFocus: () => setLit(id),
+      onBlur: idle,
       onDragStart: (e) => {
-        setDragging(id);
+        inFlight.current = true;
+        setLit(id);
         e.dataTransfer.setData('text/plain', id);
         e.dataTransfer.effectAllowed = 'move';
         // The row, not the 14px glyph, is what should travel with the pointer.

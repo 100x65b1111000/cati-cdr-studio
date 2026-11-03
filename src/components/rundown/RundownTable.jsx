@@ -71,10 +71,10 @@ export default function RundownTable() {
   const [searchQuery, setSearchQuery] = useState(() => restoredRef.current?.search || '');
   const [visibleColumns, setVisibleColumns] = useState(() => mergeVisibleColumns(restoredRef.current?.visibleColumns));
   const [order, setOrder] = useState(() => mergeOrder(restoredRef.current?.order, COLUMN_IDS));
-  // Which column is currently in flight. Kept here rather than in the header so the
-  // body cells can tint the same column: a highlight over the handle alone reads as a
-  // hover, not as "this whole column moves".
-  const [dragCol, setDragCol] = useState(null);
+  // Which column the pointer is on, or in flight: kept here rather than in the header
+  // because the body cells light the same column, and a highlight over the handle alone
+  // reads as a hover, not as "this whole column moves".
+  const [litCol, setLitCol] = useState(null);
   const [connView, setConnView] = useState(() => (restoredRef.current?.connView === 'split' ? 'split' : 'total'));
   const [sortField, setSortField] = useState(() => {
     const saved = restoredRef.current?.sort?.field;
@@ -307,8 +307,8 @@ export default function RundownTable() {
                     order={order}
                     setOrder={setOrder}
                     shownIds={shownIds}
-                    dragging={dragCol}
-                    setDragging={setDragCol}
+                    lit={litCol}
+                    setLit={setLitCol}
                   />
                 ))}
               </tr>
@@ -369,7 +369,7 @@ export default function RundownTable() {
                           onClick={copyCell}
                           className={`whitespace-nowrap px-3 align-middle cursor-copy ${colWidth(col.id)} ${
                             col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
-                          } ${dragCol === col.id ? 'bg-k-accent-fg/15' : ''}`}
+                          } ${litCol === col.id ? 'bg-k-accent-fg/15' : ''}`}
                         >
                           {col.cell(row, ctx)}
                         </td>

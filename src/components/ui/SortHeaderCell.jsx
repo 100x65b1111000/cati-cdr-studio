@@ -18,8 +18,8 @@ export default function SortHeaderCell({
   order,
   setOrder,
   shownIds,
-  dragging,
-  setDragging
+  lit,
+  setLit
 }) {
   const { moving, land, handle, target } = useDragReorder({
     id: field,
@@ -28,8 +28,8 @@ export default function SortHeaderCell({
     setOrder,
     shownIds,
     axis: 'x',
-    dragging,
-    setDragging
+    lit,
+    setLit
   });
   const active = sortable && sortField === field;
   const alignClass = align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left';

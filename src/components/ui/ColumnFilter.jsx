@@ -11,7 +11,7 @@ import { Checkbox } from './ExtensionFilter';
 // itself to its checkbox, so a grip parked in there would toggle the column. Here the
 // list runs down, so the column that moves is the whole row and the line drawn across
 // the top or bottom edge of a row is the slot the dropped column takes.
-function Row({ col, order, setOrder, shownIds, visible, setVisible, dragging, setDragging }) {
+function Row({ col, order, setOrder, shownIds, visible, setVisible, lit, setLit }) {
   const { moving, land, handle, target } = useDragReorder({
     id: col.id,
     label: col.label,
@@ -19,8 +19,8 @@ function Row({ col, order, setOrder, shownIds, visible, setVisible, dragging, se
     setOrder,
     shownIds,
     axis: 'y',
-    dragging,
-    setDragging
+    lit,
+    setLit
   });
   return (
     <div
@@ -55,7 +55,7 @@ function Row({ col, order, setOrder, shownIds, visible, setVisible, dragging, se
 // one component with the option list handed in. It lists in `order`, which is the same
 // array the head draws from: a drag in either place moves the other.
 export default function ColumnFilter({ options, order, setOrder, visible, setVisible, note }) {
-  const [dragging, setDragging] = useState(null);
+  const [lit, setLit] = useState(null);
   const shown = options.filter((col) => visible[col.id]).length;
   const rows = order.map((id) => options.find((col) => col.id === id)).filter(Boolean);
   // Arrow keys step over the columns the table actually draws, not the hidden rows that
@@ -74,8 +74,8 @@ export default function ColumnFilter({ options, order, setOrder, visible, setVis
             shownIds={shownIds}
             visible={visible}
             setVisible={setVisible}
-            dragging={dragging}
-            setDragging={setDragging}
+            lit={lit}
+            setLit={setLit}
           />
         ))}
         {note && <p className="px-2 pt-1.5 text-2xs text-k-ink-muted">{note}</p>}
