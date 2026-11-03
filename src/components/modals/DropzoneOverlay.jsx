@@ -12,9 +12,10 @@ export default function DropzoneOverlay() {
     const handleDragEnter = (e) => {
       e.preventDefault();
       dragCounter++;
-      if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
-        setIsDragging(true);
-      }
+      // Only a drag that carries files is an upload. `items` is not empty for the
+      // column handles, which drag a plain string, so this overlay used to promise a
+      // CSV over the table on every reorder.
+      if (e.dataTransfer.types.includes('Files')) setIsDragging(true);
     };
 
     const handleDragLeave = (e) => {
