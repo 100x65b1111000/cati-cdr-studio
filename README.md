@@ -115,7 +115,6 @@ Only `.csv` is accepted, up to 50MB. A wrong file type, a file with no rows, or 
 DB_PATH=data/test.sqlite npm run dev   # the harness uploads fixtures; do not point it at real data
 node ui-check.mjs                      # Playwright: tokens, layering, overflow, focus, print, hotkeys
 node check-metrics.mjs                 # the metric maths, against a generated dataset
-node icon-mockups.mjs                  # favicon candidates at every size a browser asks for
 ```
 
 `ui-check.mjs` is the behaviour oracle: it signs in with `APP_PASSWORD`, screenshots every view into `_ui/`, and exits non-zero when something is buried, clipped or throwing. Run it before and after a layout change.
@@ -169,7 +168,7 @@ src/
     common/                  Pagination, ToastContainer
 ```
 
-Fonts are self-hosted through `@fontsource` and `animate.css` supplies the view-switch keyframes. Icons are `@phosphor-icons/react`. No CDN links. Every figure uses the `.num` class, which is a monospace face with tabular numerals, so columns of digits align.
+Type is the platform stack (Segoe UI on Windows, system-ui elsewhere), so nothing downloads before the first paint. `animate.css` supplies the view-switch keyframes and icons are `@fluentui/react-icons`. No CDN links. Every figure uses the `.num` class, which is a tabular-numeral face, so columns of digits align.
 
 ## Known debt
 

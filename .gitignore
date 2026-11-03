@@ -28,6 +28,10 @@ node_modules
 
 # Localhost / machine-local tool state. Per-machine permission grants, not project config.
 .qoder/settings.local.json
+.agents/
+.hallmark/
+skills-lock.json
+start-app.cmd
 
 # Secrets. Never commit a real key; .env.example is the tracked template.
 .env
@@ -51,3 +55,4 @@ graphify-out/
 # Reference drops used while fixing a specific UI issue. Delete freely.
 ui-reference.html
 table-spacing-reference.png
+ref-*.png
