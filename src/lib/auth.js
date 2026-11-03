@@ -9,19 +9,12 @@ export const SESSION_COOKIE = 'cati_cdr_session';
 // Same path instrumentation.js writes at boot; the two constants live apart because
 // that file is compiled for the edge runtime too and must not import this module.
 const SESSION_BOOT_FILE = path.join('data', '.session-boot');
-const TTL_MS = 12 * 60 * 60 * 1000;
+export const SESSION_TTL_S = 12 * 60 * 60;
 
 const encoder = new TextEncoder();
 
 function toB64Url(bytes) {
-  let bin = '';
-  for (const b of bytes) bin += String.fromCharCode(b);
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function fromB64Url(text) {
-  const bin = atob(text.replace(/-/g, '+').replace(/_/g, '/'));
-  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  return Buffer.from(bytes).toString('base64url');
 }
 
 async function hmac(secret, message) {
@@ -34,7 +27,7 @@ async function hmac(secret, message) {
 // `===` is not constant time, but both sides here are fixed-length HMAC digests, never
 // the secret or the password, so early exit leaks nothing an attacker can act on.
 export async function createSession(secret) {
-  const exp = Date.now() + TTL_MS;
+  const exp = Date.now() + SESSION_TTL_S * 1000;
   return `${exp}.${toB64Url(await hmac(secret, String(exp)))}`;
 }
 
@@ -77,5 +70,3 @@ export function secrets() {
     session: session && `${session}:${bootNonce()}`
   };
 }
-
-export const sessionAge = () => Math.floor(TTL_MS / 1000);

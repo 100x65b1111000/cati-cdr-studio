@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { SESSION_COOKIE, checkPassword, createSession, secrets, sessionAge } from '../../../../lib/auth';
+import { SESSION_COOKIE, SESSION_TTL_S, checkPassword, createSession, secrets } from '../../../../lib/auth';
 
 export async function POST(request) {
   const form = await request.formData().catch(() => null);
@@ -19,13 +19,19 @@ export async function POST(request) {
 
   if (!real || !(await checkPassword(password, real))) return back('/login?error=1');
 
+  // `Secure` from the protocol the request actually arrived on, never from NODE_ENV: this
+  // runs as `next start` over plain http on a LAN, and a browser will not store a Secure
+  // cookie from an origin that is not trustworthy. NODE_ENV said production, so the peer
+  // machine's cookie was dropped on arrival and every request came back unauthenticated,
+  // while the same sign-in worked on the host because http://localhost IS trustworthy.
+  const secure = (request.headers.get('x-forwarded-proto') || '').split(',')[0].trim() === 'https';
   const home = back('/');
   home.cookies.set(SESSION_COOKIE, await createSession(secret), {
     httpOnly: true,
     sameSite: 'lax',
     path: '/',
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: sessionAge()
+    secure,
+    maxAge: SESSION_TTL_S
   });
   return home;
 }
