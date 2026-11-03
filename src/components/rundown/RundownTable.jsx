@@ -71,6 +71,10 @@ export default function RundownTable() {
   const [searchQuery, setSearchQuery] = useState(() => restoredRef.current?.search || '');
   const [visibleColumns, setVisibleColumns] = useState(() => mergeVisibleColumns(restoredRef.current?.visibleColumns));
   const [order, setOrder] = useState(() => mergeOrder(restoredRef.current?.order, COLUMN_IDS));
+  // Which column is currently in flight. Kept here rather than in the header so the
+  // body cells can tint the same column: a highlight over the handle alone reads as a
+  // hover, not as "this whole column moves".
+  const [dragCol, setDragCol] = useState(null);
   const [connView, setConnView] = useState(() => (restoredRef.current?.connView === 'split' ? 'split' : 'total'));
   const [sortField, setSortField] = useState(() => {
     const saved = restoredRef.current?.sort?.field;
@@ -249,6 +253,7 @@ export default function RundownTable() {
   // Dragging a handle reorders `order`, the full id list; visibility is applied on top
   // of it, so a hidden column keeps its slot and reappears where it was put.
   const shownColumns = order.map((id) => COLUMN_BY_ID[id]).filter((col) => col && visibleColumns[col.id]);
+  const shownIds = shownColumns.map((col) => col.id);
   const ctx = { connView, setOverride, openDetail };
 
   const noData = Object.keys(analysis).length === 0;
@@ -269,6 +274,8 @@ export default function RundownTable() {
         availableExtensions={extensionsInRange}
         visibleColumns={visibleColumns}
         setVisibleColumns={setVisibleColumns}
+        order={order}
+        setOrder={setOrder}
         connView={connView}
         setConnView={setConnView}
         filters={filters}
@@ -297,7 +304,11 @@ export default function RundownTable() {
                     align={col.align}
                     className={colWidth(col.id)}
                     sortable={!!col.value}
-                    reorder={{ order, setOrder }}
+                    order={order}
+                    setOrder={setOrder}
+                    shownIds={shownIds}
+                    dragging={dragCol}
+                    setDragging={setDragCol}
                   />
                 ))}
               </tr>
@@ -358,7 +369,7 @@ export default function RundownTable() {
                           onClick={copyCell}
                           className={`whitespace-nowrap px-3 align-middle cursor-copy ${colWidth(col.id)} ${
                             col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
-                          }`}
+                          } ${dragCol === col.id ? 'bg-k-accent-fg/15' : ''}`}
                         >
                           {col.cell(row, ctx)}
                         </td>

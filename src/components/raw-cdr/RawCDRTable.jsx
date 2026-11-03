@@ -51,6 +51,7 @@ export default function RawCDRTable() {
   const restoredRef = useRef(loadFromStorage('raw_view_state', null));
   const [search, setSearch] = useState(() => restoredRef.current?.search || '');
   const [order, setOrder] = useState(() => mergeOrder(restoredRef.current?.order, COLUMN_IDS));
+  const [dragCol, setDragCol] = useState(null);
   const [visibleColumns, setVisibleColumns] = useState(() =>
     Object.fromEntries(COLUMNS.map((c) => [c.id, restoredRef.current?.visibleColumns?.[c.id] !== false]))
   );
@@ -192,6 +193,7 @@ export default function RawCDRTable() {
   const shownColumns = order
     .map((id) => COLUMNS.find((c) => c.id === id))
     .filter((col) => col && visibleColumns[col.id]);
+  const shownIds = shownColumns.map((col) => col.id);
 
   return (
     <div className={`animate__animated ${slide} flex min-h-0 flex-1 flex-col space-y-4`}>
@@ -229,7 +231,13 @@ export default function RawCDRTable() {
         />
 
         <div className="hidden sm:block">
-          <ColumnFilter options={COLUMNS} visible={visibleColumns} setVisible={setVisibleColumns} />
+          <ColumnFilter
+            options={COLUMNS}
+            order={order}
+            setOrder={setOrder}
+            visible={visibleColumns}
+            setVisible={setVisibleColumns}
+          />
         </div>
 
         {/* The zero-row filter still reads the same table, so the tallies only ride
@@ -264,7 +272,11 @@ export default function RawCDRTable() {
                     onSort={handleSort}
                     align={col.align}
                     className={colWidth(col.id)}
-                    reorder={{ order, setOrder }}
+                    order={order}
+                    setOrder={setOrder}
+                    shownIds={shownIds}
+                    dragging={dragCol}
+                    setDragging={setDragCol}
                   />
                 ))}
               </tr>
@@ -335,7 +347,7 @@ export default function RawCDRTable() {
                                   : col.id === 'start_time' || col.id === 'region' || col.id === 'direction' || col.id === 'response'
                                     ? 'text-k-ink-muted'
                                     : 'text-k-talk'
-                            }`}
+                            } ${dragCol === col.id ? 'bg-k-accent-fg/15' : ''}`}
                           >
                             {col.cell(call)}
                           </td>

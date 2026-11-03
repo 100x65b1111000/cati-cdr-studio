@@ -24,6 +24,8 @@ export default function RundownToolbar({
   availableExtensions,
   visibleColumns,
   setVisibleColumns,
+  order,
+  setOrder,
   connView,
   setConnView,
   filters,
@@ -106,6 +108,8 @@ export default function RundownToolbar({
           options={FILTERABLE_COLUMN_IDS.map((id) => ({ id, label: COLUMN_BY_ID[id].label }))}
           visible={visibleColumns}
           setVisible={setVisibleColumns}
+          order={order}
+          setOrder={setOrder}
           note="Print writes exactly the columns you see here."
         />
       </div>
