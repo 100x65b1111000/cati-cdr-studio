@@ -236,7 +236,10 @@ html[data-mode='light'] {
 }
 
 .field:hover:not(:focus) {
-  border-color: rgb(var(--tone, var(--k-accent-fg, 71 158 245)) / 0.9);
+  /* A 1px line at 90% of the tone is the brightest thing in the toolbar, and on the
+     violet break control it reads as a lit edge rather than a hint. The wash carries the
+     hover cue; the edge only has to answer the pointer, not shout it. */
+  border-color: rgb(var(--tone, var(--k-accent-fg, 71 158 245)) / 0.55);
   background-image: linear-gradient(rgb(var(--tone, var(--k-accent-fg, 71 158 245)) / 0.12), rgb(var(--tone, var(--k-accent-fg, 71 158 245)) / 0.12));
 }
 
