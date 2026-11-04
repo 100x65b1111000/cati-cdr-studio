@@ -7,11 +7,8 @@ import { exportAnalysisToJSON, exportRundownToCSV, exportRundownToExcel } from '
 import FilterPopover, { menuItem } from '../ui/FilterPopover';
 
 // The upload label owns the file input and the parsing state. Both controls fill their
-// grid cell, so the caller only decides the shape: one column in the sidebar, two in the
-// bar below `lg`, where there is no sidebar to hold them. `compact` is the collapsed
-// rail: a popover menu cannot escape the aside's `overflow-hidden`, so the formats get
-// their own icon buttons instead of an "Export" trigger.
-export default function DataActions({ className = 'grid-cols-1', compact = false }) {
+// grid cell, so the caller only decides the shape: a row across the header's right edge.
+export default function DataActions({ className = 'grid-cols-1' }) {
   const { isParsing, handleFileDropOrSelect, analysis, extNameMap, dateRange, addToast } = useCdr();
 
   function onFileInputChange(e) {
@@ -48,52 +45,15 @@ export default function DataActions({ className = 'grid-cols-1', compact = false
     }
   }
 
-  // One list, two renderings: the popover's rows below lg and the rail's icon
-  // buttons above it. `label` doubles as the toast name in run(). The hue class
-  // paints the icon; the `--tone` triplet is the same hue for `.hoverable`'s wash.
+  // One list, one rendering: the popover's rows, in the bar and in the dock alike.
+  // `label` doubles as the toast name in run(). The hue class paints the icon; the
+  // `--tone` triplet is the same hue for `.hoverable`'s wash.
   const EXPORTS = [
     ['Excel', FileXls, 'text-k-success', 'var(--k-success)', 'Excel, every agent-day', (scoped) =>
       exportRundownToExcel(Object.values(scoped).flatMap(Object.values), defaultVisibleColumns(), 'total')],
     ['CSV', FileCsv, 'text-k-talk', 'var(--k-talk)', 'CSV, every agent-day', (scoped) => exportRundownToCSV(scoped, extNameMap)],
     ['JSON', BracketsCurly, 'text-k-throughput', 'var(--k-throughput)', 'JSON, full calculation', (scoped) => exportAnalysisToJSON(scoped)]
   ];
-
-  if (compact) {
-    return (
-      <div className={`grid gap-2 ${className}`}>
-        <label
-          aria-label={isParsing ? 'Parsing CSV' : 'Upload CDR CSV'}
-          className="flex h-7 cursor-pointer items-center justify-center rounded bg-k-accent text-k-accent-ink transition-colors hover:bg-k-accent/90 active:translate-y-[1px]"
-        >
-          <UploadSimple style={{ fontSize: 16 }} aria-busy={isParsing || undefined} />
-          <input type="file" accept=".csv" onChange={onFileInputChange} className="hidden" />
-        </label>
-        {EXPORTS.map(([label, Icon, hue, tone, , work]) => (
-          <button
-            key={label}
-            type="button"
-            onClick={() => run(label, work)}
-            aria-label={`Export ${label}`}
-            title={`Export ${label}`}
-            style={{ '--tone': tone }}
-            className="hoverable flex h-7 w-full items-center justify-center rounded"
-          >
-            <Icon style={{ fontSize: 16 }} className={hue} />
-          </button>
-        ))}
-        {/* Collapsed, the rail is the only sidebar, so Print rides along as a glyph. */}
-        <button
-          type="button"
-          onClick={() => window.print()}
-          aria-label="Print"
-          style={{ '--tone': 'var(--k-danger)' }}
-          className="hoverable flex h-7 w-full items-center justify-center rounded"
-        >
-          <Printer style={{ fontSize: 16 }} className="text-k-danger" />
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div className={`grid gap-2 ${className}`}>
@@ -109,28 +69,34 @@ export default function DataActions({ className = 'grid-cols-1', compact = false
           className="hidden"
         />
       </label>
-      <FilterPopover label="Export" icon={FileXls} tone="success" width="w-full">
-        <div className="p-1">
-          {EXPORTS.map(([label, Icon, hue, , text, work]) => (
-            <button key={label} type="button" className={menuItem} onClick={() => run(label, work)}>
-              <Icon style={{ fontSize: 15 }} className={hue} />
-              {text}
-            </button>
-          ))}
-        </div>
-      </FilterPopover>
+      {/* Export and Print are desk work: on a phone the bar keeps the one action it is
+          for and the rest of its width for the view. `contents` puts the two back into
+          the caller's grid at sm and above, so they are still siblings of the upload,
+          not a nested row. */}
+      <div className="hidden sm:contents">
+        <FilterPopover label="Export" icon={FileXls} tone="success" width="w-full">
+          <div className="p-1">
+            {EXPORTS.map(([label, Icon, hue, , text, work]) => (
+              <button key={label} type="button" className={menuItem} onClick={() => run(label, work)}>
+                <Icon style={{ fontSize: 15 }} className={hue} />
+                {text}
+              </button>
+            ))}
+          </div>
+        </FilterPopover>
 
-      {/* Print is the third way data leaves the app, and unlike the two above it goes
-          to the paper the browser is showing, so the cluster keeps them together. */}
-      <button
-        type="button"
-        onClick={() => window.print()}
-        style={{ '--tone': 'var(--k-danger)' }}
-        className="hoverable inline-flex h-7 w-full items-center justify-center gap-1.5 rounded border border-k-hairline bg-k-surface-hover/50 px-2.5 text-xs font-medium text-k-ink-muted active:translate-y-[1px]"
-      >
-        <Printer style={{ fontSize: 15 }} className="text-k-danger" />
-        <span>Print</span>
-      </button>
+        {/* Print is the third way data leaves the app, and unlike the two above it goes
+            to the paper the browser is showing, so the cluster keeps them together. */}
+        <button
+          type="button"
+          onClick={() => window.print()}
+          style={{ '--tone': 'var(--k-danger)' }}
+          className="hoverable inline-flex h-7 w-full items-center justify-center gap-1.5 rounded border border-k-hairline bg-k-surface-hover/50 px-2.5 text-xs font-medium text-k-ink-muted active:translate-y-[1px]"
+        >
+          <Printer style={{ fontSize: 15 }} className="text-k-danger" />
+          <span>Print</span>
+        </button>
+      </div>
     </div>
   );
 }

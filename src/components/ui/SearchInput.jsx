@@ -12,13 +12,18 @@ export default function SearchInput({ value, onChange, label, placeholder = 'Sea
         style={{ fontSize: 15 }}
         className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-k-ink-muted"
       />
+      {/* Each overlay is only worth the width it actually covers: the glass ends at 25px
+          on the left, the clear button is mounted on the right only once there is a value,
+          and an empty field is exactly where the placeholder has to fit. */}
       <input
         id={inputId}
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="field w-full rounded py-1.5 pl-8 pr-8 text-xs text-k-ink placeholder:text-k-ink-muted focus:border-k-accent-fg focus:outline-none"
+        className={`field w-full rounded py-1.5 pl-8 text-xs text-k-ink placeholder:text-k-ink-muted focus:border-k-accent-fg focus:outline-none ${
+          value ? 'pr-7' : 'pr-3'
+        }`}
       />
       {value && (
         <button

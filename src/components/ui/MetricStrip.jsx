@@ -21,11 +21,14 @@ export default function MetricStrip({ items }) {
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-xs font-medium text-k-ink-muted">{label}</div>
-              <div className="num mt-1 whitespace-nowrap text-xl font-bold leading-tight text-k-ink">{value}</div>
+              {/* The value is nowrap, so at two cards per column on a phone it is the
+                  figure's own size that has to give, not the tile's: 20px of mono plus
+                  the 40px plate is wider than the card. */}
+              <div className="num mt-1 whitespace-nowrap text-lg font-bold leading-tight text-k-ink sm:text-xl">{value}</div>
             </div>
             {Icon && (
               <div
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md border ${TILE[role]}`}
+                className={`flex size-9 shrink-0 items-center justify-center rounded-md border sm:size-10 ${TILE[role]}`}
               >
                 <Icon style={{ fontSize: 20 }} />
               </div>

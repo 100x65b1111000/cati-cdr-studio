@@ -98,7 +98,6 @@ export default function AgentDirectory() {
           label="Extension or name"
           placeholder="Extension or name"
           className="w-full flex-none sm:w-56"
-          primary
         />
         <div className="flex w-full items-center justify-end gap-1.5 sm:ml-auto sm:w-auto">
           <Segmented

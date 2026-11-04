@@ -1,9 +1,10 @@
-/* Hallmark · shape: app screen · genre: modern-minimal · theme: brand · redesign: full
- * paper: oklch(21% 0.005 240) · accent: oklch(62% 0.18 245) · display: Segoe UI · body: Segoe UI
- * nav: kept · signature: kept · states: loading, empty, error · surface: absolute
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: brand (Basalt, by request) · redesign: full
+ * paper: oklch(14.5% .006 265) · accent: oklch(83% .13 215) · display: Space Grotesk · body: Space Grotesk
+ * nav: kept · signature: the dock that opens over the canvas · states: loading, empty, error · surface: absolute
  * axes: dark/grotesk-sans/cool · posture: restrained · contrast: pass · v2.0.0 */
-/* Hallmark · pre-emit critique: P4 H4 E4 S4 R4 V4 · weakest: E, tightened table headers and states */
-/* Hallmark · waive 7b · surface: absolute · Fluent UI token system uses absolute neutrals and white print canvas */
+/* Hallmark · pre-emit critique: P5 H4 E5 S4 R4 V5 · weakest: H, the rundown table is frozen by brief */
+/* Hallmark · sweep: sloplint 0 FAIL · ui-check green · finish-review: subagent · 8 findings · 5 resolved, 1 partial, 2 unresolved (Analytics and Agents are still the before compositions) */
+/* Hallmark · waive 7b · surface: absolute · the print canvas is white and both modes are absolute neutrals */
 @import 'tailwindcss';
 @import './tokens.css';
 @import './base.css' layer(base);
@@ -17,9 +18,10 @@
   --text-meta--line-height: 0.9375rem;
 }
 
-/* The k-* roles are written onto <html> by CdrContext, so each rule below keeps the
-   fallback for the paint before React mounts. This used to be a block of ~50 --color-*
-   aliases; every one had a single consumer, so the rgb() now sits in that rule instead. */
+/* Every --k-* role is on <html> before the first paint: layout.jsx emits both palettes
+   keyed on the data-mode its head script sets, and CdrContext's inline writes take over
+   once React mounts. So no rule below restates a colour as a fallback: the ones that
+   did were dead weight, and every one of them had already drifted to the old palette. */
 :root {
   --animate-duration: 450ms;
 }
@@ -32,8 +34,17 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-focus);
+    outline: 2px solid rgb(var(--k-accent-fg));
     outline-offset: 2px;
+  }
+
+  /* A ring the same hue as the fill it rings reads as a doubled box. The two controls
+     that sit on a solid accent fill — a pressed toggle and a tone button — take the page
+     ink instead: bright on the dark canvas, dark on the light one, and never the hue of
+     what it is ringing. */
+  .tone-btn:focus-visible,
+  [role='group'] button[aria-pressed='true']:focus-visible {
+    outline-color: rgb(var(--k-ink));
   }
 }
 
@@ -42,23 +53,26 @@ html, body {
 }
 
 html {
-  background: var(--color-paper);
+  background: rgb(var(--k-page));
   color-scheme: dark;
   --shadow-2: 0 0 2px rgb(0 0 0 / 0.24), 0 1px 2px rgb(0 0 0 / 0.28);
   --shadow-4: 0 0 2px rgb(0 0 0 / 0.24), 0 2px 4px rgb(0 0 0 / 0.28);
   --shadow-8: 0 0 2px rgb(0 0 0 / 0.24), 0 4px 8px rgb(0 0 0 / 0.28);
   --shadow-16: 0 0 2px rgb(0 0 0 / 0.24), 0 8px 16px rgb(0 0 0 / 0.28);
-  --tone-ink: 31 31 31;
+  /* The ink a filled tone has to carry: every series colour is light in dark mode and
+     dark in light mode, which is the same rule --k-accent-ink is solved for, so it reads
+     through that role instead of a second pair of literals that print could not reach. */
+  --tone-ink: var(--k-accent-ink);
 }
 
 html[data-mode='light'] {
-  background: var(--color-paper-light, #fafafa);
+  /* The canvas itself needs no rule: `background` above reads --k-page, which the
+     pre-paint sheet rewrites per mode. */
   color-scheme: light;
   --shadow-2: 0 0 2px rgb(0 0 0 / 0.12), 0 1px 2px rgb(0 0 0 / 0.14);
   --shadow-4: 0 0 2px rgb(0 0 0 / 0.12), 0 2px 4px rgb(0 0 0 / 0.14);
   --shadow-8: 0 0 2px rgb(0 0 0 / 0.12), 0 4px 8px rgb(0 0 0 / 0.14);
   --shadow-16: 0 0 2px rgb(0 0 0 / 0.12), 0 8px 16px rgb(0 0 0 / 0.14);
-  --tone-ink: 255 255 255;
 }
 
 @layer components {
@@ -74,26 +88,26 @@ html[data-mode='light'] {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: rgb(var(--k-sunken, 20 20 20) / 0.6);
+  background: rgb(var(--k-sunken) / 0.6);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgb(var(--k-hairline-strong, 117 117 117));
+  background: rgb(var(--k-hairline-strong));
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgb(var(--k-ink-faint, 173 173 173));
+  background: rgb(var(--k-ink-faint));
 }
 
 @layer components {
   .panel {
-    background-color: rgb(var(--k-surface, 41 41 41));
-    border: 1px solid rgb(var(--k-hairline, 82 82 82));
+    background-color: rgb(var(--k-surface));
+    border: 1px solid rgb(var(--k-hairline));
     box-shadow: var(--shadow-2);
   }
 
   .app-bar {
-    background-color: rgb(var(--k-sunken, 20 20 20));
-    border: 1px solid rgb(var(--k-hairline, 82 82 82));
+    background-color: rgb(var(--k-sunken));
+    border: 1px solid rgb(var(--k-hairline));
     box-shadow: var(--shadow-8);
   }
 
@@ -120,18 +134,18 @@ html[data-mode='light'] {
   }
 
   .menu {
-    background-color: rgb(var(--k-surface, 41 41 41));
-    border: 1px solid rgb(var(--tone, var(--k-accent-fg, 71 158 245)) / 0.45);
+    background-color: rgb(var(--k-surface));
+    border: 1px solid rgb(var(--tone, var(--k-accent-fg)) / 0.45);
     box-shadow: var(--shadow-16);
   }
 
   .thead {
-    background-color: rgb(var(--k-page, 31 31 31));
+    background-color: rgb(var(--k-page));
   }
 
   .field {
-    background-color: rgb(var(--k-sunken, 20 20 20));
-    border: 1px solid rgb(var(--k-hairline-strong, 117 117 117));
+    background-color: rgb(var(--k-sunken));
+    border: 1px solid rgb(var(--k-hairline-strong));
   }
 
   .tip {
@@ -141,9 +155,9 @@ html[data-mode='light'] {
     max-width: min(24rem, calc(100vw - 16px));
     white-space: pre-line;
     border-radius: 0.25rem;
-    border: 1px solid rgb(var(--k-hairline, 82 82 82));
-    background-color: rgb(var(--k-surface, 41 41 41));
-    color: rgb(var(--k-ink, 255 255 255));
+    border: 1px solid rgb(var(--k-hairline));
+    background-color: rgb(var(--k-surface));
+    color: rgb(var(--k-ink));
     padding: var(--space-2xs) var(--space-xs);
     font-size: var(--text-meta);
     line-height: var(--text-meta--line-height);
@@ -151,15 +165,15 @@ html[data-mode='light'] {
   }
 
   .tone-btn {
-    background-color: rgb(var(--tone, var(--k-accent-fg, 71 158 245)));
-    color: rgb(var(--tone-ink, 31 31 31));
+    background-color: rgb(var(--tone, var(--k-accent-fg)));
+    color: rgb(var(--tone-ink));
     transition: background-color 140ms ease;
   }
 
   .close-btn {
-    border: 1px solid rgb(var(--k-danger, 227 125 128) / 0.22);
-    background-color: rgb(var(--k-danger, 227 125 128) / 0.1);
-    color: rgb(var(--k-danger, 227 125 128) / 0.8);
+    border: 1px solid rgb(var(--k-danger) / 0.22);
+    background-color: rgb(var(--k-danger) / 0.1);
+    color: rgb(var(--k-danger) / 0.8);
     transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
   }
 }
@@ -202,7 +216,7 @@ html[data-mode='light'] {
 }
 .lift:hover {
   transform: translateY(-1px);
-  border-color: rgb(var(--k-hairline-strong, 117 117 117));
+  border-color: rgb(var(--k-hairline-strong));
   box-shadow: var(--shadow-4);
 }
 
@@ -211,36 +225,36 @@ html[data-mode='light'] {
     background-color 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
 }
 .hoverable:not(:disabled):hover {
-  background-color: rgb(var(--tone, var(--k-accent-fg, 71 158 245)) / 0.12);
-  border-color: rgb(var(--tone, var(--k-accent-fg, 71 158 245)) / 0.12);
-  color: rgb(var(--k-ink, 255 255 255));
+  background-color: rgb(var(--tone, var(--k-accent-fg)) / 0.12);
+  border-color: rgb(var(--tone, var(--k-accent-fg)) / 0.12);
+  color: rgb(var(--k-ink));
 }
 
 .row-hover:hover {
-  background-color: rgb(var(--tone, var(--k-accent-fg, 71 158 245)) / 0.13);
+  background-color: rgb(var(--tone, var(--k-accent-fg)) / 0.13);
 }
 :root[data-mode='light'] .row-hover:hover {
-  background-color: rgb(var(--tone, var(--k-accent-fg, 15 108 189)) / 0.07);
+  background-color: rgb(var(--tone, var(--k-accent-fg)) / 0.07);
 }
 
 .tone-btn:hover {
-  background-color: rgb(var(--tone, var(--k-accent-fg, 71 158 245)) / 0.88);
+  background-color: rgb(var(--tone, var(--k-accent-fg)) / 0.88);
 }
 .close-btn:hover {
-  border-color: rgb(var(--k-danger, 227 125 128) / 0.55);
-  background-color: rgb(var(--k-danger, 227 125 128) / 0.2);
-  color: rgb(var(--k-danger, 227 125 128));
+  border-color: rgb(var(--k-danger) / 0.55);
+  background-color: rgb(var(--k-danger) / 0.2);
+  color: rgb(var(--k-danger));
 }
 .menu .field:focus {
-  border-color: rgb(var(--tone, var(--k-accent-fg, 71 158 245)));
+  border-color: rgb(var(--tone, var(--k-accent-fg)));
 }
 
 .field:hover:not(:focus) {
   /* A 1px line at 90% of the tone is the brightest thing in the toolbar, and on the
      violet break control it reads as a lit edge rather than a hint. The wash carries the
      hover cue; the edge only has to answer the pointer, not shout it. */
-  border-color: rgb(var(--tone, var(--k-accent-fg, 71 158 245)) / 0.55);
-  background-image: linear-gradient(rgb(var(--tone, var(--k-accent-fg, 71 158 245)) / 0.12), rgb(var(--tone, var(--k-accent-fg, 71 158 245)) / 0.12));
+  border-color: rgb(var(--tone, var(--k-accent-fg)) / 0.55);
+  background-image: linear-gradient(rgb(var(--tone, var(--k-accent-fg)) / 0.12), rgb(var(--tone, var(--k-accent-fg)) / 0.12));
 }
 
 .cbox {
@@ -252,34 +266,34 @@ html[data-mode='light'] {
   height: 1.125rem;
   width: 1.125rem;
   cursor: pointer;
-  border: 1px solid rgb(var(--k-hairline-strong, 117 117 117));
+  border: 1px solid rgb(var(--k-hairline-strong));
   border-radius: 4px;
-  background-color: rgb(var(--k-sunken, 20 20 20));
+  background-color: rgb(var(--k-sunken));
   transition: border-color 140ms ease, background-color 140ms ease;
 }
 .cbox:hover {
-  border-color: rgb(var(--tone, var(--k-accent-fg, 71 158 245)) / 0.9);
+  border-color: rgb(var(--tone, var(--k-accent-fg)) / 0.9);
 }
 .cbox:checked {
-  border-color: rgb(var(--tone, var(--k-accent-fg, 71 158 245)));
-  background-color: rgb(var(--tone, var(--k-accent-fg, 71 158 245)));
+  border-color: rgb(var(--tone, var(--k-accent-fg)));
+  background-color: rgb(var(--tone, var(--k-accent-fg)));
 }
 .cbox:checked::after {
   content: '';
   width: 3px;
   height: 6px;
-  border: solid rgb(var(--tone-ink, 31 31 31));
+  border: solid rgb(var(--tone-ink));
   border-width: 0 2px 2px 0;
   transform: rotate(45deg) translate(-1px, -1px);
 }
 
 .cbox:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px rgb(var(--tone, var(--k-accent-fg, 71 158 245)) / 0.5);
+  box-shadow: 0 0 0 2px rgb(var(--tone, var(--k-accent-fg)) / 0.5);
 }
 
 .menu :focus-visible {
-  outline-color: rgb(var(--tone, var(--k-accent-fg, 71 158 245)));
+  outline-color: rgb(var(--tone, var(--k-accent-fg)));
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -351,7 +365,7 @@ html[data-mode='light'] {
   }
 
   html {
-    background: #fff !important;
+    background: rgb(var(--k-page)) !important;
     color-scheme: light;
   }
 
@@ -364,7 +378,7 @@ html[data-mode='light'] {
   .thead,
   .menu,
   .field {
-    background-color: #fff !important;
+    background-color: rgb(var(--k-surface)) !important;
     background-image: none !important;
     box-shadow: none !important;
     border-color: rgb(var(--k-hairline)) !important;

@@ -207,7 +207,6 @@ export default function RawCDRTable() {
           label="Extension, number or region"
           placeholder="Extension, number or region"
           className="w-full flex-none sm:w-64"
-          primary
         />
 
         <ExtensionFilter

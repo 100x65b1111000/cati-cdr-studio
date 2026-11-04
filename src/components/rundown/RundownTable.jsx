@@ -1,6 +1,7 @@
 import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useCdr } from '../../context/CdrContext';
 import { rangeDates } from '../../utils/dateRange';
+import { formatDurationCompact } from '../../utils/timeFormatter';
 import { loadFromStorage } from '../../utils/storage';
 import { mergeOrder } from '../../utils/columnOrder';
 import useDebouncedSave from '../../hooks/useDebouncedSave';
@@ -173,6 +174,31 @@ export default function RundownTable() {
     return out;
   }, [allRows, sortField, sortAsc, scope, grouped]);
 
+  const totals = useMemo(() => {
+    let calls = 0, connected = 0, talk = 0, breakSec = 0, net = 0, longest = 0, bestRate = 0;
+    rows.forEach((row) => {
+      calls += row.total_calls;
+      connected += row.connected_calls;
+      talk += row.total_talk_time_sec;
+      breakSec += row.total_break_sec;
+      net += row.net_active_sec;
+      bestRate = Math.max(bestRate, Number(row.calls_per_hour) || 0);
+      (row.breaks_list || []).forEach((b) => {
+        if (b.duration_seconds > longest) longest = b.duration_seconds;
+      });
+    });
+    return {
+      calls,
+      connected,
+      talk,
+      breakSec,
+      net,
+      longest,
+      bestRate: bestRate.toFixed(1),
+      rate: calls > 0 ? ((connected / calls) * 100).toFixed(1) : '0.0'
+    };
+  }, [rows]);
+
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
@@ -289,6 +315,32 @@ export default function RundownTable() {
       />
 
       <div className="panel report-panel overflow-hidden rounded-md">
+        {/* The shift's own figures, welded to the top of the sheet rather than carded
+            above it: the strip is read against the rows, so it travels with them and
+            shares the card's border. It is a `dl`, not a `div`, on purpose — the scroll
+            box below is the panel's first `div` child, and that is how both the sticky
+            head test and the report region find it. Every number is summed from `rows`,
+            the same filtered set the table renders, so the strip can never disagree with
+            the column it sits on top of; the longest break is a max, not a sum. */}
+        <dl className="flex flex-wrap items-baseline gap-x-6 gap-y-1 border-b border-k-hairline bg-k-sunken px-3.5 py-2.5 text-2xs leading-tight text-k-ink-muted">
+          <div className="flex items-baseline gap-1.5">
+            <dt>Net active</dt>
+            <dd className="num text-md font-semibold text-k-accent-fg">{formatDurationCompact(totals.net)}</dd>
+          </div>
+          {[
+            ['Calls', totals.calls],
+            ['Connected', `${totals.rate}%`],
+            ['Talk', formatDurationCompact(totals.talk)],
+            ['Break', formatDurationCompact(totals.breakSec)],
+            ['Best rate', `${totals.bestRate}/h`, 'sm:ml-auto'],
+            ['Longest break', formatDurationCompact(totals.longest)]
+          ].map(([label, value, cls]) => (
+            <div key={label} className={`flex items-baseline gap-1.5 ${cls || ''}`}>
+              <dt>{label}</dt>
+              <dd className="num font-semibold text-k-ink">{value}</dd>
+            </div>
+          ))}
+        </dl>
         <div aria-busy={isParsing || undefined} className="report-region overflow-auto">
           <table className="w-full text-left text-xs text-k-ink-muted">
             <thead className="sticky top-0 z-[25] border-b border-k-hairline thead text-meta font-bold">

@@ -1,8 +1,7 @@
 import React from 'react';
-import { ChevronDoubleLeftRegular as CaretDoubleLeft, ChevronDoubleRightRegular as CaretDoubleRight } from '@fluentui/react-icons';
 import { useCdr } from '../../context/CdrContext';
 import { NAV } from './navConfig';
-import DataActions from './DataActions';
+import BrandMark from '../ui/BrandMark';
 import { availableDates } from '../../utils/dateRange';
 
 // The dataset card is the reference app's "Active run" panel: a switcher, then the
@@ -22,11 +21,11 @@ function DatasetCard() {
   ];
 
   return (
-    // One step up from the panel's `sunken`, so it reads as a plate on the dark column
-    // rather than a hole in it: the panel is now the deepest layer the sidebar owns.
-    <div className="flex flex-col gap-3 rounded-md border border-k-hairline bg-k-page/60 p-3">
+    // One step down from the opened column's `surface`, so the switcher and its figures
+    // read as one plate laid on the flyout rather than a hole cut into it.
+    <div className="flex flex-col gap-3 rounded-md border border-k-hairline bg-k-sunken p-3">
       <div className="flex flex-col gap-1.5">
-        <span className="text-2xs font-medium uppercase tracking-wide text-k-ink-faint">Active dataset</span>
+        <span className="text-2xs font-medium text-k-ink-faint">Active dataset</span>
         {/* One native select does the whole job: the live upload is the selected
             option, the retained ones are what you can go back to. */}
         <select
@@ -57,95 +56,78 @@ function DatasetCard() {
   );
 }
 
+// The dock. 72px of icon, name and hotkey per view, welded to the app bar's geometry: the
+// same 8px off the left edge, the same `sunken` fill, the same air above it as below. It
+// opens to the right on hover or focus, and the column it opens into floats over the canvas
+// — nothing reflows to make room, so the table never shifts under the pointer. The dataset
+// switcher, its figures and the shift rules live in that opened column; the switcher that
+// answers keys all day stays on the strip where it is always visible. There is no collapsed
+// state to remember: 72px is the width, and opening is the interaction.
 export default function AppSidebar() {
-  const { activeTab, setActiveTab, shiftConfig, sidebarCollapsed, setSidebarCollapsed } = useCdr();
+  const { activeTab, setActiveTab, shiftConfig, activeUpload } = useCdr();
   const shift = `${shiftConfig.shiftStartTime} → ${shiftConfig.shiftEndTime}${
     shiftConfig.shiftEndDay > shiftConfig.shiftStartDay ? ' +1' : ''
   }`;
 
   return (
-    // The app bar's own geometry, repeated: 8px off the left edge and 8px of air at
-    // both ends of the vertical run (`under-bar` parks it clear of the bar). `app-bar`
-    // rather than `panel` so it is the same sunken layer as the bar instead of a card
-    // lifted out of the content. Collapsed it keeps the nav icons and nothing else;
-    // the content padding in App.jsx moves with it — and it already transitions, so the
-    // rail has to use the same ramp or the content glides while the panel snaps.
-    <aside
-      className={`app-bar no-print fixed bottom-2 left-2 under-bar z-40 hidden flex-col overflow-hidden rounded-lg transition-[width] duration-200 lg:flex ${
-        sidebarCollapsed ? 'w-16' : 'w-72'
-      }`}
-    >
-      {/* The scroll is on the inside, never on the aside itself: a panel that both
-          clips and paints is where a focus ring or an overflowed label disappears. */}
-      {/* The rail carries a smaller inset than the panel: at `p-4` its 30px column left
-          7px of dead air on each side of a 16px glyph, which reads as a gap rather than a
-          margin. `p-3` keeps the icon on the same centre line it had before. */}
-      <div className={`flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto ${sidebarCollapsed ? 'p-3' : 'p-4'}`}>
-        {/* Left-parked in the panel so the button stays under the cursor when the rail
-            widens to meet it; centred in the rail's 38px column, because at 36px wide the
-            two states want different offsets to land the glyph on the nav glyphs below it.
-            `grid` centering rather than padding around the icon, because an SVG is an
-            inline-level box and padding alone leaves it sitting on the text baseline. */}
-        <div className={`flex ${sidebarCollapsed ? 'justify-center' : ''}`}>
-          <button
-            type="button"
-            onClick={() => setSidebarCollapsed((v) => !v)}
-            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-pressed={sidebarCollapsed}
-            className="hoverable grid h-7 w-9 shrink-0 place-items-center rounded border border-k-hairline bg-k-surface/70 text-k-ink-faint hover:border-k-accent-fg hover:text-k-accent-fg"
-          >
-            {sidebarCollapsed ? <CaretDoubleRight style={{ fontSize: 16 }} /> : <CaretDoubleLeft style={{ fontSize: 16 }} />}
-          </button>
-        </div>
-        <nav aria-label="Views">
-          <ul className="flex flex-col gap-0.5">
-            {NAV.map((item) => {
-              const active = activeTab === item.id;
-              return (
-                <li key={item.id}>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab(item.id)}
-                    aria-current={active ? 'page' : undefined}
-                    aria-label={`${item.label} (${item.hotkey})`}
-                    className={`flex w-full items-center gap-2.5 rounded px-2.5 py-2 text-meta font-medium transition-colors ${
-                      sidebarCollapsed ? 'justify-center px-0' : ''
-                    } ${
-                      active ? 'bg-k-accent-fg/15 text-k-accent-fg' : 'hoverable text-k-ink-muted'
+    <aside className="app-bar no-print group fixed bottom-2 left-2 under-bar z-40 hidden w-[4.5rem] flex-col gap-1.5 rounded-xl px-2 pb-2 pt-2.5 lg:flex">
+      <span className="mx-auto grid h-10 w-10 shrink-0 place-items-center rounded-md border border-k-hairline bg-k-page/60">
+        <BrandMark size={22} />
+      </span>
+
+      {/* The scroll is on the nav, never on the aside: a panel that both clips and paints
+          is where a focus ring or an overflowed label disappears, and an `overflow-hidden`
+          aside would cut the opened column off at its own edge. A short window is the only
+          thing that reaches this, and then the rows scroll inside their own box. */}
+      <nav aria-label="Views" className="flex min-h-0 w-full flex-1 flex-col justify-center overflow-y-auto">
+        <ul className="flex flex-col gap-0.5">
+          {NAV.map((item) => {
+            const active = activeTab === item.id;
+            return (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab(item.id)}
+                  aria-current={active ? 'page' : undefined}
+                  aria-label={`${item.label} (${item.hotkey})`}
+                  className={`relative flex min-h-[3.25rem] w-full flex-col items-center justify-center gap-0.5 rounded-lg px-0.5 pb-1 pt-2.5 text-2xs font-medium transition-colors ${
+                    active ? 'bg-k-accent-fg/15 text-k-accent-fg' : 'hoverable text-k-ink-muted'
+                  }`}
+                >
+                  <item.Icon style={{ fontSize: 16 }} className="shrink-0" />
+                  <span className="w-full truncate leading-tight">{item.label}</span>
+                  {/* The hotkey rides the corner rather than the row's end: at 56px of
+                      column there is no trailing space left, and the digit belongs to the
+                      key it is drawn on anyway. */}
+                  <kbd
+                    className={`num absolute right-0.5 top-0.5 rounded border px-1 text-2xs leading-tight ${
+                      active ? 'border-k-accent-fg/40 text-k-accent-fg' : 'border-k-hairline text-k-ink-faint'
                     }`}
                   >
-                    <item.Icon style={{ fontSize: 16 }} className="shrink-0" />
-                    {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
-                    {!sidebarCollapsed && (
-                      <kbd
-                        className={`num ml-auto shrink-0 rounded border px-1.5 text-2xs ${
-                          active ? 'border-k-accent-fg/40 text-k-accent-fg' : 'border-k-hairline text-k-ink-muted'
-                        }`}
-                      >
-                        {item.hotkey}
-                      </kbd>
-                    )}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
+                    {item.hotkey}
+                  </kbd>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
 
-        {/* `mt-auto` lives here rather than on the card so the whole data cluster — load,
-            switch, read — travels to the foot together. Collapsed, only the actions
-            survive at rail width; the card's figures and the shift note do not. */}
-        <DataActions className="mt-auto grid-cols-1" compact={sidebarCollapsed} />
+      {/* Which file the strip is describing, at the foot, in the place the reference app
+          put its own status plate. The name is one hover away in the opened column. */}
+      <p className="num w-full truncate border-t border-k-hairline pt-1.5 text-center text-2xs leading-tight text-k-ink-faint">
+        {activeUpload?.source === 'demo' ? 'sample' : activeUpload ? 'loaded' : '—'}
+      </p>
 
-        {!sidebarCollapsed && (
-          <>
-            <DatasetCard />
+      {/* The opened column hugs what it has to say and is capped by the dock, so it reads
+          as a card laid over the canvas rather than a shaft of empty surface. The filename
+          is not repeated here: the switcher's selected option already is the filename. */}
+      <div className="pointer-events-none absolute left-[4.25rem] top-0 flex max-h-full w-60 flex-col gap-3 overflow-y-auto rounded-r-xl border border-l-0 border-k-hairline bg-k-surface p-3 opacity-0 shadow-[var(--shadow-16)] transition-opacity duration-[140ms] ease-linear group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
+        <DatasetCard />
 
-            <p className="text-2xs leading-relaxed text-k-ink-faint">
-              break {shiftConfig.breakThresholdMinutes} min · {shift}
-            </p>
-          </>
-        )}
+        <p className="text-2xs leading-relaxed text-k-ink-faint">
+          break {shiftConfig.breakThresholdMinutes} min · {shift}
+        </p>
       </div>
     </aside>
   );

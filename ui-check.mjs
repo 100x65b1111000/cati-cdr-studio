@@ -1237,10 +1237,11 @@ async function checkChrome() {
   const inline = await page.evaluate(() => document.documentElement.getAttribute('style'));
   // Located by the words on the control, not by a `title=` it no longer carries —
   // the native tooltip became a real one, and a selector that leaned on it would
-  // have silently started measuring the view-switcher buttons instead.
+  // have silently started measuring the view-switcher buttons instead. Basalt puts
+  // the data actions in the bar at every width, so they are measured there now.
   const buttons = {
-    upload: { sel: 'aside label' },
-    export: { sel: 'aside button', text: 'Export' }
+    upload: { sel: 'header.no-print label' },
+    export: { sel: 'header.no-print button', text: 'Export' }
   };
   await press('1');
   // Two metrics carry a hue of their own. Which nth-child a column is depends on how
@@ -1472,9 +1473,10 @@ async function checkToolbarFits() {
       thresh: { need: textWidth(thresh, '120') + 13, room: room(thresh) }
     };
   });
-  // Two rows is the design at 1440 now that the sidebar owns 288px of the column, so
-  // the ceiling is a third row; the slack figure is reported, not asserted, because a
-  // wrapped row has no single width to measure.
+  // One row is the design at 1440 now that the dock owns 72px rather than the old
+  // 288px sidebar, but the badges grow with the data, so the ceiling is two rows; the
+  // slack figure is reported, not asserted, because a wrapped row has no single width
+  // to measure.
   console.log(
     `fit rundown  rows=${m.rows} slack=${m.slack}px h=${m.h.min}..${m.h.max} search=${m.search.need}/${m.search.room} thresh=${m.thresh.need}/${m.thresh.room}`
   );
@@ -2151,10 +2153,10 @@ async function checkViewTitles() {
   if (!overlapped) failures.push('titles: no view heading ever slides behind the app bar, so the stacking check has nothing to test');
 }
 
-// The sidebar is a full 288px column: every view named in text, and the shared dataset
-// switcher at the bottom. These are the assertions that would rot silently — labels
-// present with no pointer, the panel not growing, no hover card, and the switcher actually
-// re-pointing the dataset every browser reads.
+// The sidebar is the dock: 72px of icon, name and hotkey per view, and the dataset
+// switcher with its facts one hover to the right. These are the assertions that would rot
+// silently — labels present with no pointer, the panel not growing, no hover card, and the
+// switcher actually re-pointing the dataset every browser reads.
 async function checkSidebar() {
   await press('1');
   const rows = await navRows();
@@ -2164,8 +2166,10 @@ async function checkSidebar() {
   }
   const panel = page.locator('aside');
   const idle = (await panel.boundingBox()).width;
-  if (idle < 200) {
-    failures.push(`sidebar: the panel is ${Math.round(idle)}px wide, the labels are collapsed away`);
+  // The floor is the dock's own width, not the old 288px column: what must not regress is
+  // that the names are on the strip, which the row text check below measures directly.
+  if (idle < 64) {
+    failures.push(`sidebar: the dock is ${Math.round(idle)}px wide, that is icons and nothing else`);
   }
   // The panel is the app bar's twin: the same left inset, the same sunken fill, and
   // the same air above it as below. The gap is asserted rather than just "no overlap"
@@ -2220,8 +2224,9 @@ async function checkSidebar() {
   }
   await shot(page, `${OUT}/sidebar-rundown.png`);
 
-  // Hover stays a no-op: the card that used to open beside the sidebar is gone, and a
-  // panel that resizes under the pointer means the labels collapsed again.
+  // Hover opens the dataset column over the canvas, so the strip itself must not move:
+  // the dock growing means the labels collapsed into it, and the table would jump under
+  // the pointer the moment someone reaches for a view.
   await page.locator('aside nav li button').first().hover();
   await page.waitForTimeout(450);
   if ((await panel.boundingBox()).width !== idle) {
@@ -2234,6 +2239,11 @@ async function checkSidebar() {
     failures.push('sidebar: no dataset switcher, a bad upload has no way back');
     return;
   }
+  // The switcher lives in the column the dock opens on hover, exactly where a person
+  // reaches it from, so the check opens the dock before acting on anything inside it.
+  await panel.hover();
+  await page.waitForTimeout(250);
+  await shot(page, `${OUT}/sidebar-flyout.png`);
   const options = await switcher.locator('option').evaluateAll((nodes) => nodes.map((o) => o.value));
   const live = await switcher.inputValue();
   const facts = await page.evaluate(() =>

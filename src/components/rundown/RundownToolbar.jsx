@@ -90,8 +90,7 @@ export default function RundownToolbar({
         onChange={setSearchQuery}
         label="Agent or extension"
         placeholder="Agent or extension"
-        className="w-full flex-none sm:w-44"
-        primary
+        className="w-full flex-none sm:w-48"
       />
 
       <ExtensionFilter

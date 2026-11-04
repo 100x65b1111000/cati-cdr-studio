@@ -24,8 +24,7 @@ function focusSearch() {
 }
 
 export default function App({ children }) {
-  const { activeTab, setActiveTab, slide, parseError, clearParseError, analysis, dateRange, sidebarCollapsed } =
-    useCdr();
+  const { activeTab, setActiveTab, slide, parseError, clearParseError, analysis, dateRange } = useCdr();
 
   const wantsSearchRef = useRef(false);
 
@@ -76,11 +75,7 @@ export default function App({ children }) {
       <MobileNav />
       <AppSidebar />
 
-      <div
-        className={`relative flex min-h-0 min-w-0 flex-1 flex-col transition-[padding] duration-200 ${
-          sidebarCollapsed ? 'lg:pl-[5.5rem]' : 'lg:pl-[19.5rem]'
-        }`}
-      >
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col lg:pl-[5.5rem]">
         <header className="hidden print:block print:pb-2">
           <h2 className="text-sm font-semibold text-k-ink">{view.label}</h2>
           <p className="num text-meta text-k-ink-muted">
@@ -98,7 +93,7 @@ export default function App({ children }) {
           tabIndex={-1}
           className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col space-y-4 p-4 pb-24 sm:space-y-6 sm:p-6 sm:pb-24 lg:pb-6"
         >
-          {/* The rail is 48px of icons and the floating bar stays on the brand, so this
+          {/* The dock is 72px of icons and the floating bar stays on the brand, so this
               is the only place a view says what it is. It borrows the tiles' icon plate
               and the header's title ink rather than inventing a third heading style. */}
           {/* z-[35]: above the z-30 table toolbars, or the calendar popover this row

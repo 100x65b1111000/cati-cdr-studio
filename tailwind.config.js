@@ -21,17 +21,18 @@ export default {
           ])
         )
       },
-      // Fluent's own stacks (webLightTheme.fontFamilyBase / fontFamilyMonospace). Native
-      // system faces, so nothing is shipped: Segoe UI on Windows, the platform sans
-      // elsewhere. The old Fira webfonts are gone with the Fira palette.
+      // Basalt's two faces: Space Grotesk for everything written, JetBrains Mono for
+      // everything counted. Both come from Google Fonts in app/layout.jsx, and the stacks
+      // behind them are the system faces the app used before, so a blocked font request
+      // costs a look, not a layout.
       fontFamily: {
-        sans: ["'Segoe UI'", "'Segoe UI Web (West European)'", '-apple-system', 'BlinkMacSystemFont', 'Roboto', "'Helvetica Neue'", 'sans-serif'],
-        mono: ['Consolas', "'Courier New'", 'Courier', 'monospace']
+        sans: ['"Space Grotesk"', "'Segoe UI'", 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        mono: ["'JetBrains Mono'", 'Consolas', 'ui-monospace', 'monospace']
       },
-      // Fluent's radius scale, not Tailwind's. 4px is Fluent's `borderRadiusMedium` and
-      // the default for every plate and control; 2px is for the small chips, 6-8 for
-      // popovers, and `full` only for dots, avatars and region pills. The old 3px default
-      // was a hand-tuned compromise for the Fira-era density.
+      // 4px is Basalt's --r and the default for every plate and control; 2px is for the
+      // small chips, 6-8 for popovers, 12 for the dock, and `full` only for dots, avatars
+      // and region pills. The old 3px default was a hand-tuned compromise for the
+      // Fira-era density.
       borderRadius: {
         none: '0',
         sm: '2px',

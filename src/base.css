@@ -1,14 +1,17 @@
-/* Hallmark · shape: app screen · genre: modern-minimal · theme: brand · redesign: full
- * paper: oklch(21% 0.005 240) · accent: oklch(62% 0.18 245) · display: Segoe UI · body: Segoe UI
- * nav: kept · signature: kept · states: loading, empty, error
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: brand (Basalt, by request) · redesign: full
+ * paper: oklch(14.5% .006 265) · accent: oklch(83% .13 215) · display: Space Grotesk · body: Space Grotesk
+ * nav: kept · signature: the dock that opens over the canvas · states: loading, empty, error · surface: absolute
  * axes: dark/grotesk-sans/cool · posture: restrained · contrast: pass · v2.0.0 */
-/* Hallmark · pre-emit critique: P4 H4 E4 S4 R4 V4 · weakest: E, tightened table headers and states */
+/* Hallmark · pre-emit critique: P5 H4 E5 S4 R4 V5 · weakest: H, the rundown table is frozen by brief */
+/* Hallmark · sweep: sloplint 0 FAIL · ui-check green · finish-review: subagent · 8 findings · 5 resolved, 1 partial, 2 unresolved (Analytics and Agents are still the before compositions) */
 /* Only what Tailwind preflight and index.css do not already cover: the box-sizing, margin
    zeroing, form-control font, img/svg display, [hidden] and tabular-nums here were all
-   duplicates, and the reduced-motion clamp fought index.css's in-app data-motion override. */
-html { scrollbar-color: var(--color-muted) var(--color-paper); scroll-padding-top: var(--space-3xl); }
-body { background: var(--color-paper); color: var(--color-ink); font-family: var(--font-body); font-size: var(--text-md); line-height: 1.55; -webkit-font-smoothing: antialiased; caret-color: var(--color-accent); }
-::selection { background: color-mix(in oklab, var(--color-accent) 22%, transparent); color: var(--color-ink); }
+   duplicates, and the reduced-motion clamp fought index.css's in-app data-motion override.
+   Every colour reads through a `--k-*` role, which layout.jsx puts on <html> for the
+   active mode before the first paint, so nothing here needs a fallback of its own. */
+html { scrollbar-color: rgb(var(--k-hairline-strong)) rgb(var(--k-page)); scroll-padding-top: var(--space-3xl); }
+body { background: rgb(var(--k-page)); color: rgb(var(--k-ink)); font-family: var(--font-body); font-size: var(--text-md); line-height: 1.55; -webkit-font-smoothing: antialiased; caret-color: rgb(var(--k-accent-fg)); }
+::selection { background: rgb(var(--k-accent) / 0.28); color: rgb(var(--k-ink)); }
 button:active, [role='button']:active { transform: translateY(1px); }
 a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 0.16em; }
 h1, h2, h3 { font-family: var(--font-display); font-weight: var(--display-weight, 700); font-synthesis: none; letter-spacing: var(--tracking-display); line-height: 1.05; overflow-wrap: break-word; min-width: 0; text-wrap: balance; }

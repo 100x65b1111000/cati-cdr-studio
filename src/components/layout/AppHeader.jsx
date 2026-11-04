@@ -3,14 +3,15 @@ import { flushSync } from 'react-dom';
 import { WeatherMoonRegular as Moon, WeatherSunnyRegular as Sun } from '@fluentui/react-icons';
 import { useCdr } from '../../context/CdrContext';
 import DataActions from './DataActions';
+import BrandMark from '../ui/BrandMark';
 import Segmented from '../ui/Segmented';
 import { COLOR_MODES } from '../../theme/colorSchemes';
 import { availableDates, rangeLabel } from '../../utils/dateRange';
 import { reducedMotion } from '../../utils/motion';
 
-// The dial and the two hues it can wear, so the switch reads as the thing it changes.
-// The word still has to be spoken to a screen reader, so it rides along hidden rather
-// than becoming a `title=`, which a keyboard or a tap never sees.
+// The two hues the switch can wear, so it reads as the thing it changes. The word still
+// has to be spoken to a screen reader, so it rides along hidden rather than becoming a
+// `title=`, which a keyboard or a tap never sees.
 const MODE_ICONS = { dark: Moon, light: Sun };
 const MODES = Object.entries(COLOR_MODES).map(([id, mode]) => {
   const Icon = MODE_ICONS[id];
@@ -21,11 +22,11 @@ const MODES = Object.entries(COLOR_MODES).map(([id, mode]) => {
 // the page by its own shadow. It reads as a different layer from the cards because
 // .app-bar fills with `sunken`, not the `surface` the content uses, so it stays
 // distinguishable without needing distance. Identity on the left; what is loaded, and
-// which palette paints it, on the right. Below lg there is no rail, so loading a file
-// comes back to the bar — the views went to the bottom bar instead — and the bar scrolls
-// away with the page rather than pinning a second row of chrome over a phone screen. The
-// mode switch stays in the bar at every width: it is chrome, not a setting you should
-// have to visit a page for.
+// which palette paints it, on the right. Loading a file stays in the bar at every
+// width — below lg the dock is gone, so the bar is the only place left that never asks
+// for a hover over 72px of icons. The views went to the bottom bar instead, because a
+// phone cannot carry a second row of nav up top. The mode switch stays here too: it is
+// chrome, not a setting you should have to visit a page for.
 export default function AppHeader() {
   const { rawCalls, analysis, dateRange, colorScheme, setColorScheme } = useCdr();
   const dates = availableDates(analysis);
@@ -44,19 +45,22 @@ export default function AppHeader() {
   return (
     <header className="app-bar no-print z-40 mx-2 mt-2 flex flex-wrap items-center justify-between gap-3 rounded-lg px-4 py-3 sm:gap-4 sm:px-6 sm:py-4 lg:sticky lg:top-2">
       <div className="flex min-w-0 items-center gap-3">
-        {/* The shift dial, same geometry as public/favicon.svg, drawn through the
-            theme roles so it re-colours with the scheme instead of being a picture. */}
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-k-surface ring-1 ring-inset ring-k-hairline">
-          <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
-            <path d="M16 6.4A9.6 9.6 0 1 1 6.4 16" fill="none" strokeWidth="3.5" strokeLinecap="round" style={{ stroke: 'rgb(var(--k-accent-fg))' }} />
-            <path d="M6.4 16A9.6 9.6 0 0 1 16 6.4" fill="none" strokeWidth="3.5" strokeLinecap="round" style={{ stroke: 'rgb(var(--k-throughput))' }} />
-            <circle cx="16" cy="16" r="2.6" style={{ fill: 'rgb(var(--k-talk))' }} />
-          </svg>
+        {/* The headset, same geometry as public/favicon.svg, drawn through the theme
+            roles so it re-colours with the scheme instead of being a picture. */}
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-k-page/60 ring-1 ring-inset ring-k-hairline">
+          <BrandMark size={26} />
         </div>
         <div className="min-w-0">
           <h1 className="truncate text-base font-bold leading-tight tracking-tight text-k-ink sm:text-lg">
             CATI CDR Studio
           </h1>
+          {/* The tagline is what the bar says about itself; the range is what the bar
+              says about the data. A phone has room for one second line and it is the
+              one that changes — below sm the table's own heading counts the dates
+              ("1 of 1"), it does not name them. */}
+          <p className="num truncate text-xs leading-tight text-k-ink-muted sm:hidden">
+            {rawCalls.length} calls · {rangeLabel(dateRange, dates)}
+          </p>
           <p className="hidden truncate text-xs leading-tight text-k-ink-muted sm:block">CDR Team Rundown &amp; Shift Intelligence</p>
         </div>
       </div>
@@ -71,10 +75,12 @@ export default function AppHeader() {
         <p className="hidden shrink-0 items-center gap-2 text-xs leading-tight text-k-ink-muted sm:flex">
           <span className="num">{rawCalls.length} calls · {rangeLabel(dateRange, dates)}</span>
         </p>
+        {/* The data actions live here at every width, as they do in the mockup's header:
+            loading a file is the one thing the app is for, and it should not wait on a
+            hover over a 72px dock. */}
+        <DataActions className="grid-flow-col auto-cols-max gap-2" />
         <Segmented label="Colour mode" options={MODES} value={colorScheme} onChange={switchMode} />
       </div>
-
-      <DataActions className="order-last w-full grid-cols-2 lg:hidden" />
     </header>
   );
 }

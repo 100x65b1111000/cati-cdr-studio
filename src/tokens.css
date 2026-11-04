@@ -1,7 +1,9 @@
 @theme static {
   /* Only the scale the app actually reads. text-2xl/3xl, display-s and lead had no call
-     site, the oklch colour roles are all reached through the k-* Fluent roles instead,
-     and radius/shadow/outlier never resolved to a utility. */
+     site, and radius/shadow/outlier never resolved to a utility. The colour tokens that
+     used to sit here (--color-paper, -ink, -muted, -accent, -focus) each had exactly one
+     consumer and were mode-blind: a static dark body colour under a light mode. Every
+     colour now resolves through the `--k-*` roles, which the active mode rewrites. */
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-md: 1rem;
@@ -11,15 +13,12 @@
   --text-section: 1.2rem;
   --text-title: 1rem;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --color-paper: oklch(21% 0.005 240);
-  --color-ink: oklch(98% 0.005 240);
-  --color-muted: oklch(65% 0.01 240);
-  --color-accent: oklch(62% 0.18 245);
-  --color-accent-ink: oklch(15% 0.02 245);
-  --color-focus: oklch(68% 0.19 245);
-  --font-display: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  --font-body: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  --font-numeric: Bahnschrift, 'Segoe UI', -apple-system, sans-serif;
+  /* Space Grotesk for everything written, JetBrains Mono for everything counted. Loaded
+     from Google Fonts in app/layout.jsx with a system stack behind each, so an offline
+     build still renders — the fallback is Segoe UI, not a generic sans. */
+  --font-display: 'Space Grotesk', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-body: 'Space Grotesk', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-numeric: 'JetBrains Mono', Consolas, ui-monospace, monospace;
   --tracking-display: -0.02em;
 }
 /* The three the stylesheets still read. z-index, duration, gutter and section-gap

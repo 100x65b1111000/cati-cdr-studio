@@ -58,6 +58,15 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className="h-full overflow-x-clip" data-mode="dark" suppressHydrationWarning>
       <head>
+        {/* A plain <link>, not next/font: next/font/google fetches at build time and
+            fails the build when the network does not answer, while this one fails at
+            runtime into the system stack tailwind.config.js already carries. */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+          rel="stylesheet"
+        />
         <style dangerouslySetInnerHTML={{ __html: TOKEN_SHEET }} />
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
