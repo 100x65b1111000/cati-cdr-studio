@@ -1,5 +1,5 @@
 import React from 'react';
-import { DismissRegular as X, SearchRegular as MagnifyingGlass } from '@fluentui/react-icons';
+import { GlyphX as X, GlyphSearch as MagnifyingGlass } from './Glyph';
 
 export default function SearchInput({ value, onChange, label, placeholder = 'Search', className = '', id }) {
   const inputId = id || `search-${label || placeholder}`.replace(/\W+/g, '-');

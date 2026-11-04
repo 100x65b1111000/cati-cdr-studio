@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowUploadRegular as UploadSimple, CodeRegular as BracketsCurly, DocumentCsvRegular as FileCsv, DocumentExcelRegular as FileXls, PrintRegular as Printer } from '@fluentui/react-icons';
+import { GlyphUpload as UploadSimple, GlyphCode as BracketsCurly, GlyphFileCsv as FileCsv, GlyphFileXls as FileXls, GlyphPrinter as Printer } from '../ui/Glyph';
 import { useCdr } from '../../context/CdrContext';
 import { rangeDates } from '../../utils/dateRange';
 import { defaultVisibleColumns } from '../rundown/columns';
@@ -46,13 +46,14 @@ export default function DataActions({ className = 'grid-cols-1' }) {
   }
 
   // One list, one rendering: the popover's rows, in the bar and in the dock alike.
-  // `label` doubles as the toast name in run(). The hue class paints the icon; the
-  // `--tone` triplet is the same hue for `.hoverable`'s wash.
+  // `label` is the whole row — the icon carries the format, a sentence under it is the
+  // same fact twice and wraps a narrow panel to three lines. It doubles as the toast
+  // name in run(), the hue class paints the icon.
   const EXPORTS = [
-    ['Excel', FileXls, 'text-k-success', 'var(--k-success)', 'Excel, every agent-day', (scoped) =>
+    ['Excel', FileXls, 'text-k-success', (scoped) =>
       exportRundownToExcel(Object.values(scoped).flatMap(Object.values), defaultVisibleColumns(), 'total')],
-    ['CSV', FileCsv, 'text-k-talk', 'var(--k-talk)', 'CSV, every agent-day', (scoped) => exportRundownToCSV(scoped, extNameMap)],
-    ['JSON', BracketsCurly, 'text-k-throughput', 'var(--k-throughput)', 'JSON, full calculation', (scoped) => exportAnalysisToJSON(scoped)]
+    ['CSV', FileCsv, 'text-k-talk', (scoped) => exportRundownToCSV(scoped, extNameMap)],
+    ['JSON', BracketsCurly, 'text-k-throughput', (scoped) => exportAnalysisToJSON(scoped)]
   ];
 
   return (
@@ -76,10 +77,10 @@ export default function DataActions({ className = 'grid-cols-1' }) {
       <div className="hidden sm:contents">
         <FilterPopover label="Export" icon={FileXls} tone="success" width="w-full">
           <div className="p-1">
-            {EXPORTS.map(([label, Icon, hue, , text, work]) => (
+            {EXPORTS.map(([label, Icon, hue, work]) => (
               <button key={label} type="button" className={menuItem} onClick={() => run(label, work)}>
                 <Icon style={{ fontSize: 15 }} className={hue} />
-                {text}
+                {label}
               </button>
             ))}
           </div>

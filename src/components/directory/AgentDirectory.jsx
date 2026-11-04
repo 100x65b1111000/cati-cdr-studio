@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronDownRegular as CaretDown, ChevronUpRegular as CaretUp, DeleteRegular as Trash, EyeRegular as Eye } from '@fluentui/react-icons';
+import { GlyphCaretDown as CaretDown, GlyphCaretUp as CaretUp, GlyphTrash as Trash, GlyphEye as Eye } from '../ui/Glyph';
 import { useCdr } from '../../context/CdrContext';
 import AddAgentModal from './AddAgentModal';
 import EmptyState from '../ui/EmptyState';

@@ -1,5 +1,5 @@
 import React from 'react';
-import { DismissRegular as X, ErrorCircleRegular as WarningCircle } from '@fluentui/react-icons';
+import { GlyphX as X, GlyphWarningCircle as WarningCircle } from './Glyph';
 
 export default function ErrorBanner({ message, onDismiss }) {
   if (!message) return null;

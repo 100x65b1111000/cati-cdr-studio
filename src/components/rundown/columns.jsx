@@ -1,5 +1,5 @@
 import React from 'react';
-import { EyeRegular as Eye } from '@fluentui/react-icons';
+import { GlyphEye as Eye } from '../ui/Glyph';
 import EditCell from './EditCell';
 import Chip from '../ui/Chip';
 import Tip from '../ui/Tip';

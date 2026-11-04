@@ -1,5 +1,5 @@
 import React from 'react';
-import { CalendarRegular as Calendar } from '@fluentui/react-icons';
+import { GlyphCalendar as Calendar } from './Glyph';
 import FilterPopover from './FilterPopover';
 
 // A range that covers several shifts is ambiguous the moment a view aggregates it,

@@ -1,6 +1,6 @@
 import React from 'react';
 import { flushSync } from 'react-dom';
-import { WeatherMoonRegular as Moon, WeatherSunnyRegular as Sun } from '@fluentui/react-icons';
+import { GlyphMoon as Moon, GlyphSun as Sun } from '../ui/Glyph';
 import { useCdr } from '../../context/CdrContext';
 import DataActions from './DataActions';
 import BrandMark from '../ui/BrandMark';

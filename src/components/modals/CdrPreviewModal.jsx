@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { DocumentCsvRegular as FileCsv, PlayFilled as Play } from '@fluentui/react-icons';
+import { GlyphFileCsv as FileCsv, GlyphPlay as Play } from '../ui/Glyph';
 import { useCdr } from '../../context/CdrContext';
 import Modal from '../ui/Modal';
 

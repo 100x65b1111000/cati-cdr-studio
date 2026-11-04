@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronDoubleLeftRegular as CaretDoubleLeft, ChevronDoubleRightRegular as CaretDoubleRight, ChevronLeftRegular as CaretLeft, ChevronRightRegular as CaretRight } from '@fluentui/react-icons';
+import { GlyphCaretDoubleLeft as CaretDoubleLeft, GlyphCaretDoubleRight as CaretDoubleRight, GlyphCaretLeft as CaretLeft, GlyphCaretRight as CaretRight } from '../ui/Glyph';
 
 const btn =
   'hoverable rounded border border-k-hairline px-2 py-1 text-k-ink-muted active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-40';

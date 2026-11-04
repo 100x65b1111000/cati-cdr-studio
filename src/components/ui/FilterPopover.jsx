@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { ChevronDownRegular as CaretDown } from '@fluentui/react-icons';
+import { GlyphCaretDown as CaretDown } from './Glyph';
 import useDismissOverlay from '../../hooks/useDismissOverlay';
 
 // Each popover owns a hue so the toolbar reads as distinct controls instead of
@@ -20,7 +20,7 @@ const TONE = {
 // Columns list and the Export items all want the same plate, so it lives beside the
 // wrapper that owns the tone rather than being retyped per call site.
 export const menuItem =
-  'hoverable flex w-full cursor-pointer items-center gap-2 rounded border border-transparent px-2.5 py-1.5 text-left text-xs text-k-ink';
+  'menu-item hoverable flex w-full cursor-pointer items-center gap-2 rounded border border-transparent px-2.5 py-1.5 text-left text-xs text-k-ink';
 
 // `width="w-full"` is also how a caller says the trigger fills its cell — the sidebar's
 // stacked action cluster, where every other control does and a popover that hangs past

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { DismissRegular as X } from '@fluentui/react-icons';
+import { GlyphX as X } from './Glyph';
 import useDismissOverlay from '../../hooks/useDismissOverlay';
 
 const FOCUSABLE =

@@ -1,8 +1,5 @@
 import React, { useState } from 'react';
-import {
-  ColumnTripleRegular as Columns,
-  ReOrderDotsHorizontalRegular as Grip
-} from '@fluentui/react-icons';
+import { GlyphColumns as Columns, GlyphGrip as Grip } from './Glyph';
 import useDragReorder from '../../hooks/useDragReorder';
 import FilterPopover from './FilterPopover';
 import { Checkbox } from './ExtensionFilter';

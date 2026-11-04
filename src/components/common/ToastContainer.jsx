@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckmarkCircleRegular as CheckCircle, DismissCircleRegular as XCircle, InfoRegular as Info } from '@fluentui/react-icons';
+import { GlyphCheckCircle as CheckCircle, GlyphXCircle as XCircle, GlyphInfo as Info } from '../ui/Glyph';
 import { useCdr } from '../../context/CdrContext';
 
 const BY_TYPE = {

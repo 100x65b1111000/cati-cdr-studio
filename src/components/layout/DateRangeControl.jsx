@@ -1,5 +1,5 @@
 import React from 'react';
-import { CalendarRegular as Calendar } from '@fluentui/react-icons';
+import { GlyphCalendar as Calendar } from '../ui/Glyph';
 import { useCdr } from '../../context/CdrContext';
 import Segmented from '../ui/Segmented';
 import FilterPopover from '../ui/FilterPopover';

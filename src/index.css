@@ -3,7 +3,7 @@
  * nav: kept · signature: the dock that opens over the canvas · states: loading, empty, error · surface: absolute
  * axes: dark/grotesk-sans/cool · posture: restrained · contrast: pass · v2.0.0 */
 /* Hallmark · pre-emit critique: P5 H4 E5 S4 R4 V5 · weakest: H, the rundown table is frozen by brief */
-/* Hallmark · sweep: sloplint 0 FAIL · ui-check green (menu wash 0.06 in every tone) · check-metrics green
+/* Hallmark · sweep: sloplint 0 FAIL · ui-check green (menu plate 0.05, chrome 0.05, option rows sit on the plate and tint to 0.12 on hover) · check-metrics green
  * finish-review: subagent · 8 findings · 7 resolved, 1 partial · Analytics and Agents are their own compositions now
  * the four analytics plots draw at animation duration 0: chart.js cancels the entry ramp on its own first re-measure */
 /* Hallmark · waive 7b · surface: absolute · the print canvas is white and both modes are absolute neutrals */
@@ -137,6 +137,13 @@ html[data-mode='light'] {
 
   .menu {
     background-color: rgb(var(--k-surface));
+    /* The plate carries its trigger's hue too, so the panel is one tinted space rather
+       than a grey box with coloured rows dropped in it. Over the surface colour, at the
+       same 0.05 the rows sit at: a row then composites to ~0.10, the trigger's own wash. */
+    background-image: linear-gradient(
+      rgb(var(--tone, var(--k-accent-fg)) / 0.05),
+      rgb(var(--tone, var(--k-accent-fg)) / 0.05)
+    );
     border: 1px solid rgb(var(--tone, var(--k-accent-fg)) / 0.45);
     box-shadow: var(--shadow-16);
   }
@@ -251,22 +258,53 @@ html[data-mode='light'] {
   border-color: rgb(var(--tone, var(--k-accent-fg)));
 }
 
-/* The trigger wears the tone while its menu is open; the rows inside sit on the same hue a
-   step lower, so the panel reads as that control's own space rather than a grey box dropped
-   under it. 0.06 against the trigger's 0.10: enough to colour the plate, not enough to make
-   a ten-row Columns list look like a stack of buttons. The hover rule is three classes
-   strong, so it still wins over this one. */
+/* Everything in a panel that is not a row of options — the All/None pair, the drag
+   grips — wears the trigger's hue at rest, so the panel reads as one tinted space. */
 .menu .hoverable {
-  background-color: rgb(var(--tone, var(--k-accent-fg)) / 0.06);
+  background-color: rgb(var(--tone, var(--k-accent-fg)) / 0.05);
+}
+
+/* The options themselves stay the colour of the plate and only light up under the
+   pointer. Two rules at the same specificity, so this one has to come after; a
+   `:not(.menu-item)` guard would be a class stronger and would beat the hover rule
+   on source order, killing the tint this is meant to leave in. */
+.menu .menu-item {
+  background-color: transparent;
 }
 
 .field:hover:not(:focus) {
-  /* A 1px line at 90% of the tone is the brightest thing in the toolbar, and on the
-     violet break control it reads as a lit edge rather than a hint. The wash carries the
-     hover cue; the edge only has to answer the pointer, not shout it. At a third of the
-     tone it is barely a nudge, which is what the plain buttons beside it do. */
+  /* A 1px line at 90% of the tone is the brightest thing in the toolbar, and on a violet
+     control it reads as a lit edge rather than a hint. The wash carries the hover cue; the
+     edge only has to answer the pointer, not shout it. At a third of the tone it is
+     barely a nudge, which is what the plain buttons beside it do. */
   border-color: rgb(var(--tone, var(--k-accent-fg)) / 0.35);
   background-image: linear-gradient(rgb(var(--tone, var(--k-accent-fg)) / 0.12), rgb(var(--tone, var(--k-accent-fg)) / 0.12));
+}
+
+/* A search box inside a panel is the panel's own furniture, so it wears the panel's hue:
+   a step stronger than the plate it sits on, and an edge that is a hint rather than the
+   loudest line in the box. Focus still goes to full tone, one level up. */
+.menu .field {
+  background-image: linear-gradient(
+    rgb(var(--tone, var(--k-accent-fg)) / 0.08),
+    rgb(var(--tone, var(--k-accent-fg)) / 0.08)
+  );
+  border-color: rgb(var(--tone, var(--k-accent-fg)) / 0.25);
+}
+
+/* The typeable part of a grouped control — the number inside the break setter. Its rest
+   edge is the same token as the pill's, so the two read as one control until the pointer
+   or the caret arrives, then the hue answers "where do I type" instead of being a second
+   outline that is always lit. No transition: the focus paint has to be there the instant
+   the caret is, and a ramp on a 1px edge is invisible anyway. */
+.well {
+  border: 1px solid rgb(var(--k-hairline));
+}
+.well:hover {
+  border-color: rgb(var(--tone, var(--k-accent-fg)) / 0.45);
+}
+.well:focus {
+  border-color: rgb(var(--tone, var(--k-accent-fg)) / 0.7);
 }
 
 .cbox {

@@ -580,28 +580,34 @@ async function checkTone() {
         field.blur();
       }
       const btn = el.querySelector('.tone-btn');
-      // Read before anything is hovered: the resting wash is the panel's own claim that
-      // its rows sit in the trigger's hue.
-      const row = el.querySelector('label.hoverable, button.hoverable');
+      // Read before anything is hovered: the panel's chrome (All/None, the drag grips)
+      // wears the trigger's hue at rest, while the option rows let the plate show through.
+      const chrome = el.querySelector('.hoverable:not(.menu-item)');
+      const row = el.querySelector('.menu-item');
       return {
         tone,
         border: getComputedStyle(el).borderTopColor,
+        plate: getComputedStyle(el).backgroundImage,
         fill: on ? getComputedStyle(on).backgroundColor : null,
         hasBox: !!on,
         btn: btn ? getComputedStyle(btn).backgroundColor : null,
         fieldBorder,
-        wash: row ? getComputedStyle(row).backgroundColor : null
+        wash: chrome ? getComputedStyle(chrome).backgroundColor : null,
+        rowBg: row ? getComputedStyle(row).backgroundColor : null,
+        rows: el.querySelectorAll('.menu-item').length
       };
     });
     // The hover step, in the tone too: a border that repaints to some other hue is
     // the half-finished version of the same bug. A panel that has saved nothing yet
-    // has no hoverable rows, so absence is skipped rather than hunted.
-    const item = menu.locator('.hoverable').first();
+    // has no option rows, so absence is skipped rather than hunted.
+    const item = menu.locator('.menu-item').first();
     let hoverBorder = null;
+    let hoverRow = null;
     if (await item.count()) {
       await item.hover();
       await page.waitForTimeout(200);
       hoverBorder = chan(await item.evaluate((el) => getComputedStyle(el).borderTopColor));
+      hoverRow = await item.evaluate((el) => getComputedStyle(el).backgroundColor);
     }
     await press('Escape', 150);
     return {
@@ -616,7 +622,13 @@ async function checkTone() {
       wash: r.wash ? chan(r.wash) : null,
       // The fourth number in `rgba(r, g, b, a)` is the strength of the wash, and the
       // brief was "the trigger's clicked tint, a step lower".
-      washA: r.wash ? Number((r.wash.match(/[\d.]+/g) || [])[3]) : null
+      washA: r.wash ? Number((r.wash.match(/[\d.]+/g) || [])[3]) : null,
+      rowBg: r.rowBg,
+      rows: r.rows,
+      plate: (r.plate.match(/[\d.]+/g) || []).length >= 4 ? chan(r.plate) : null,
+      plateA: (r.plate.match(/[\d.]+/g) || []).length >= 4 ? Number(r.plate.match(/[\d.]+/g)[3]) : null,
+      hoverRow: hoverRow && !/rgba\(0, 0, 0, 0\)|transparent/.test(hoverRow) ? chan(hoverRow) : null,
+      hoverRowA: hoverRow ? Number((hoverRow.match(/[\d.]+/g) || [])[3]) || 0 : null
     };
   }
 
@@ -625,14 +637,16 @@ async function checkTone() {
   const views = await probe('Views');
   if (!agents || !columns || !views) return;
 
+  const trio = (p) =>
+    `chrome=${key(p.wash)}@${p.washA} rowRest=${key(chan(p.rowBg))} rowHover=${key(p.hoverRow)}@${p.hoverRowA} plate=${key(p.plate)}@${p.plateA}`;
   console.log(
-    `tone agents  icon=${key(agents.icon)} menu=${key(agents.tone)} border=${key(agents.border)} box=${key(agents.fill)} hover=${key(agents.hoverBorder)} wash=${key(agents.wash)}@${agents.washA}`
+    `tone agents  icon=${key(agents.icon)} menu=${key(agents.tone)} border=${key(agents.border)} box=${key(agents.fill)} hover=${key(agents.hoverBorder)} ${trio(agents)}`
   );
   console.log(
-    `tone columns  icon=${key(columns.icon)} menu=${key(columns.tone)} border=${key(columns.border)} box=${key(columns.fill)} hover=${key(columns.hoverBorder)} wash=${key(columns.wash)}@${columns.washA}`
+    `tone columns  icon=${key(columns.icon)} menu=${key(columns.tone)} border=${key(columns.border)} box=${key(columns.fill)} hover=${key(columns.hoverBorder)} ${trio(columns)}`
   );
   console.log(
-    `tone views  icon=${key(views.icon)} menu=${key(views.tone)} border=${key(views.border)} btn=${key(views.btn)} field=${key(views.fieldBorder)}`
+    `tone views  icon=${key(views.icon)} menu=${key(views.tone)} border=${key(views.border)} btn=${key(views.btn)} field=${key(views.fieldBorder)} ${trio(views)}`
   );
 
   if (key(agents.tone) === key(columns.tone)) {
@@ -651,12 +665,24 @@ async function checkTone() {
     // Controls the panel owns, painted by the call site rather than the stylesheet.
     if (p.btn && !near(p.icon, p.btn, 1)) failures.push(`tone [${name}]: the panel's primary button is ${key(p.btn)}, not the trigger's ${key(p.icon)}`);
     if (p.fieldBorder && !near(p.icon, p.fieldBorder, 1)) failures.push(`tone [${name}]: a focused field in the panel edges to ${key(p.fieldBorder)}, not the trigger's ${key(p.icon)}`);
-    // The panel's own rows sit on the trigger's hue, a step under the /0.10 the clicked
-    // trigger wears. A wash at or over the trigger's strength turns the panel into a
-    // stack of buttons; a missing one leaves it the grey box the brief complained about.
+    // The panel chrome — All/None, the drag grips, the per-row icons — wears the trigger's
+    // hue at rest, a step under the /0.10 the clicked trigger wears.
     if (p.wash) {
-      if (!near(p.icon, p.wash, 1)) failures.push(`tone [${name}]: the menu rows sit on ${key(p.wash)}, not the trigger's ${key(p.icon)}`);
-      if (!(p.washA > 0 && p.washA < 0.1)) failures.push(`tone [${name}]: the menu rows wash at ${p.washA}, which is not below the trigger's 0.1`);
+      if (!near(p.icon, p.wash, 1)) failures.push(`tone [${name}]: the panel chrome sits on ${key(p.wash)}, not the trigger's ${key(p.icon)}`);
+      if (!(p.washA > 0 && p.washA < 0.1)) failures.push(`tone [${name}]: the panel chrome washes at ${p.washA}, which is not below the trigger's 0.1`);
+    }
+    // The option rows are the plate's own colour until the pointer arrives: a resting strip
+    // under every name is the stack-of-buttons look the brief is meant to have left.
+    if (p.rows) {
+      if (!/rgba\(0, 0, 0, 0\)|transparent/.test(p.rowBg || '')) failures.push(`tone [${name}]: a menu row rests on ${p.rowBg}, so it is a strip, not the plate`);
+      if (!p.hoverRow || !near(p.icon, p.hoverRow, 1)) failures.push(`tone [${name}]: hovering a menu row paints ${key(p.hoverRow)}, not the trigger's ${key(p.icon)}`);
+      if (!(p.hoverRowA > 0.1)) failures.push(`tone [${name}]: a hovered menu row tints at ${p.hoverRowA}, too faint to find under the pointer`);
+    }
+    // The plate itself, not just its rows: a grey panel with tinted rows in it is the
+    // half-finished version of the same idea.
+    if (p.plate) {
+      if (!near(p.icon, p.plate, 1)) failures.push(`tone [${name}]: the plate is washed ${key(p.plate)}, not the trigger's ${key(p.icon)}`);
+      if (!(p.plateA > 0 && p.plateA < 0.1)) failures.push(`tone [${name}]: the plate washes at ${p.plateA}, which is not below the trigger's 0.1`);
     }
   }
   if (!views.btn) failures.push('tone [views]: the Save button lost its .tone-btn class, it is accent again');
@@ -674,15 +700,17 @@ async function checkThreshold() {
   const pill = field.locator('xpath=ancestor::div[1]');
   const rest = await field.evaluate((el) => {
     const cs = getComputedStyle(el);
-    const p = el.closest('.field');
+    // The pill is dressed as a button now, so it is found by its place in the tree:
+    // the input's wrapper is a span and the nearest div above it is the pill.
+    const p = el.closest('div');
     const pcs = getComputedStyle(p);
     return {
       value: el.value,
       align: cs.textAlign,
       wellBg: cs.backgroundColor,
+      wellBorder: cs.borderTopWidth,
       wellEdge: cs.borderTopColor,
       pillBg: pcs.backgroundColor,
-      wash: pcs.backgroundImage,
       border: parseFloat(pcs.borderTopWidth),
       color: pcs.borderTopColor,
       shadow: pcs.boxShadow,
@@ -693,9 +721,12 @@ async function checkThreshold() {
   if (rest.border < 1) failures.push('threshold: the pill has no edge, it is a bare box in the toolbar');
   if (/rgba\(0, 0, 0, 0\)|transparent/.test(rest.color)) failures.push('threshold: the pill border is transparent');
   if (rest.align !== 'center') failures.push(`threshold: the value is "${rest.align}"-aligned in a fixed box`);
-  // The number has to read as the typeable part of the control, so it separates from
-  // the pill by fill rather than by a second outline.
+  // The number has to read as the typeable part of the control: an edge of its own that
+  // stays neutral until the pointer or the caret arrives. A permanently violet well is
+  // the second lit outline in one pill that started this; no well edge at all is text
+  // painted straight onto the pill.
   if (rest.wellBg === rest.pillBg) failures.push('threshold: the number shares the pill fill, so the editable box is invisible');
+  if (parseFloat(rest.wellBorder) < 1) failures.push('threshold: the number has no edge of its own, so it is not a box');
 
   // Every other field in this toolbar lights up under the pointer. This one used to
   // sit dead, because its outline was a `ring-*` utility outside the hover contract.
@@ -703,25 +734,31 @@ async function checkThreshold() {
   const crop = clip(pillBox, 12);
   await shot(page, `${OUT}/threshold-idle.png`, { clip: crop });
   await page.mouse.move(pillBox.x + 6, pillBox.y + pillBox.height / 2);
-  await page.waitForTimeout(80);
+  await page.waitForTimeout(220);
   const hov = await pill.evaluate((el) => {
     const cs = getComputedStyle(el);
-    return { color: cs.borderTopColor, shadow: cs.boxShadow, wash: cs.backgroundImage };
+    return { color: cs.borderTopColor, shadow: cs.boxShadow, fill: cs.backgroundColor };
   });
   await shot(page, `${OUT}/threshold-hover.png`, { clip: crop });
   console.log(`hover threshold  ${rest.color} ${rest.shadow} -> ${hov.color} ${hov.shadow}`);
   if (hov.color === rest.color) failures.push('threshold: hovering the pill never moved its edge, the control is dead to the pointer');
-  // The flat model answers the pointer with an edge and a wash, not a cast, so the
-  // wash is what has to move — a rule that only recoloured the border would still
-  // pass a borderTopColor check.
-  if (hov.wash === rest.wash) failures.push('threshold: hovering the pill leaves its fill alone, unlike the fields beside it');
-  // One control, one hue.
-  const [glyph, well, hovEdge] = await chans([rest.icon, rest.wellEdge, hov.color]);
-  console.log(`hue threshold    glyph=${rgb(glyph)} well=${rgb(well)} hover=${rgb(hovEdge)}`);
-  if (!near(well, glyph))
-    failures.push(`threshold: the well edge is ${rgb(well)} while the control's glyph is ${rgb(glyph)}, so one control paints two colours`);
+  // The pill is dressed like the buttons in this row, so it has to answer the pointer
+  // like them: an edge and a fill, not a cast shadow.
+  if (hov.fill === rest.pillBg) failures.push('threshold: hovering the pill leaves its fill alone, unlike the buttons beside it');
+  // One control, one hue. The pill's hover edge is the tone at a twelfth, so it is read
+  // as the rgb the browser was handed rather than composited: a faint edge still has to
+  // be *this* control's faint edge, and compositing it over the page would only prove
+  // the alpha is low.
+  const glyph = chan(rest.icon);
+  const wellRest = chan(rest.wellEdge);
+  const hovEdge = chan(hov.color);
+  const hovA = Number((hov.color.match(/[\d.]+/g) || [])[3]);
+  console.log(`hue threshold    glyph=${rgb(glyph)} well=${rgb(wellRest)} hover=${rgb(hovEdge)}@${hovA}`);
   if (!near(hovEdge, glyph))
     failures.push(`threshold: hovering lights ${rgb(hovEdge)} while this control's own hue is ${rgb(glyph)}`);
+  if (hovA > 0.2) failures.push(`threshold: the hover edge is ${hovA} of the tone, a lit ring rather than a nudge`);
+  if (near(wellRest, glyph))
+    failures.push(`threshold: the well is ${rgb(glyph)} at rest, so the pill holds two coloured outlines again`);
   await page.mouse.move(0, 0);
   await page.waitForTimeout(80);
 
@@ -738,6 +775,9 @@ async function checkThreshold() {
   // overflowing its own container rather than wrapping cleanly.
   await field.focus();
   await page.waitForTimeout(180);
+  const wellLit = chan(await field.evaluate((el) => getComputedStyle(el).borderTopColor));
+  console.log(`focus well     ${rgb(wellLit)}`);
+  if (!near(wellLit, glyph)) failures.push(`threshold: the focused well is ${rgb(wellLit)}, not the control's ${rgb(glyph)}`);
   await shot(page, `${OUT}/threshold-focus.png`, { clip: crop });
   await field.blur();
 
@@ -1829,13 +1869,13 @@ async function checkExports() {
   await press('5');
   await page.getByRole('button', { name: /Export/ }).click();
   for (const [label, ext] of [
-    ['Excel, every agent-day', '.xlsx'],
-    ['CSV, every agent-day', '.csv'],
-    ['JSON, full calculation', '.json']
+    ['Excel', '.xlsx'],
+    ['CSV', '.csv'],
+    ['JSON', '.json']
   ]) {
     const [download] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('button', { name: label }).click()
+      page.getByRole('button', { name: label, exact: true }).click()
     ]);
     const name = download.suggestedFilename();
     console.log(`export       ${ext.padEnd(5)} ${name}`);

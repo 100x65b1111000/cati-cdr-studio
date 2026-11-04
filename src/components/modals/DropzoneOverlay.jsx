@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CloudArrowUpRegular as CloudArrowUp } from '@fluentui/react-icons';
+import { GlyphUpload as CloudArrowUp } from '../ui/Glyph';
 import { useCdr } from '../../context/CdrContext';
 
 export default function DropzoneOverlay() {

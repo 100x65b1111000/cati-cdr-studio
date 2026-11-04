@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronLeftRegular as CaretLeft, ChevronRightRegular as CaretRight } from '@fluentui/react-icons';
+import { GlyphCaretLeft as CaretLeft, GlyphCaretRight as CaretRight } from './Glyph';
 import { key, pickRange, todayKey } from '../../utils/dateRange';
 
 const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];

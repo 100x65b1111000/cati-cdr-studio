@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { DeleteRegular as Trash, SaveRegular as FloppyDisk, TimerRegular as Timer } from '@fluentui/react-icons';
+import { GlyphTrash as Trash, GlyphSave as FloppyDisk, GlyphTimer as Timer } from '../ui/Glyph';
 import { useCdr } from '../../context/CdrContext';
 import { DEFAULT_SHIFT_CONFIG } from '../../constants/defaultData';
 import ExtensionFilter from '../ui/ExtensionFilter';
@@ -129,17 +129,23 @@ export default function RundownToolbar({
       {/* One hue, one hover surface. This control is about breaks, so it owns the same
           token the Timer glyph and the Break metric use: `--tone` is what the stylesheet
           hands to the edge, the glow and the stepper hovers, and leaving it unset made
-          them fall through to the app accent — a blue light on a violet control. The
-          number sits in a well inside the pill, separated by fill rather than by a
-          second outline. */}
+          them fall through to the app accent — a blue light on a violet control.
+
+          It is dressed like the buttons beside it, not like a text field: `.field` paints
+          a sunken plate behind a strong hairline, which is why this one control in the row
+          always looked like it belonged to a different app. The number inside carries its
+          own neutral edge and takes the hue when the pointer or the caret arrives, so only
+          one of the two outlines is ever lit at once. */}
       {/* The height is pinned, not derived. Left to its own box this pill is 35px while
           every other control in the row is 30, because its content height is the number
           input's 21px line-and-well, not the 15px of text beside it — so any change to
           the type scale moved this one control and nothing else. */}
       <div
         style={{ '--tone': 'var(--k-break-time)' }}
-        className={`field ml-auto flex h-[30px] flex-none items-center gap-1 rounded px-2 text-meta focus-within:border-k-break-time/70 ${
-          thresholdDirty ? 'border-k-break-time/70 text-k-ink' : 'text-k-ink-muted'
+        className={`ml-auto flex h-[30px] flex-none items-center gap-1 rounded border px-2 text-meta ${
+          thresholdDirty
+            ? 'border-k-break-time/70 text-k-ink'
+            : 'hoverable border-k-hairline bg-k-surface-hover/50 text-k-ink-muted'
         }`}
       >
         <Timer style={{ fontSize: 14 }} className="text-k-break-time" />
@@ -155,7 +161,7 @@ export default function RundownToolbar({
               if (e.key === 'Enter') applyThreshold();
             }}
             onBlur={applyThreshold}
-            className="num h-[18px] w-[2.6rem] rounded border border-k-break-time/25 bg-k-surface/70 px-0 text-center text-k-ink focus:outline-none"
+            className="num well h-[18px] w-[2.6rem] rounded bg-k-surface/70 px-0 text-center text-k-ink focus:outline-none"
           />
           <Stepper
             upLabel="Increase the break threshold by one minute"
@@ -180,7 +186,7 @@ export default function RundownToolbar({
           ) : (
             savedViews.map((view) => (
               <div key={view.id} className="row-hover flex items-center gap-1 rounded px-1 py-0.5">
-                <button type="button" className="hoverable flex-1 truncate rounded border border-transparent px-1 py-0.5 text-left text-xs text-k-ink" onClick={() => onApplyFilters(view.filters)}>
+                <button type="button" className="menu-item hoverable flex-1 truncate rounded border border-transparent px-1 py-0.5 text-left text-xs text-k-ink" onClick={() => onApplyFilters(view.filters)}>
                   {view.name}
                 </button>
                 <span className="num text-2xs text-k-ink-muted">{view.createdAt}</span>

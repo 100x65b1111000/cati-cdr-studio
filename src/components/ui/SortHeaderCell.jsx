@@ -1,9 +1,5 @@
 import React from 'react';
-import {
-  ChevronDownRegular as CaretDown,
-  ChevronUpRegular as CaretUp,
-  ReOrderDotsHorizontalRegular as Grip
-} from '@fluentui/react-icons';
+import { GlyphCaretDown as CaretDown, GlyphCaretUp as CaretUp, GlyphGrip as Grip } from './Glyph';
 import useDragReorder from '../../hooks/useDragReorder';
 
 export default function SortHeaderCell({

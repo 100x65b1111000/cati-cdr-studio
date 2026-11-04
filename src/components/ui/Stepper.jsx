@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronDownRegular as CaretDown, ChevronUpRegular as CaretUp } from '@fluentui/react-icons';
+import { GlyphCaretDown as CaretDown, GlyphCaretUp as CaretUp } from './Glyph';
 
 /* The up/down pair that rides the right edge of a numeric field. Two copies of this
    existed — one in EditCell, one in the break-threshold pill — down to a byte-identical

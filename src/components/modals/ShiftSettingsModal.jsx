@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { HistoryRegular as ClockCounterClockwise } from '@fluentui/react-icons';
+import { GlyphHistory as ClockCounterClockwise } from '../ui/Glyph';
 import { useCdr } from '../../context/CdrContext';
 import { SHIFT_PRESETS, DEFAULT_SHIFT_CONFIG } from '../../constants/defaultData';
 import Modal from '../ui/Modal';

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PersonRegular as UserFocus } from '@fluentui/react-icons';
+import { GlyphUser as UserFocus } from './Glyph';
 import FilterPopover, { menuItem } from './FilterPopover';
 import SearchInput from './SearchInput';
 
