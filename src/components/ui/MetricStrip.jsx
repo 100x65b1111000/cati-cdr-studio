@@ -1,38 +1,20 @@
 import React from 'react';
 import Chip from './Chip';
 
-const TILE = {
-  accent: 'border-k-accent-fg/25 bg-k-accent-fg/10 text-k-accent-fg',
-  success: 'border-k-success/25 bg-k-success/10 text-k-success',
-  talk: 'border-k-talk/25 bg-k-talk/10 text-k-talk',
-  'break-time': 'border-k-break-time/25 bg-k-break-time/10 text-k-break-time',
-  throughput: 'border-k-throughput/25 bg-k-throughput/10 text-k-throughput',
-  region: 'border-k-region/25 bg-k-region/10 text-k-region'
-};
-
+// The Basalt tile: the label, the figure at 24px of mono, and its two facts pinned to
+// the bottom edge. There is no icon plate any more — the mockup's tiles carry none, and
+// the hue the plate used to paint is still here, on the chips that need it. `role` is
+// what an unlabelled chip takes.
 export default function MetricStrip({ items }) {
   return (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
-      {items.map(({ label, value, chips = [], Icon, role = 'accent' }) => (
-        <div
-          key={label}
-          className="panel lift relative flex flex-col overflow-hidden rounded-lg border border-k-hairline p-4 sm:p-5"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-xs font-medium text-k-ink-muted">{label}</div>
-              {/* The value is nowrap, so at two cards per column on a phone it is the
-                  figure's own size that has to give, not the tile's: 20px of mono plus
-                  the 40px plate is wider than the card. */}
-              <div className="num mt-1 whitespace-nowrap text-lg font-bold leading-tight text-k-ink sm:text-xl">{value}</div>
-            </div>
-            {Icon && (
-              <div
-                className={`flex size-9 shrink-0 items-center justify-center rounded-md border sm:size-10 ${TILE[role]}`}
-              >
-                <Icon style={{ fontSize: 20 }} />
-              </div>
-            )}
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      {items.map(({ label, value, chips = [], role = 'accent' }) => (
+        <div key={label} className="panel lift flex flex-col rounded p-3.5">
+          <div className="text-xs font-medium text-k-ink-muted">{label}</div>
+          {/* The value is nowrap, so at two cards per column on a phone it is the
+              figure's own size that has to give, not the tile's. */}
+          <div className="num mt-1.5 whitespace-nowrap text-xl font-semibold leading-none text-k-ink sm:text-2xl">
+            {value}
           </div>
           {chips.length > 0 && (
             <div className="mt-auto flex flex-wrap gap-1.5 pt-3">

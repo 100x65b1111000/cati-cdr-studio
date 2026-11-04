@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react';
-import { CallRegular as Phone, CheckmarkCircleRegular as CheckCircle, DrinkCoffeeRegular as Coffee, GaugeRegular as Gauge, PulseRegular as Pulse, TimerRegular as Timer } from '@fluentui/react-icons';
 import { useCdr } from '../../context/CdrContext';
 import { deriveMetrics } from '../../services/metrics';
 import { formatDurationCompact } from '../../utils/timeFormatter';
@@ -15,14 +14,12 @@ export default function MetricsStrip({ dayScope = '' }) {
         {
           label: 'Calls',
           value: metrics.totalCalls,
-          Icon: Phone,
           role: 'accent',
           chips: [{ text: `${metrics.placed} out` }, { text: `top ${metrics.topRegion}`, tone: 'region' }]
         },
         {
           label: 'Connected',
           value: `${metrics.rate}%`,
-          Icon: CheckCircle,
           role: 'success',
           chips: [
             { text: `${metrics.connected} answered`, tone: 'success' },
@@ -32,7 +29,6 @@ export default function MetricsStrip({ dayScope = '' }) {
         {
           label: 'Talk',
           value: formatDurationCompact(metrics.talkSec),
-          Icon: Timer,
           role: 'talk',
           chips: [
             { text: `avg ${formatDurationCompact(metrics.avgTalkSec)}` },
@@ -42,7 +38,6 @@ export default function MetricsStrip({ dayScope = '' }) {
         {
           label: 'Break',
           value: formatDurationCompact(metrics.breakSec),
-          Icon: Coffee,
           role: 'break-time',
           chips: [
             { text: `${metrics.breaksCount} logged` },
@@ -52,7 +47,6 @@ export default function MetricsStrip({ dayScope = '' }) {
         {
           label: 'Net active',
           value: formatDurationCompact(metrics.netActiveSec),
-          Icon: Pulse,
           role: 'region',
           chips: [
             { text: `${formatDurationCompact(metrics.perAgentNet)} /agent` },
@@ -62,7 +56,6 @@ export default function MetricsStrip({ dayScope = '' }) {
         {
           label: 'Calls / hour',
           value: metrics.perHour,
-          Icon: Gauge,
           role: 'throughput',
           chips: [
             { text: `best ${metrics.bestHour}/h` },

@@ -1,22 +1,27 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronDownRegular as CaretDown, ChevronUpRegular as CaretUp, DeleteRegular as Trash, PeopleRegular as UsersThree } from '@fluentui/react-icons';
+import { ChevronDownRegular as CaretDown, ChevronUpRegular as CaretUp, DeleteRegular as Trash, EyeRegular as Eye } from '@fluentui/react-icons';
 import { useCdr } from '../../context/CdrContext';
 import AddAgentModal from './AddAgentModal';
 import EmptyState from '../ui/EmptyState';
 import SearchInput from '../ui/SearchInput';
 import Segmented from '../ui/Segmented';
-import Chip from '../ui/Chip';
+import { inDateRange, rangeDates } from '../../utils/dateRange';
 
 const numeric = new Intl.Collator(undefined, { numeric: true });
 
 const SORT_OPTIONS = [
   { id: 'extension', label: 'Extension' },
-  { id: 'name', label: 'Name' }
+  { id: 'name', label: 'Name' },
+  { id: 'calls', label: 'Calls' }
 ];
 
 // A row was two characters of extension and one name against a full page of width.
-// Paired cards let the grid spend that width on the names that actually need it.
-function AgentCard({ ext, name, onRename, onDelete }) {
+// Paired cards let the grid spend that width on the names that actually need it. The
+// extension sits in a `sunken` plate rather than a cyan wash: it is a key, and the one
+// electric hue in Basalt is reserved for what a reader can act on. The card now carries
+// what the agent did in the range, because a mapping list with no evidence of work is a
+// config page, and this is the page you go to to find the person.
+function AgentCard({ ext, name, stats, onRename, onDelete, onReport }) {
   const [draft, setDraft] = useState(name);
 
   useEffect(() => {
@@ -31,42 +36,88 @@ function AgentCard({ ext, name, onRename, onDelete }) {
   };
 
   return (
-    <div className="panel lift flex items-center gap-2 rounded px-2 py-1.5">
-      <span className="num w-14 flex-none rounded bg-k-accent-fg/15 py-1 text-center text-meta font-medium text-k-accent-fg">
-        {ext}
-      </span>
-      <input
-        type="text"
-        value={draft}
-        aria-label={`Name for extension ${ext}`}
-        placeholder={`Agent ${ext}`}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') e.currentTarget.blur();
-          if (e.key === 'Escape') setDraft(name);
-        }}
-        className={`field min-w-0 flex-1 rounded px-2.5 py-1.5 text-xs text-k-ink placeholder:text-k-ink-muted focus:border-k-accent-fg focus:outline-none ${
-          dirty ? 'border-k-accent-fg' : 'hover:border-k-accent-fg/50'
-        }`}
-      />
-      <button
-        type="button"
-        onClick={() => onDelete(ext)}
-        aria-label={`Remove the mapping for ${ext}`}
-        className="flex-none rounded p-1.5 text-k-ink-muted transition-colors hover:bg-k-critical/15 hover:text-k-critical"
-      >
-        <Trash style={{ fontSize: 15 }} />
-      </button>
+    <div className="panel lift flex flex-col gap-2 rounded p-2">
+      <div className="flex items-center gap-2">
+        <span className="num w-12 flex-none rounded bg-k-sunken py-1 text-center text-meta font-semibold text-k-accent-fg">
+          {ext}
+        </span>
+        <input
+          type="text"
+          value={draft}
+          aria-label={`Name for extension ${ext}`}
+          placeholder={`Agent ${ext}`}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur();
+            if (e.key === 'Escape') setDraft(name);
+          }}
+          className={`field min-w-0 flex-1 rounded px-2.5 py-1.5 text-xs text-k-ink placeholder:text-k-ink-muted focus:border-k-accent-fg focus:outline-none ${
+            dirty ? 'border-k-accent-fg' : 'hover:border-k-accent-fg/50'
+          }`}
+        />
+        <button
+          type="button"
+          onClick={() => onDelete(ext)}
+          aria-label={`Remove the mapping for ${ext}`}
+          className="flex-none rounded p-1.5 text-k-ink-muted transition-colors hover:bg-k-critical/15 hover:text-k-critical"
+        >
+          <Trash style={{ fontSize: 15 }} />
+        </button>
+      </div>
+
+      {stats ? (
+        <>
+          <div className="flex items-baseline justify-between gap-2 text-2xs text-k-ink-muted">
+            <span className="num text-k-ink">{stats.calls} calls</span>
+            <span className="num">{stats.rate}% connected</span>
+            <button
+              type="button"
+              onClick={() => onReport(ext, stats.last)}
+              aria-label={`Breakdown for ${ext} on ${stats.last}`}
+              className="hoverable inline-flex items-center gap-1 rounded border border-k-hairline px-1.5 py-0.5 text-2xs text-k-ink-muted"
+            >
+              <Eye style={{ fontSize: 12 }} />
+              Report
+            </button>
+          </div>
+          <div className="h-1 overflow-hidden rounded bg-k-sunken ring-1 ring-inset ring-k-hairline">
+            <div className="h-full rounded bg-k-talk" style={{ width: `${stats.rate}%` }} />
+          </div>
+        </>
+      ) : (
+        <p className="text-2xs text-k-ink-faint">No calls in this date range.</p>
+      )}
     </div>
   );
 }
 
 export default function AgentDirectory() {
-  const { extNameMap, updateExtMapping, removeExtMapping, setIsAddAgentOpen, slide } = useCdr();
+  const { extNameMap, analysis, dateRange, updateExtMapping, removeExtMapping, setIsAddAgentOpen, setSelectedAgentDetail, slide } =
+    useCdr();
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState('extension');
   const [sortAsc, setSortAsc] = useState(true);
+
+  // Scoped to the same date range the rundown and analytics honour, so the card is not
+  // quietly counting a month while the page above it says "last 7 days".
+  const stats = useMemo(() => {
+    const dateSet = new Set(rangeDates(dateRange, analysis));
+    const out = {};
+    Object.entries(analysis).forEach(([ext, byDate]) => {
+      let calls = 0;
+      let connected = 0;
+      let last = '';
+      Object.entries(byDate).forEach(([date, row]) => {
+        if (!inDateRange(date, dateRange, dateSet)) return;
+        calls += row.total_calls;
+        connected += row.connected_calls;
+        if (date > last) last = date;
+      });
+      if (calls) out[ext] = { calls, rate: Math.round((connected / calls) * 100), last };
+    });
+    return out;
+  }, [analysis, dateRange]);
 
   const rows = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -77,21 +128,30 @@ export default function AgentDirectory() {
     const dir = sortAsc ? 1 : -1;
     list.sort((a, b) => {
       if (sortField === 'name') return dir * numeric.compare(extNameMap[a] || '', extNameMap[b] || '');
+      if (sortField === 'calls') return dir * ((stats[a]?.calls || 0) - (stats[b]?.calls || 0));
       return dir * numeric.compare(a, b);
     });
     return list;
-  }, [extNameMap, search, sortField, sortAsc]);
+  }, [extNameMap, search, sortField, sortAsc, stats]);
 
   const mapped = Object.keys(extNameMap).length;
+  const busy = rows.reduce((sum, ext) => sum + (stats[ext]?.calls || 0), 0);
 
   return (
-    <div className={`animate__animated ${slide} panel overflow-hidden rounded-md`}>
-      <div className="no-print flex flex-wrap items-center gap-2 border-b border-k-hairline bg-k-surface/50 px-4 py-3">
-        <h3 className="mr-1 flex items-center gap-2 text-xs font-semibold text-k-ink">
-          <UsersThree style={{ fontSize: 16 }} className="text-k-talk" />
-          Extension mapping
-          <Chip tone="talk">{mapped}</Chip>
-        </h3>
+    <div className={`animate__animated ${slide} panel overflow-hidden rounded`}>
+      {/* The count is the fact this page is about, so the title reads the way the rundown
+          KPI strip reads — a label in ink-muted and the figure in mono on one baseline,
+          no icon and no restated hex. The strip stays on `surface`, not `sunken`: the
+          search field is sunken, and a sunken field on a sunken plate has no edge left. */}
+      <div className="no-print flex flex-wrap items-center gap-2 border-b border-k-hairline px-3.5 py-2.5">
+        <p className="mr-1 flex items-baseline gap-1.5 text-2xs leading-tight text-k-ink-muted">
+          Extensions mapped
+          <span className="num text-md font-semibold text-k-accent-fg">{mapped}</span>
+        </p>
+        <p className="mr-1 flex items-baseline gap-1.5 text-2xs leading-tight text-k-ink-muted">
+          Calls in range
+          <span className="num text-md font-semibold text-k-accent-fg">{busy}</span>
+        </p>
         <SearchInput
           value={search}
           onChange={setSearch}
@@ -154,8 +214,10 @@ export default function AgentDirectory() {
               key={ext}
               ext={ext}
               name={extNameMap[ext] || ''}
+              stats={stats[ext]}
               onRename={updateExtMapping}
               onDelete={removeExtMapping}
+              onReport={(target, date) => setSelectedAgentDetail({ ext: target, dateStr: date })}
             />
           ))}
         </div>

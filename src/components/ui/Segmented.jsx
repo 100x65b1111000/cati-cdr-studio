@@ -7,6 +7,7 @@ import React, { useLayoutEffect, useRef } from 'react';
 export default function Segmented({ label, options, value, onChange }) {
   const track = useRef(null);
   const pill = useRef(null);
+  const settled = useRef(false);
 
   // One fill that travels between the options instead of two that trade places, because
   // a switch that only changes colour in place reads as a freeze. The geometry comes
@@ -28,7 +29,19 @@ export default function Segmented({ label, options, value, onChange }) {
     if (!pill.current.style.width) {
       pill.current.style.width = `${Math.max(...btns.map((n) => n.getBoundingClientRect().width))}px`;
     }
-    pill.current.style.transform = `translateX(${b.left - t.left}px) scaleX(${b.width / parseFloat(pill.current.style.width)})`;
+    // The mount write is not a move. Without this the pill is transitioned from its
+    // empty left edge to the active option on first paint, so every group on a freshly
+    // loaded page slides in as though something had just been clicked.
+    const move = `translateX(${b.left - t.left}px) scaleX(${b.width / parseFloat(pill.current.style.width)})`;
+    if (settled.current) {
+      pill.current.style.transform = move;
+      return;
+    }
+    pill.current.style.transition = 'none';
+    pill.current.style.transform = move;
+    void pill.current.offsetWidth;
+    pill.current.style.transition = '';
+    settled.current = true;
   }, [value, options]);
 
   return (
@@ -40,11 +53,13 @@ export default function Segmented({ label, options, value, onChange }) {
     >
       {/* `left-0` plus a translate, because the track's border box is where `offsetLeft`
           starts counting and the ring is a shadow, not a border. `origin-left` so the
-          squash shortens the trailing edge and the leading edge stays put. */}
+          squash shortens the trailing edge and the leading edge stays put. The curve is
+          a long settle rather than a linear 200ms: a move that ends at speed reads as a
+          jump, and this pill is the only cue that the switch took. */}
       <span
         ref={pill}
         aria-hidden="true"
-        className="pointer-events-none absolute inset-y-0.5 left-0 w-0 origin-left rounded bg-k-accent transition-transform duration-200 ease-out"
+        className="pointer-events-none absolute inset-y-0.5 left-0 w-0 origin-left rounded bg-k-accent transition-transform duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
       />
       {options.map((opt) => {
         const active = opt.id === value;

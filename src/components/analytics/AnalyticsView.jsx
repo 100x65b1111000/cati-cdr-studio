@@ -1,82 +1,16 @@
 import React, { useMemo, useState } from 'react';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  LineElement,
-  PointElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-} from 'chart.js';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
-import { DataBarVerticalRegular as ChartBar, DataLineRegular as ChartLine, DataPieRegular as ChartDonut, TimerRegular as Timer } from '@fluentui/react-icons';
 import { useCdr } from '../../context/CdrContext';
 import { DEFAULT_SHIFT_CONFIG } from '../../constants/defaultData';
 import { themeColor, themeSeries } from '../../theme/colorSchemes';
-import { reducedMotion } from '../../utils/motion';
 import { createShiftDateResolver } from '../../services/shiftCalculator';
 import { inDateRange, rangeDates } from '../../utils/dateRange';
+import Chart from '../ui/Chart';
 import DayScopeSelect from '../ui/DayScopeSelect';
 import EmptyState from '../ui/EmptyState';
 import MetricsStrip from '../dashboard/MetricsStrip';
 
 const D = DEFAULT_SHIFT_CONFIG;
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  LineElement,
-  PointElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-);
-
-function ChartSkeleton() {
-  return (
-    <div className="flex h-full items-end gap-3" role="status" aria-label="Recalculating charts">
-      {[45, 70, 30, 60, 85, 40, 65, 50, 75, 35].map((h, i) => (
-        <div
-          key={i}
-          className="animate-pulse rounded bg-k-hairline"
-          style={{ height: `${h}%`, width: '10%' }}
-        />
-      ))}
-    </div>
-  );
-}
-
-function Chart({ icon: Icon, title, note, empty, loading, children }) {
-  return (
-    <section className="panel overflow-hidden rounded-lg">
-      <header className="flex items-center justify-between gap-3 border-b border-k-hairline px-5 py-4">
-        <h3 className="flex items-center gap-2 text-sm font-semibold text-k-ink">
-          <Icon style={{ fontSize: 16 }} className="text-k-accent-fg" />
-          {title}
-        </h3>
-        <span className="num text-meta text-k-ink-muted">{note}</span>
-      </header>
-      <div className="h-72 p-5">
-        {loading ? (
-          <ChartSkeleton />
-        ) : empty ? (
-          <div className="flex h-full items-center justify-center">
-            <EmptyState title={empty} />
-          </div>
-        ) : (
-          children
-        )}
-      </div>
-    </section>
-  );
-}
 
 export default function AnalyticsView() {
   const { analysis, extNameMap, rawCalls, shiftConfig, dateRange, colorScheme, slide, isParsing } = useCdr();
@@ -100,17 +34,15 @@ export default function AnalyticsView() {
 
   const scope = shiftDays.some((d) => d.date === dayScope) ? dayScope : '';
 
-  const { volumeData, regionalData, timeData, hourlyData, options, scales, agentDays, regions, hours } =
+  const { volumeData, regionalData, timeData, hourlyData, dayRows,
+    volumeOptions, regionOptions, hourlyOptions, timeOptions, agentDays, regions, hours } =
     useMemo(() => {
-      const ink = themeColor('ink');
-      const inkMuted = themeColor('ink-muted');
-      const hairline = themeColor('hairline');
-      const surface = themeColor('surface');
-      const series = themeSeries();
+      const ink = themeColor(colorScheme, 'ink');
+      const inkMuted = themeColor(colorScheme, 'ink-muted');
+      const hairline = themeColor(colorScheme, 'hairline');
+      const surface = themeColor(colorScheme, 'surface');
+      const series = themeSeries(colorScheme);
       const [accent, talk, throughput, breakTime, success] = series;
-      // Chart.js animates in JS, so the CSS ramp in `prefers-reduced-motion` cannot
-      // reach it — the duration has to be switched off here as well.
-      const reduce = reducedMotion();
 
       const resolveShiftDate = createShiftDateResolver(shiftConfig);
       const dateSet = new Set(rangeDates(dateRange, analysis));
@@ -121,6 +53,7 @@ export default function AnalyticsView() {
       const talkMins = [];
       const breakMins = [];
       const regionTotals = {};
+      const dayTotals = {};
 
       Object.keys(analysis)
         .sort()
@@ -134,6 +67,10 @@ export default function AnalyticsView() {
             connectedCounts.push(data.connected_calls);
             talkMins.push(parseFloat((data.total_talk_time_sec / 60).toFixed(1)));
             breakMins.push(parseFloat((data.total_break_sec / 60).toFixed(1)));
+            const day = dayTotals[dateStr] || (dayTotals[dateStr] = { calls: 0, netSec: 0, agents: 0 });
+            day.calls += data.total_calls;
+            day.netSec += data.net_active_sec;
+            day.agents += 1;
             Object.entries(data.region_counts || {}).forEach(([reg, count]) => {
               regionTotals[reg] = (regionTotals[reg] || 0) + count;
             });
@@ -188,20 +125,41 @@ export default function AnalyticsView() {
 
       const regionLabels = Object.keys(regionTotals);
 
+      const scales = () => ({
+        x: { ticks: { color: inkMuted }, grid: { color: hairline } },
+        y: { ticks: { color: inkMuted }, grid: { color: hairline } }
+      });
+      const stacked = () => {
+        const s = scales();
+        s.x.stacked = true;
+        s.y.stacked = true;
+        return s;
+      };
+      const options = {
+        responsive: true,
+        maintainAspectRatio: false,
+        // No entry ramp, and not by taste: the responsive observer re-measures a chart a few
+        // frames after it is built and chart.js answers with an unanimated update, so three of
+        // these four would snap to their data regardless. 0 makes them agree. The hover still
+        // ramps, through `transitions.active`.
+        animation: { duration: 0 },
+        plugins: { legend: { labels: { color: ink, boxWidth: 10, boxHeight: 10 } } }
+      };
+      // One options object and one scales object per chart, built with the data: react-chartjs-2
+      // re-updates a chart whenever either identity changes, and a spread written inline in the
+      // JSX changes it on every render.
+
       return {
         agentDays: labels.length,
         regions: regionLabels.length,
         hours: callsInRange.length,
-        scales: {
-          x: { ticks: { color: inkMuted }, grid: { color: hairline } },
-          y: { ticks: { color: inkMuted }, grid: { color: hairline } }
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          animation: { duration: reduce ? 0 : 700, easing: 'easeOutQuart' },
-          plugins: { legend: { labels: { color: ink, boxWidth: 10, boxHeight: 10 } } }
-        },
+        dayRows: Object.entries(dayTotals)
+          .map(([date, v]) => ({ date, ...v }))
+          .sort((a, b) => (a.date < b.date ? -1 : 1)),
+        volumeOptions: { ...options, scales: scales() },
+        hourlyOptions: { ...options, scales: scales() },
+        regionOptions: { ...options, plugins: { legend: { position: 'right', labels: { color: ink } } } },
+        timeOptions: { ...options, scales: stacked() },
         volumeData: {
           labels,
           datasets: [
@@ -234,7 +192,7 @@ export default function AnalyticsView() {
               label: 'Calls in the hour',
               data: hourlyIntensity,
               borderColor: throughput,
-              backgroundColor: themeColor('throughput', 0.15),
+              backgroundColor: themeColor(colorScheme, 'throughput', 0.15),
               fill: true,
               tension: 0.3,
               pointRadius: 2
@@ -246,7 +204,7 @@ export default function AnalyticsView() {
 
   if (agentDays === 0) {
     return (
-      <div className="panel rounded-lg">
+      <div className="panel rounded">
         <EmptyState
           title="Nothing to chart"
           body="Upload a CDR CSV from the sidebar, then widen the date range above."
@@ -255,36 +213,88 @@ export default function AnalyticsView() {
     );
   }
 
+  // The rhythm plate is a bar chart of bars: every row is scaled against the busiest
+  // shift in range, so the reader compares nights without reading numbers off a grid.
+  const maxCalls = Math.max(...dayRows.map((d) => d.calls), 1);
+
   return (
-    <div className={`animate__animated ${slide} space-y-6`}>
+    <div className={`animate__animated ${slide} space-y-3`}>
       <DayScopeSelect days={shiftDays} value={scope} onChange={setDayScope} />
 
       <MetricsStrip dayScope={scope} />
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <Chart icon={ChartBar} title="Calls per agent-day" note={`${agentDays} agent-days`} loading={isParsing}>
-          <Bar data={volumeData} options={{ ...options, scales }} />
+      {/* One grid, three weights. The volume chart leads at two thirds and the region
+          split rides beside it; the hour line and the shift rhythm take the second row;
+          the talk-against-break stack runs the full width because it is the one chart
+          read across every agent-day at once. Four equal boxes in two equal rows was
+          the composition the app shipped with, and it said nothing about which of
+          these to look at first. */}
+      <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-3">
+        <Chart
+          className="xl:col-span-2"
+          title="Calls per agent-day"
+          note={`${agentDays} agent-days`}
+          body="h-64 sm:h-80"
+          loading={isParsing}
+        >
+          <Bar data={volumeData} options={volumeOptions} />
         </Chart>
 
         <Chart
-          icon={ChartDonut}
           title="Calls by region"
           note={regions > 0 ? `${regions} ${regions === 1 ? 'region' : 'regions'}` : 'no region column'}
           empty={regions === 0 ? 'No region recorded' : null}
+          body="h-64 sm:h-80"
           loading={isParsing}
         >
-          <Doughnut
-            data={regionalData}
-            options={{ ...options, plugins: { legend: { position: 'right', labels: { color: themeColor('ink') } } } }}
-          />
+          <Doughnut data={regionalData} options={regionOptions} />
         </Chart>
 
-        <Chart icon={Timer} title="Talk against break" note="minutes" loading={isParsing}>
-          <Bar data={timeData} options={{ ...options, scales }} />
+        <Chart
+          className="xl:col-span-2"
+          title="Call intensity by hour"
+          note={hours > 0 ? `${hours} calls` : 'no calls'}
+          empty={hours === 0 ? 'No calls in this date range' : null}
+          body="h-56 sm:h-64"
+          loading={isParsing}
+        >
+          <Line data={hourlyData} options={hourlyOptions} />
         </Chart>
 
-        <Chart icon={ChartLine} title="Call intensity by hour" note={hours > 0 ? `${hours} calls` : 'no calls'} empty={hours === 0 ? 'No calls in this date range' : null} loading={isParsing}>
-          <Line data={hourlyData} options={{ ...options, scales }} />
+        <section className="panel overflow-hidden rounded">
+          <header className="flex items-baseline justify-between gap-3 border-b border-k-hairline bg-k-sunken px-3.5 py-2.5">
+            <h3 className="text-xs font-semibold text-k-ink">Shift by shift</h3>
+            <span className="num text-2xs text-k-ink-muted">{dayRows.length} in range</span>
+          </header>
+          <ul className="divide-y divide-k-hairline/60">
+            {dayRows.map((d) => (
+              <li key={d.date} className="row-hover flex flex-col gap-1.5 px-3.5 py-2.5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="num text-xs text-k-ink">{d.date}</span>
+                  <span className="num text-sm font-semibold leading-none text-k-ink">{d.calls}</span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded bg-k-sunken ring-1 ring-inset ring-k-hairline">
+                  <div
+                    className="h-full rounded bg-k-accent-fg/70"
+                    style={{ width: `${Math.max(2, Math.round((d.calls / maxCalls) * 100))}%` }}
+                  />
+                </div>
+                <span className="text-2xs text-k-ink-muted">
+                  {d.agents} on shift, {Math.round(d.netSec / 60)} min net
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <Chart
+          className="xl:col-span-3"
+          title="Talk against break"
+          note="minutes, stacked over the session"
+          body="h-56 sm:h-64"
+          loading={isParsing}
+        >
+          <Bar data={timeData} options={timeOptions} />
         </Chart>
       </div>
     </div>

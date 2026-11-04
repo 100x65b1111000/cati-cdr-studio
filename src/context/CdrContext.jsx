@@ -344,6 +344,19 @@ export function CdrProvider({ children }) {
     });
   }, []);
 
+  // The rundown writes a value; Settings is the only place that can take one back off,
+  // because a typed half-done silently moves every total on the analytics view.
+  const clearManualOverride = useCallback((ext, dateStr) => {
+    const key = `${ext}_${dateStr}`;
+    setManualOverrides(prev => {
+      if (!(key in prev)) return prev;
+      const copy = { ...prev };
+      delete copy[key];
+      return copy;
+    });
+    addToast(`Cleared the typed values for extension ${ext} on ${dateStr}`, 'info');
+  }, [addToast]);
+
   const updateExtMapping = useCallback((ext, name) => {
     setExtNameMap(prev => ({
       ...prev,
@@ -449,6 +462,7 @@ export function CdrProvider({ children }) {
     confirmPendingUpload,
     cancelPendingUpload,
     updateManualOverride,
+    clearManualOverride,
     updateExtMapping,
     removeExtMapping,
     updateShiftConfig

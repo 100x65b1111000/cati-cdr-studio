@@ -1,5 +1,5 @@
 import { lazy } from 'react';
-import { ContactCardRegular as IdentificationCard, DataBarVerticalRegular as ChartBar, ListRegular as ListBullets, OptionsRegular as Sliders, TableSimpleRegular as Table } from '@fluentui/react-icons';
+import { GlyphAgents, GlyphConfig, GlyphRaw, GlyphRundown, GlyphStats } from '../ui/Glyph';
 
 // Shared by the sidebar, the narrow-screen header, the print title and the route in
 // app/(app)/[view]/page.jsx, so the view list has exactly one source. `id` is
@@ -12,7 +12,7 @@ export const NAV = [
   {
     id: 'rundown',
     label: 'Rundown',
-    Icon: Table,
+    Icon: GlyphRundown,
     hotkey: '1',
     desc: 'Per-agent shift table: calls, talk time, break stamps and net active time.',
     component: lazy(() => import('../rundown/RundownTable'))
@@ -20,7 +20,7 @@ export const NAV = [
   {
     id: 'rawCdr',
     label: 'Raw CDR',
-    Icon: ListBullets,
+    Icon: GlyphRaw,
     hotkey: '2',
     desc: 'Every parsed call row as it came out of the CSV, searchable and filterable.',
     component: lazy(() => import('../raw-cdr/RawCDRTable'))
@@ -28,15 +28,15 @@ export const NAV = [
   {
     id: 'analytics',
     label: 'Analytics',
-    Icon: ChartBar,
+    Icon: GlyphStats,
     hotkey: '3',
-    desc: 'Metric cards, volume per agent-day, region split, talk against break.',
+    desc: 'Volume per agent-day, the hour line, region split, shift by shift.',
     component: lazy(() => import('../analytics/AnalyticsView'))
   },
   {
     id: 'directory',
     label: 'Agents',
-    Icon: IdentificationCard,
+    Icon: GlyphAgents,
     hotkey: '4',
     desc: 'Map extensions to agent names and open an agent detail sheet.',
     component: lazy(() => import('../directory/AgentDirectory'))
@@ -44,9 +44,9 @@ export const NAV = [
   {
     id: 'settings',
     label: 'Settings',
-    Icon: Sliders,
+    Icon: GlyphConfig,
     hotkey: '5',
-    desc: 'Shift rules, manual overrides and saved views.',
+    desc: 'Shift rules and what they produce, manual overrides, and this browser session.',
     component: lazy(() => import('../settings/SettingsView'))
   }
 ];

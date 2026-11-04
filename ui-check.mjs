@@ -117,21 +117,28 @@ await signIn(page.context());
 
 // Tailwind v4 mixes an alpha variant of a colour into oklab while the solid token
 // computes to plain rgb, so the computed strings are not comparable. Paint each value
-// into a 1px buffer with copy compositing and read the sRGB channels back — un-
-// premultiplied, so the hue survives the tint and the fourth channel is its alpha.
-const paint = (vals) =>
-  page.evaluate((list) => {
+// into a 1px buffer and read the sRGB channels back — un-premultiplied, so the hue
+// survives the tint and the fourth channel is its alpha.
+// One pass is the faithful read, for the checks that compare alpha as well as colour.
+// `opaque: true` re-paints the swatch over itself until alpha reaches 1, for the checks
+// that only ask "is this the same hue": an 8-bit buffer loses two to seven channels at
+// the alphas a subtle edge uses, which is measurement noise and not a colour, while a
+// genuinely different hue (blue against violet) stays ~100 apart however many passes.
+const paint = (vals, { opaque = false } = {}) =>
+  page.evaluate((arg) => {
     const cv = document.createElement('canvas');
     cv.width = cv.height = 1;
     const g = cv.getContext('2d', { willReadFrequently: true });
-    return list.map((v) => {
-      g.globalCompositeOperation = 'copy';
+    return arg.list.map((v) => {
       g.fillStyle = v;
-      g.fillRect(0, 0, 1, 1);
+      for (let i = 0; i < arg.passes; i++) {
+        g.globalCompositeOperation = i ? 'source-over' : 'copy';
+        g.fillRect(0, 0, 1, 1);
+      }
       return [...g.getImageData(0, 0, 1, 1).data];
     });
-  }, vals);
-const chans = (vals) => paint(vals).then((list) => list.map((c) => c.slice(0, 3)));
+  }, { list: vals, passes: opaque ? 8 : 1 });
+const chans = (vals) => paint(vals, { opaque: true }).then((list) => list.map((c) => c.slice(0, 3)));
 const near = (a, b, tol = 3) => a.every((n, i) => Math.abs(n - b[i]) <= tol);
 const rgb = (a) => `rgb(${a.join(' ')})`;
 // The sync twin of chans(): three channels out of a computed rgb()/oklab() string, for
@@ -478,6 +485,7 @@ await checkTone();
 await checkThreshold();
 await checkDetail();
 await checkCellSteppers();
+await checkOverrideLedger();
 await checkCopy();
 await checkFieldHover();
 await checkToolbarFits();
@@ -572,13 +580,17 @@ async function checkTone() {
         field.blur();
       }
       const btn = el.querySelector('.tone-btn');
+      // Read before anything is hovered: the resting wash is the panel's own claim that
+      // its rows sit in the trigger's hue.
+      const row = el.querySelector('label.hoverable, button.hoverable');
       return {
         tone,
         border: getComputedStyle(el).borderTopColor,
         fill: on ? getComputedStyle(on).backgroundColor : null,
         hasBox: !!on,
         btn: btn ? getComputedStyle(btn).backgroundColor : null,
-        fieldBorder
+        fieldBorder,
+        wash: row ? getComputedStyle(row).backgroundColor : null
       };
     });
     // The hover step, in the tone too: a border that repaints to some other hue is
@@ -600,7 +612,11 @@ async function checkTone() {
       hoverBorder,
       hasBox: r.hasBox,
       btn: r.btn ? chan(r.btn) : null,
-      fieldBorder: r.fieldBorder ? chan(r.fieldBorder) : null
+      fieldBorder: r.fieldBorder ? chan(r.fieldBorder) : null,
+      wash: r.wash ? chan(r.wash) : null,
+      // The fourth number in `rgba(r, g, b, a)` is the strength of the wash, and the
+      // brief was "the trigger's clicked tint, a step lower".
+      washA: r.wash ? Number((r.wash.match(/[\d.]+/g) || [])[3]) : null
     };
   }
 
@@ -610,10 +626,10 @@ async function checkTone() {
   if (!agents || !columns || !views) return;
 
   console.log(
-    `tone agents  icon=${key(agents.icon)} menu=${key(agents.tone)} border=${key(agents.border)} box=${key(agents.fill)} hover=${key(agents.hoverBorder)}`
+    `tone agents  icon=${key(agents.icon)} menu=${key(agents.tone)} border=${key(agents.border)} box=${key(agents.fill)} hover=${key(agents.hoverBorder)} wash=${key(agents.wash)}@${agents.washA}`
   );
   console.log(
-    `tone columns  icon=${key(columns.icon)} menu=${key(columns.tone)} border=${key(columns.border)} box=${key(columns.fill)} hover=${key(columns.hoverBorder)}`
+    `tone columns  icon=${key(columns.icon)} menu=${key(columns.tone)} border=${key(columns.border)} box=${key(columns.fill)} hover=${key(columns.hoverBorder)} wash=${key(columns.wash)}@${columns.washA}`
   );
   console.log(
     `tone views  icon=${key(views.icon)} menu=${key(views.tone)} border=${key(views.border)} btn=${key(views.btn)} field=${key(views.fieldBorder)}`
@@ -635,6 +651,13 @@ async function checkTone() {
     // Controls the panel owns, painted by the call site rather than the stylesheet.
     if (p.btn && !near(p.icon, p.btn, 1)) failures.push(`tone [${name}]: the panel's primary button is ${key(p.btn)}, not the trigger's ${key(p.icon)}`);
     if (p.fieldBorder && !near(p.icon, p.fieldBorder, 1)) failures.push(`tone [${name}]: a focused field in the panel edges to ${key(p.fieldBorder)}, not the trigger's ${key(p.icon)}`);
+    // The panel's own rows sit on the trigger's hue, a step under the /0.10 the clicked
+    // trigger wears. A wash at or over the trigger's strength turns the panel into a
+    // stack of buttons; a missing one leaves it the grey box the brief complained about.
+    if (p.wash) {
+      if (!near(p.icon, p.wash, 1)) failures.push(`tone [${name}]: the menu rows sit on ${key(p.wash)}, not the trigger's ${key(p.icon)}`);
+      if (!(p.washA > 0 && p.washA < 0.1)) failures.push(`tone [${name}]: the menu rows wash at ${p.washA}, which is not below the trigger's 0.1`);
+    }
   }
   if (!views.btn) failures.push('tone [views]: the Save button lost its .tone-btn class, it is accent again');
 }
@@ -787,6 +810,18 @@ async function checkDetail() {
   if (/rgba\(0, 0, 0, 0\)|transparent/.test(paint.bg)) failures.push('close: the button has no red wash behind it');
   if (rest === on) failures.push('close: hovering the button repaints nothing');
 
+  // The sheet is a report now, not three tiles: the shift's own numbers, a chart of the
+  // hour, and the redial count only the raw rows can give.
+  const report = await page.evaluate(() => {
+    const d = document.querySelector('[role="dialog"]');
+    return { canvas: !!d.querySelector('canvas'), facts: d.querySelectorAll('dt').length, redials: /Redialled numbers/.test(d.innerText) };
+  });
+  console.log(`sheet  chart=${report.canvas} facts=${report.facts} redials=${report.redials}`);
+  if (!report.canvas) failures.push('details: the sheet draws no chart, the hour-by-hour read is gone');
+  if (report.facts < 12)
+    failures.push(`details: the sheet lists ${report.facts} facts, the numbers the rundown row already holds are not all there`);
+  if (!report.redials) failures.push('details: the sheet never says how many numbers were redialled');
+
   await close.click();
   await page.waitForTimeout(400);
   if (await page.locator('[role="dialog"]').count()) failures.push('close: the X no longer dismisses the panel');
@@ -875,6 +910,41 @@ async function checkCellSteppers() {
   console.log(`cell stepper ${label?.split(' for ')[0]} ${before} -> ${after} -> ${back}`);
   if (String(Number(before) + 2) !== after) failures.push(`cell stepper: two + left "${after}" from "${before}", the clicks do not accumulate`);
   if (String(Number(before)) !== back) failures.push(`cell stepper: two - from "${after}" landed on "${back}", not back on "${before}"`);
+}
+
+// The rundown's Half and Surveys cells write straight into localStorage, so until Settings
+// listed them nothing in the app could read them back or take them off. Type a value, prove
+// the ledger names the agent and the number, clear it, prove the cell follows it back down.
+async function checkOverrideLedger() {
+  await press('1');
+  const input = page.locator('main tbody tr').first().locator('input').first();
+  const label = await input.getAttribute('aria-label');
+  const before = await input.inputValue();
+  await input.click();
+  await input.fill('3');
+  await input.press('Enter');
+  await page.waitForTimeout(250);
+
+  await press('5', 400);
+  const clears = page.getByRole('button', { name: /^Clear overrides for/ });
+  const listed = await clears.count();
+  console.log(`overrides    typed "${label}" ${before}->3, plate lists ${listed}`);
+  if (!listed) failures.push('overrides: a typed half-done leaves the Settings plate empty, nothing can read it back');
+  else {
+    const detail = await clears.first().evaluate((el) => el.closest('li').textContent);
+    if (!/half dones 3/.test(detail))
+      failures.push(`overrides: the plate reads "${detail.trim()}", the typed value is not in it`);
+    await clears.first().click();
+    await page.waitForTimeout(250);
+    if (await page.getByRole('button', { name: /^Clear overrides for/ }).count())
+      failures.push('overrides: Clear leaves the row in the plate, the stored value never went');
+  }
+
+  await press('1', 400);
+  const after = await page.locator('main tbody tr').first().locator('input').first().inputValue();
+  console.log(`overrides    cleared, cell back to "${after}"`);
+  if (listed && after !== before)
+    failures.push(`overrides: clearing the plate left the rundown cell at "${after}", it was "${before}" before the type`);
 }
 
 // A click on a figure in the grid takes it to the clipboard. Two ways this is silently
@@ -1619,37 +1689,21 @@ async function checkMotion() {
       `motion: switching into a taller view moved the app bar ${taller.barLo}→${taller.barHi}px, so the header flickers`
     );
 
-  // Sample from inside the page on animation frames: a round-trip per sample is slower
-  // than the chunk load, so measuring from outside only ever catches the settled chart.
-  // And the sampler has to be running before the key goes, because the chart only starts
-  // drawing once the route has settled — press first and measure second sees a finished
-  // picture and calls it a ramp.
-  const chart = page.evaluate(
-    () =>
-      new Promise((done) => {
-        const out = [];
-        const t0 = performance.now();
-        const poll = () => {
-          const c = document.querySelector('main canvas');
-          if (c) {
-            const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
-            let n = 0;
-            for (let i = 3; i < d.length; i += 4) if (d[i] > 8) n++;
-            if (out[out.length - 1] !== n) out.push(n);
-          }
-          const ms = performance.now() - t0;
-          // 1500ms, not 900: the chart does not begin until the route has settled, so the
-          // window has to cover the wait as well as the 700ms ramp.
-          if (ms < 2500 && !(out.length > 4 && ms > 1500)) requestAnimationFrame(poll);
-          else done(out);
-        };
-        poll();
-      })
-  );
-  await page.keyboard.press('3');
-  const levels = await chart;
-  console.log(`motion chart   ${levels.length} frames: ${levels.slice(0, 8).join('>')}`);
-  if (levels.length < 5) failures.push(`motion: the volume chart drew ${levels.length} frames, so it snaps to its data`);
+  // The canvas has to carry ink, not merely exist — an empty plot with a mounted <Bar> is
+  // what this caught once. Measured once the route has settled: the analytics charts draw at
+  // duration 0 (see AnalyticsView), so the promise is a painted picture, not a ramp.
+  await press('3', 1200);
+  const ink = await page.evaluate(() => {
+    const c = document.querySelector('main canvas');
+    if (!c) return -1;
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let n = 0;
+    for (let i = 3; i < d.length; i += 4) if (d[i] > 8) n++;
+    return n;
+  });
+  console.log(`chart paint    ${ink} lit px`);
+  if (ink < 2000)
+    failures.push(`chart: the lead plot paints ${ink} px, so the canvas is blank or the data never reached it`);
   // The failure that hid this feature for three rounds: a browser reporting reduced motion
   // clamps every ramp to about a millisecond — animate.css pins `.animate__animated`, our own
   // stylesheet pins `*` — so the sweep is a single frame and no amount of travel is visible.

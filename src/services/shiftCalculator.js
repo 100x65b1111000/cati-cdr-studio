@@ -75,6 +75,30 @@ export function parseRawCallRecords(rawRecords) {
   return calls;
 }
 
+// A redial is one destination number reached more than inside a single agent's shift.
+// Nothing else in the pipeline counts numbers — the rundown counts calls — so this reads
+// the raw row for the number, the same way the Raw CDR table does.
+export function summariseRedials(calls) {
+  const byNumber = new Map();
+  calls.forEach((c) => {
+    const dest = c.raw?.DESTINATION || c.raw?.CLID || '';
+    if (!dest) return;
+    const e = byNumber.get(dest) || { dest, calls: 0, answered: 0, sec: 0, last: c.start_time };
+    e.calls += 1;
+    if (c.response === 'ANSWERED') e.answered += 1;
+    e.sec += c.duration;
+    if (c.start_time > e.last) e.last = c.start_time;
+    byNumber.set(dest, e);
+  });
+  const repeated = [...byNumber.values()].filter((e) => e.calls > 1).sort((a, b) => b.calls - a.calls);
+  return {
+    numbers: byNumber.size,
+    repeated: repeated.length,
+    extra: repeated.reduce((sum, e) => sum + e.calls - 1, 0),
+    top: repeated.slice(0, 8)
+  };
+}
+
 export function calculateShiftAnalysis(calls, extNameMap, config, manualOverrides = {}) {
   const thresholdSecs = (config.breakThresholdMinutes || 10) * 60;
   const getShiftDate = createShiftDateResolver(config);

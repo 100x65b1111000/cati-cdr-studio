@@ -109,20 +109,15 @@ export function getMode(id) {
   return COLOR_MODES[id] || COLOR_MODES[DEFAULT_MODE];
 }
 
-// Canvas fills need concrete colour strings, so charts read the variables the
-// active mode already wrote on <html>. The mode object stays out of the
-// render path and the canvas always matches what the DOM shows.
-export function themeColor(role, alpha = 1) {
-  const raw = getComputedStyle(document.documentElement)
-    .getPropertyValue(cssVarName(role))
-    .trim();
-  const parts = raw.split(/[\s,/]+/).filter(Boolean).map(Number);
-  if (parts.length < 3 || parts.some((n) => !Number.isFinite(n))) return 'transparent';
-  return alpha >= 1
-    ? `rgb(${parts[0]}, ${parts[1]}, ${parts[2]})`
-    : `rgba(${parts[0]}, ${parts[1]}, ${parts[2]}, ${alpha})`;
+// Canvas fills need concrete colour strings. The mode object is resolved directly rather
+// than read back off <html>: Chart.js bakes colours into pixels during the render, and that
+// render runs before the layout effect that writes the variables — reading the DOM handed the
+// chart the previous mode's palette, so a switch left every plot outlined in the old hairline.
+export function themeColor(mode, role, alpha = 1) {
+  const [r, g, b] = hexToRgbTriplet(getMode(mode).colors[role]).split(' ');
+  return alpha >= 1 ? `rgb(${r}, ${g}, ${b})` : `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-export function themeSeries(count = SERIES_ROLES.length) {
-  return SERIES_ROLES.slice(0, count).map((role) => themeColor(role));
+export function themeSeries(mode, count = SERIES_ROLES.length) {
+  return SERIES_ROLES.slice(0, count).map((role) => themeColor(mode, role));
 }

@@ -3,7 +3,9 @@
  * nav: kept · signature: the dock that opens over the canvas · states: loading, empty, error · surface: absolute
  * axes: dark/grotesk-sans/cool · posture: restrained · contrast: pass · v2.0.0 */
 /* Hallmark · pre-emit critique: P5 H4 E5 S4 R4 V5 · weakest: H, the rundown table is frozen by brief */
-/* Hallmark · sweep: sloplint 0 FAIL · ui-check green · finish-review: subagent · 8 findings · 5 resolved, 1 partial, 2 unresolved (Analytics and Agents are still the before compositions) */
+/* Hallmark · sweep: sloplint 0 FAIL · ui-check green (menu wash 0.06 in every tone) · check-metrics green
+ * finish-review: subagent · 8 findings · 7 resolved, 1 partial · Analytics and Agents are their own compositions now
+ * the four analytics plots draw at animation duration 0: chart.js cancels the entry ramp on its own first re-measure */
 /* Hallmark · waive 7b · surface: absolute · the print canvas is white and both modes are absolute neutrals */
 @import 'tailwindcss';
 @import './tokens.css';
@@ -249,11 +251,21 @@ html[data-mode='light'] {
   border-color: rgb(var(--tone, var(--k-accent-fg)));
 }
 
+/* The trigger wears the tone while its menu is open; the rows inside sit on the same hue a
+   step lower, so the panel reads as that control's own space rather than a grey box dropped
+   under it. 0.06 against the trigger's 0.10: enough to colour the plate, not enough to make
+   a ten-row Columns list look like a stack of buttons. The hover rule is three classes
+   strong, so it still wins over this one. */
+.menu .hoverable {
+  background-color: rgb(var(--tone, var(--k-accent-fg)) / 0.06);
+}
+
 .field:hover:not(:focus) {
   /* A 1px line at 90% of the tone is the brightest thing in the toolbar, and on the
      violet break control it reads as a lit edge rather than a hint. The wash carries the
-     hover cue; the edge only has to answer the pointer, not shout it. */
-  border-color: rgb(var(--tone, var(--k-accent-fg)) / 0.55);
+     hover cue; the edge only has to answer the pointer, not shout it. At a third of the
+     tone it is barely a nudge, which is what the plain buttons beside it do. */
+  border-color: rgb(var(--tone, var(--k-accent-fg)) / 0.35);
   background-image: linear-gradient(rgb(var(--tone, var(--k-accent-fg)) / 0.12), rgb(var(--tone, var(--k-accent-fg)) / 0.12));
 }
 
