@@ -21,9 +21,9 @@ function DatasetCard() {
   ];
 
   return (
-    // One step down from the opened column's `surface`, so the switcher and its figures
-    // read as one plate laid on the flyout rather than a hole cut into it.
-    <div className="flex flex-col gap-3 rounded-md border border-k-hairline bg-k-sunken p-3">
+    // One step up from the column, which now wears the dock's own `sunken`: the switcher
+    // and its figures read as a plate laid on the rail rather than a hole cut into it.
+    <div className="flex flex-col gap-3 rounded-md border border-k-hairline bg-k-surface p-3">
       <div className="flex flex-col gap-1.5">
         <span className="text-2xs font-medium text-k-ink-faint">Active dataset</span>
         {/* One native select does the whole job: the live upload is the selected
@@ -121,12 +121,12 @@ export default function AppSidebar() {
         {activeUpload?.source === 'demo' ? 'sample' : activeUpload ? 'loaded' : '—'}
       </p>
 
-      {/* The column starts 1px inside the dock's right border so the two plates share that
-          edge rather than draw it twice, and the stylesheet squares the dock's top-right
-          corner while it is up. It still hugs what it has to say and is capped by the dock,
+      {/* The column wears the dock's own `sunken`, starts 1px inside its right border and
+          squares that corner while it is up, so rail and wing are one object rather than a
+          card leaning on a rail. It still hugs what it has to say and is capped by the dock,
           so it reads as a wing, not a shaft of empty surface. The filename is not repeated
           here: the switcher's selected option already is the filename. */}
-      <div className="rail-fly pointer-events-none absolute left-full top-0 flex max-h-full w-60 flex-col gap-3 overflow-y-auto rounded-r-xl border border-l-0 border-k-hairline bg-k-surface p-3 opacity-0 shadow-[var(--shadow-16)] transition-opacity duration-[140ms] ease-linear">
+      <div className="rail-popover pointer-events-none absolute -top-px left-full flex max-h-full w-60 flex-col gap-3 overflow-y-auto rounded-r-xl border border-l-0 border-k-hairline bg-k-sunken p-3 opacity-0 shadow-[var(--shadow-16)] transition-[opacity,transform] duration-[140ms] ease-out">
         <DatasetCard />
 
         <p className="text-2xs leading-relaxed text-k-ink-faint">

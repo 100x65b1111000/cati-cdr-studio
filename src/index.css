@@ -274,22 +274,26 @@ html[data-mode='light'] {
 
 /* The dock's wing. It answers the pointer, and the keyboard only once focus lands inside
    it: a click in the nav leaves focus on the row that was pressed, and reading *that* as
-   "the column is wanted" would park the wing over the view someone just switched to. */
-.rail .rail-fly {
+   "the column is wanted" would park the wing over the view someone just switched to.
+   Closed, it stands 12px back inside the rail, so it arrives by sliding out of the dock
+   rather than fading in over the canvas. Transform and opacity only. */
+.rail .rail-popover {
   opacity: 0;
   pointer-events: none;
+  transform: translateX(-0.75rem);
 }
-.rail:hover .rail-fly,
-.rail .rail-fly:focus-within {
+.rail:hover .rail-popover,
+.rail .rail-popover:focus-within {
   opacity: 1;
   pointer-events: auto;
+  transform: none;
 }
 
 /* The wing starts 1px inside the dock's border, so the seam between the two plates is
    painted over rather than drawn twice — but only where the wing reaches, which is why
    the corner squares off with it instead of the dock losing all four. */
 .rail:hover,
-.rail:has(.rail-fly:focus-within) {
+.rail:has(.rail-popover:focus-within) {
   border-top-right-radius: 0;
 }
 

@@ -2331,35 +2331,53 @@ async function checkSidebar() {
   // under it. Anything else draws the shared edge twice, or cuts a notch into the dock.
   const weld = await page.evaluate(() => {
     const rail = document.querySelector('aside');
-    const fly = rail.querySelector('.rail-fly');
+    const fly = rail.querySelector('.rail-popover');
+    const box = rail.getBoundingClientRect();
+    const fb = fly.getBoundingClientRect();
     return {
-      seam: Math.round(rail.getBoundingClientRect().right - fly.getBoundingClientRect().left),
+      seam: Math.round(box.right - fb.left),
+      top: Math.round(fb.top - box.top),
       radius: getComputedStyle(rail).borderTopRightRadius,
-      open: getComputedStyle(fly).opacity
+      open: getComputedStyle(fly).opacity,
+      slide: getComputedStyle(fly).transform,
+      railFill: getComputedStyle(rail).backgroundColor,
+      flyFill: getComputedStyle(fly).backgroundColor,
+      cardFill: getComputedStyle(fly.querySelector('dl').parentElement).backgroundColor
     };
   });
-  console.log(`weld         seam=${weld.seam}px · corner=${weld.radius} · column=${weld.open}`);
+  console.log(
+    `weld         seam=${weld.seam}px top=${weld.top}px corner=${weld.radius} column=${weld.open} ${weld.slide} · rail=${weld.railFill} fly=${weld.flyFill} card=${weld.cardFill}`
+  );
   if (weld.seam < 1 || weld.seam > 2)
     failures.push(`sidebar: the column overlaps the dock by ${weld.seam}px, so the shared edge is ${weld.seam > 2 ? 'cut into the dock' : 'drawn twice'}`);
+  if (weld.top !== 0) failures.push(`sidebar: the column's top edge sits ${weld.top}px off the dock's, so the two do not line up`);
   if (weld.radius !== '0px') failures.push(`sidebar: the dock keeps a ${weld.radius} corner under the column, so the two plates do not meet`);
   if (weld.open !== '1') failures.push('sidebar: hovering the dock leaves the dataset column down');
+  if (weld.slide !== 'none') failures.push(`sidebar: an open column is still offset (${weld.slide}), so it is not flush with the rail`);
+  // One object, two steps: the wing wears the dock's fill and the card inside lifts off it.
+  if (weld.flyFill !== weld.railFill)
+    failures.push(`sidebar: the column fills ${weld.flyFill} while the dock fills ${weld.railFill}, so the wing reads as a separate plate`);
+  if (!(lum(chan(weld.cardFill)) > lum(chan(weld.flyFill))))
+    failures.push(`sidebar: the dataset card is ${weld.cardFill} on a ${weld.flyFill} column, not a step lighter`);
   // A click in the nav leaves focus on the row that was pressed. The column must not read
   // that as still wanted, or it parks itself over the view someone just switched to.
   await page.getByRole('button', { name: /Analytics/ }).click();
   await page.mouse.move(4, 4);
   await page.waitForTimeout(450);
   const after = await page.evaluate(() => {
-    const fly = document.querySelector('aside .rail-fly');
+    const fly = document.querySelector('aside .rail-popover');
     const cs = getComputedStyle(fly);
     return {
       open: cs.opacity,
       click: cs.pointerEvents,
+      slide: cs.transform,
       focus: document.activeElement?.getAttribute('aria-label') || document.activeElement?.tagName
     };
   });
-  console.log(`switch       column=${after.open}/${after.click} focus=${after.focus}`);
+  console.log(`switch       column=${after.open}/${after.click} ${after.slide} focus=${after.focus}`);
   if (after.open !== '0') failures.push(`sidebar: switching views through the nav left the dataset column up at opacity ${after.open}`);
   if (after.click !== 'none') failures.push('sidebar: the closed column still takes pointer events, so it eats clicks over the canvas');
+  if (after.slide === 'none') failures.push('sidebar: a closed column sits at its open position, so it fades in rather than sliding out of the dock');
   if (!/Analytics/.test(after.focus)) failures.push(`sidebar: switching views moved focus to ${after.focus}, the pressed row should keep it`);
   await press('1');
   await page.mouse.move(4, 4);
