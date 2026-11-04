@@ -272,6 +272,27 @@ html[data-mode='light'] {
   background-color: transparent;
 }
 
+/* The dock's wing. It answers the pointer, and the keyboard only once focus lands inside
+   it: a click in the nav leaves focus on the row that was pressed, and reading *that* as
+   "the column is wanted" would park the wing over the view someone just switched to. */
+.rail .rail-fly {
+  opacity: 0;
+  pointer-events: none;
+}
+.rail:hover .rail-fly,
+.rail .rail-fly:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* The wing starts 1px inside the dock's border, so the seam between the two plates is
+   painted over rather than drawn twice — but only where the wing reaches, which is why
+   the corner squares off with it instead of the dock losing all four. */
+.rail:hover,
+.rail:has(.rail-fly:focus-within) {
+  border-top-right-radius: 0;
+}
+
 .field:hover:not(:focus) {
   /* A 1px line at 90% of the tone is the brightest thing in the toolbar, and on a violet
      control it reads as a lit edge rather than a hint. The wash carries the hover cue; the

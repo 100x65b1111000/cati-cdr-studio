@@ -2326,6 +2326,42 @@ async function checkSidebar() {
   if ((await panel.boundingBox()).width !== idle) {
     failures.push('sidebar: the panel changed width under the pointer');
   }
+  // The column is a wing, not a card leaning on the rail: it has to overlap the dock's
+  // border by exactly the width of that border, and the dock's corner has to square off
+  // under it. Anything else draws the shared edge twice, or cuts a notch into the dock.
+  const weld = await page.evaluate(() => {
+    const rail = document.querySelector('aside');
+    const fly = rail.querySelector('.rail-fly');
+    return {
+      seam: Math.round(rail.getBoundingClientRect().right - fly.getBoundingClientRect().left),
+      radius: getComputedStyle(rail).borderTopRightRadius,
+      open: getComputedStyle(fly).opacity
+    };
+  });
+  console.log(`weld         seam=${weld.seam}px · corner=${weld.radius} · column=${weld.open}`);
+  if (weld.seam < 1 || weld.seam > 2)
+    failures.push(`sidebar: the column overlaps the dock by ${weld.seam}px, so the shared edge is ${weld.seam > 2 ? 'cut into the dock' : 'drawn twice'}`);
+  if (weld.radius !== '0px') failures.push(`sidebar: the dock keeps a ${weld.radius} corner under the column, so the two plates do not meet`);
+  if (weld.open !== '1') failures.push('sidebar: hovering the dock leaves the dataset column down');
+  // A click in the nav leaves focus on the row that was pressed. The column must not read
+  // that as still wanted, or it parks itself over the view someone just switched to.
+  await page.getByRole('button', { name: /Analytics/ }).click();
+  await page.mouse.move(4, 4);
+  await page.waitForTimeout(450);
+  const after = await page.evaluate(() => {
+    const fly = document.querySelector('aside .rail-fly');
+    const cs = getComputedStyle(fly);
+    return {
+      open: cs.opacity,
+      click: cs.pointerEvents,
+      focus: document.activeElement?.getAttribute('aria-label') || document.activeElement?.tagName
+    };
+  });
+  console.log(`switch       column=${after.open}/${after.click} focus=${after.focus}`);
+  if (after.open !== '0') failures.push(`sidebar: switching views through the nav left the dataset column up at opacity ${after.open}`);
+  if (after.click !== 'none') failures.push('sidebar: the closed column still takes pointer events, so it eats clicks over the canvas');
+  if (!/Analytics/.test(after.focus)) failures.push(`sidebar: switching views moved focus to ${after.focus}, the pressed row should keep it`);
+  await press('1');
   await page.mouse.move(4, 4);
 
   const switcher = page.locator('aside select[aria-label="Choose a dataset"]');

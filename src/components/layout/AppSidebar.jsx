@@ -58,7 +58,9 @@ function DatasetCard() {
 
 // The dock. 72px of icon, name and hotkey per view, welded to the app bar's geometry: the
 // same 8px off the left edge, the same `sunken` fill, the same air above it as below. It
-// opens to the right on hover or focus, and the column it opens into floats over the canvas
+// opens to the right on hover — and on focus only once that focus lands inside the column
+// itself, since a click in the nav leaves it on the row that was pressed. The column it
+// opens into floats over the canvas
 // — nothing reflows to make room, so the table never shifts under the pointer. The dataset
 // switcher, its figures and the shift rules live in that opened column; the switcher that
 // answers keys all day stays on the strip where it is always visible. There is no collapsed
@@ -70,7 +72,7 @@ export default function AppSidebar() {
   }`;
 
   return (
-    <aside className="app-bar no-print group fixed bottom-2 left-2 under-bar z-40 hidden w-[4.5rem] flex-col gap-1.5 rounded-xl px-2 pb-2 pt-2.5 lg:flex">
+    <aside className="app-bar rail no-print fixed bottom-2 left-2 under-bar z-40 hidden w-[4.5rem] flex-col gap-1.5 rounded-xl px-2 pb-2 pt-2.5 lg:flex">
       <span className="mx-auto grid h-10 w-10 shrink-0 place-items-center rounded-md border border-k-hairline bg-k-page/60">
         <BrandMark size={22} />
       </span>
@@ -119,10 +121,12 @@ export default function AppSidebar() {
         {activeUpload?.source === 'demo' ? 'sample' : activeUpload ? 'loaded' : '—'}
       </p>
 
-      {/* The opened column hugs what it has to say and is capped by the dock, so it reads
-          as a card laid over the canvas rather than a shaft of empty surface. The filename
-          is not repeated here: the switcher's selected option already is the filename. */}
-      <div className="pointer-events-none absolute left-[4.25rem] top-0 flex max-h-full w-60 flex-col gap-3 overflow-y-auto rounded-r-xl border border-l-0 border-k-hairline bg-k-surface p-3 opacity-0 shadow-[var(--shadow-16)] transition-opacity duration-[140ms] ease-linear group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
+      {/* The column starts 1px inside the dock's right border so the two plates share that
+          edge rather than draw it twice, and the stylesheet squares the dock's top-right
+          corner while it is up. It still hugs what it has to say and is capped by the dock,
+          so it reads as a wing, not a shaft of empty surface. The filename is not repeated
+          here: the switcher's selected option already is the filename. */}
+      <div className="rail-fly pointer-events-none absolute left-full top-0 flex max-h-full w-60 flex-col gap-3 overflow-y-auto rounded-r-xl border border-l-0 border-k-hairline bg-k-surface p-3 opacity-0 shadow-[var(--shadow-16)] transition-opacity duration-[140ms] ease-linear">
         <DatasetCard />
 
         <p className="text-2xs leading-relaxed text-k-ink-faint">
