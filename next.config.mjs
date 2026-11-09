@@ -1,16 +1,42 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // The dev-tools mark is a 32x32 <button aria-expanded> fixed to the bottom-left of
-  // every dev page. ui-check.mjs sweeps `[aria-expanded]` and asserts each one opens a
-  // .menu, so in dev it picks the indicator up and reports a phantom popover per view.
-  // Hiding it keeps the sweep honest instead of narrowing the sweep.
   devIndicators: false,
 
-  // The hostname a peer machine browses from. Next blocks dev assets requested from an
-  // origin it was not started with, and without this the page arrives without its
-  // chunks. Hostname only, no scheme or port, so it covers every port this server runs
-  // on — and it is a DHCP lease, so it has to change with the address.
-  allowedDevOrigins: ['192.168.5.98']
+  // Configurable dev origins via environment variable instead of hardcoded LAN IP
+  allowedDevOrigins: process.env.ALLOWED_DEV_ORIGINS
+    ? process.env.ALLOWED_DEV_ORIGINS.split(',').map((s) => s.trim())
+    : ['localhost', '127.0.0.1'],
+
+  // Standard HTTP security response headers (CWE-693)
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY'
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff'
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin'
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=()'
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block'
+          }
+        ]
+      }
+    ];
+  }
 };
 
 export default nextConfig;

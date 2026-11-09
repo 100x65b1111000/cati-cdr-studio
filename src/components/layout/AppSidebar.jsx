@@ -1,7 +1,6 @@
 import React from 'react';
 import { useCdr } from '../../context/CdrContext';
 import { NAV } from './navConfig';
-import BrandMark from '../ui/BrandMark';
 import { availableDates } from '../../utils/dateRange';
 
 // The dataset card is the reference app's "Active run" panel: a switcher, then the
@@ -73,10 +72,6 @@ export default function AppSidebar() {
 
   return (
     <aside className="app-bar rail no-print fixed bottom-2 left-2 under-bar z-40 hidden w-[4.5rem] flex-col gap-1.5 rounded-xl px-2 pb-2 pt-2.5 lg:flex">
-      <span className="mx-auto grid h-10 w-10 shrink-0 place-items-center rounded-md border border-k-hairline bg-k-page/60">
-        <BrandMark size={22} />
-      </span>
-
       {/* The scroll is on the nav, never on the aside: a panel that both clips and paints
           is where a focus ring or an overflowed label disappears, and an `overflow-hidden`
           aside would cut the opened column off at its own edge. A short window is the only

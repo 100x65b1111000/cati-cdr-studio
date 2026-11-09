@@ -1,5 +1,17 @@
 import Papa from 'papaparse';
 
+/**
+ * Neutralizes CSV/Excel formula injection (CWE-1236).
+ * Prepends a single quote to strings that begin with formula trigger characters: =, +, -, @, tab, or newline.
+ */
+export function sanitizeFormula(value) {
+  if (typeof value !== 'string') return value;
+  if (/^[\s]*[=+\-@\t\r]/.test(value)) {
+    return `'${value}`;
+  }
+  return value;
+}
+
 const EXCEL_COLUMN_WIDTHS = {
   'Extension': 11,
   'Agent Name': 18,
@@ -72,10 +84,10 @@ export async function exportRundownToExcel(rows, visibleColumns, connView) {
 
   const exportRows = rows.map((row) => {
     const exportRow = {};
-    if (visibleColumns.extension) exportRow['Extension'] = row.extension;
-    if (visibleColumns.name) exportRow['Agent Name'] = row.name;
-    if (visibleColumns.date) exportRow['Shift Date'] = row.date;
-    if (visibleColumns.region) exportRow['Calls by Region'] = row.region_summary;
+    if (visibleColumns.extension) exportRow['Extension'] = sanitizeFormula(row.extension);
+    if (visibleColumns.name) exportRow['Agent Name'] = sanitizeFormula(row.name);
+    if (visibleColumns.date) exportRow['Shift Date'] = sanitizeFormula(row.date);
+    if (visibleColumns.region) exportRow['Calls by Region'] = sanitizeFormula(row.region_summary);
     if (visibleColumns.connected) {
       if (connView === 'total') {
         exportRow['Total Calls'] = row.total_calls;
@@ -87,21 +99,21 @@ export async function exportRundownToExcel(rows, visibleColumns, connView) {
     if (visibleColumns.calls_per_hour) exportRow['Calls / Hr'] = parseFloat(row.calls_per_hour) || 0;
     if (visibleColumns.half_dones) exportRow['Half Done(s)'] = row.half_dones;
     if (visibleColumns.surveys) exportRow['Survey(s)'] = row.surveys;
-    if (visibleColumns.talk_time) exportRow['Total Talk Time'] = row.total_talk_time_formatted;
+    if (visibleColumns.talk_time) exportRow['Total Talk Time'] = sanitizeFormula(row.total_talk_time_formatted);
     if (visibleColumns.shift_span) {
-      exportRow['First Call Time'] = row.first_call;
-      exportRow['Last Call Time'] = row.last_call;
+      exportRow['First Call Time'] = sanitizeFormula(row.first_call);
+      exportRow['Last Call Time'] = sanitizeFormula(row.last_call);
     }
     if (visibleColumns.break_stamps) {
       exportRow['Breaks'] = row.breaks_list && row.breaks_list.length > 0
-        ? row.breaks_list.map((brk) => `${brk.start} - ${brk.end} (${brk.duration_formatted})`).join('\n')
+        ? sanitizeFormula(row.breaks_list.map((brk) => `${brk.start} - ${brk.end} (${brk.duration_formatted})`).join('\n'))
         : '-';
     }
     if (visibleColumns.breaks_count) exportRow['Total Breaks'] = row.breaks_count;
     if (visibleColumns.total_break_time) {
-      exportRow['Total Break Time'] = row.total_break_formatted;
+      exportRow['Total Break Time'] = sanitizeFormula(row.total_break_formatted);
     }
-    if (visibleColumns.net_active) exportRow['Net Active Time'] = row.net_active_formatted;
+    if (visibleColumns.net_active) exportRow['Net Active Time'] = sanitizeFormula(row.net_active_formatted);
     return exportRow;
   });
 
@@ -166,17 +178,17 @@ export function exportRundownToCSV(parsedAnalysis, extNameMap) {
     Object.keys(parsedAnalysis[ext]).sort().forEach(dateStr => {
       const data = parsedAnalysis[ext][dateStr];
       exportRows.push({
-        Extension: ext,
-        Name: name,
-        Date: dateStr,
+        Extension: sanitizeFormula(ext),
+        Name: sanitizeFormula(name),
+        Date: sanitizeFormula(dateStr),
         Connected: data.connected_calls,
         NotConnected: data.not_connected_calls,
         CallsPerHour: data.calls_per_hour,
         HalfDones: data.half_dones,
         Surveys: data.surveys,
-        TalkTime: data.total_talk_time_formatted,
+        TalkTime: sanitizeFormula(data.total_talk_time_formatted),
         BreaksCount: data.breaks_count,
-        NetActiveTime: data.net_active_formatted
+        NetActiveTime: sanitizeFormula(data.net_active_formatted)
       });
     });
   });
