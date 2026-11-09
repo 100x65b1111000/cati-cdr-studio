@@ -126,8 +126,8 @@ export default function AnalyticsView() {
       const regionLabels = Object.keys(regionTotals);
 
       const scales = () => ({
-        x: { ticks: { color: inkMuted }, grid: { color: hairline } },
-        y: { ticks: { color: inkMuted }, grid: { color: hairline } }
+        x: { ticks: { color: inkMuted }, grid: { color: themeColor(colorScheme, 'hairline', 0.4) } },
+        y: { ticks: { color: inkMuted }, grid: { color: themeColor(colorScheme, 'hairline', 0.4) } }
       });
       const stacked = () => {
         const s = scales();

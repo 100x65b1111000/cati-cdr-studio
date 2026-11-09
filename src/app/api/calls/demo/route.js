@@ -12,9 +12,10 @@ export const dynamic = 'force-dynamic';
 // ignores the names.
 export async function POST(request) {
   const body = await request.json().catch(() => null);
-  const extensions = Array.isArray(body?.extensions) && body.extensions.length > 0
-    ? body.extensions.map(String)
-    : Object.keys(DEFAULT_EXT_MAP);
+  const rawExts = Array.isArray(body?.extensions) && body.extensions.length > 0
+    ? body.extensions.map(String).filter((e) => !e.startsWith('10404'))
+    : [];
+  const extensions = rawExts.length > 0 ? rawExts : Object.keys(DEFAULT_EXT_MAP);
 
   const roster = Object.fromEntries(extensions.map((ext) => [ext, ext]));
   const rows = generateDemoCDRData(roster);

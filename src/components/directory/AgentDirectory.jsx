@@ -93,7 +93,7 @@ function AgentCard({ ext, name, stats, onRename, onDelete, onReport }) {
 }
 
 export default function AgentDirectory() {
-  const { extNameMap, analysis, dateRange, updateExtMapping, removeExtMapping, setIsAddAgentOpen, setSelectedAgentDetail, slide } =
+  const { extNameMap, analysis, dateRange, updateExtMapping, removeExtMapping, resetExtMappings, setIsAddAgentOpen, setSelectedAgentDetail, slide } =
     useCdr();
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState('extension');
@@ -176,6 +176,14 @@ export default function AgentDirectory() {
             className="hoverable flex h-[30px] w-[30px] flex-none items-center justify-center rounded border border-k-hairline text-k-ink-muted"
           >
             {sortAsc ? <CaretUp style={{ fontSize: 14 }} /> : <CaretDown style={{ fontSize: 14 }} />}
+          </button>
+          <button
+            type="button"
+            onClick={resetExtMappings}
+            aria-label="Reset agent mappings to default"
+            className="hoverable inline-flex h-[30px] items-center rounded border border-k-hairline px-2.5 text-xs text-k-ink-muted transition-colors hover:border-k-hairline-strong hover:text-k-ink"
+          >
+            Reset
           </button>
           <button
             type="button"

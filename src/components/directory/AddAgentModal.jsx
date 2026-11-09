@@ -56,7 +56,7 @@ export default function AddAgentModal() {
             required
             aria-invalid={error ? 'true' : undefined}
             aria-describedby={error ? 'agent-ext-error' : undefined}
-            placeholder="1040421"
+            placeholder="1021"
             value={extension}
             onChange={(e) => setExtension(e.target.value)}
             className={`${field} num${error ? ' border-k-danger' : ''}`}

@@ -29,9 +29,28 @@ const demoRequest = (extensions) =>
 
 export function CdrProvider({ children }) {
   // 1. Persistent State
-  const [extNameMap, setExtNameMap] = useState(() =>
-    loadFromStorage('ext_map', DEFAULT_EXT_MAP)
-  );
+  const [extNameMap, setExtNameMap] = useState(() => {
+    const saved = loadFromStorage('ext_map', null);
+    if (!saved || typeof saved !== 'object') return DEFAULT_EXT_MAP;
+    const legacyNames = [
+      'harshita', 'unnati', 'shivani', 'yukti', 'purnima', 'shivam', 'palak',
+      'pranjali', 'aakansha', 'bhumika', 'himanshu', 'akchat', 'shreya',
+      'deeksha', 'ayan', 'falak', 'sakshi', 'simran'
+    ];
+    const hasLegacyExts = Object.keys(saved).some((k) => k.startsWith('10404'));
+    const hasLegacyNames = Object.values(saved).some(
+      (v) => typeof v === 'string' && legacyNames.some((n) => v.toLowerCase().includes(n))
+    );
+    const hasGenericNames = Object.values(saved).some(
+      (v) => typeof v === 'string' && /^Agent 10[0-2][0-9]$/.test(v)
+    );
+    if (hasLegacyExts || hasLegacyNames || hasGenericNames) {
+      removeFromStorage('ext_map');
+      saveToStorage('ext_map', DEFAULT_EXT_MAP);
+      return DEFAULT_EXT_MAP;
+    }
+    return saved;
+  });
 
   // Named `colorScheme` rather than `colorMode` because AnalyticsView lists it in a
   // useMemo dependency, and that dependency is what repaints the chart canvases when
@@ -374,6 +393,12 @@ export function CdrProvider({ children }) {
     addToast(`Removed extension ${ext} mapping`, 'info');
   }, [addToast]);
 
+  const resetExtMappings = useCallback(() => {
+    setExtNameMap(DEFAULT_EXT_MAP);
+    saveToStorage('ext_map', DEFAULT_EXT_MAP);
+    addToast('Reset agent mappings to default', 'info');
+  }, [addToast]);
+
   const updateShiftConfig = useCallback((newConfig) => {
     const timingChanged =
       newConfig.shiftStartDay !== shiftConfig.shiftStartDay ||
@@ -465,6 +490,7 @@ export function CdrProvider({ children }) {
     clearManualOverride,
     updateExtMapping,
     removeExtMapping,
+    resetExtMappings,
     updateShiftConfig
   };
 

@@ -31,6 +31,9 @@ function DatasetCard() {
           aria-label="Choose a dataset"
           value={activeUpload?.id ?? ''}
           onChange={(event) => event.target.value && restoreUpload(Number(event.target.value))}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') event.currentTarget.blur();
+          }}
           disabled={isParsing || uploadHistory.length === 0}
           className="field w-full rounded px-2 py-1.5 text-meta text-k-ink disabled:opacity-60"
         >
@@ -66,12 +69,30 @@ function DatasetCard() {
 // state to remember: 72px is the width, and opening is the interaction.
 export default function AppSidebar() {
   const { activeTab, setActiveTab, shiftConfig, activeUpload } = useCdr();
+  const asideRef = React.useRef(null);
   const shift = `${shiftConfig.shiftStartTime} → ${shiftConfig.shiftEndTime}${
     shiftConfig.shiftEndDay > shiftConfig.shiftStartDay ? ' +1' : ''
   }`;
 
+  const handleMouseLeave = () => {
+    if (document.activeElement && asideRef.current?.contains(document.activeElement)) {
+      document.activeElement.blur();
+    }
+  };
+
+  const handlePointerDown = (event) => {
+    if (event.target.tagName !== 'SELECT' && document.activeElement?.tagName === 'SELECT') {
+      document.activeElement.blur();
+    }
+  };
+
   return (
-    <aside className="app-bar rail no-print fixed bottom-2 left-2 under-bar z-40 hidden w-[4.5rem] flex-col gap-1.5 rounded-xl px-2 pb-2 pt-2.5 lg:flex">
+    <aside
+      ref={asideRef}
+      onMouseLeave={handleMouseLeave}
+      onPointerDown={handlePointerDown}
+      className="app-bar rail no-print fixed bottom-2 left-2 under-bar z-40 hidden w-[4.5rem] flex-col gap-1.5 rounded-xl px-2 pb-2 pt-2.5 lg:flex"
+    >
       {/* Which file the strip is describing, moved from the foot to the top */}
       <p
         title={activeUpload?.filename || (activeUpload?.source === 'demo' ? 'Synthetic sample' : 'No dataset')}

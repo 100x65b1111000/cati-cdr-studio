@@ -283,7 +283,7 @@ html[data-mode='light'] {
   transform: translateX(-0.75rem);
 }
 .rail:hover .rail-popover,
-.rail .rail-popover:focus-within {
+.rail .rail-popover:has(:focus-visible) {
   opacity: 1;
   pointer-events: auto;
   transform: none;
@@ -293,7 +293,7 @@ html[data-mode='light'] {
    painted over rather than drawn twice — but only where the wing reaches, which is why
    the corner squares off with it instead of the dock losing all four. */
 .rail:hover,
-.rail:has(.rail-popover:focus-within) {
+.rail:has(.rail-popover:has(:focus-visible)) {
   border-top-right-radius: 0;
 }
 
