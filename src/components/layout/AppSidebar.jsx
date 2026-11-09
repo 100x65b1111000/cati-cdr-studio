@@ -72,6 +72,14 @@ export default function AppSidebar() {
 
   return (
     <aside className="app-bar rail no-print fixed bottom-2 left-2 under-bar z-40 hidden w-[4.5rem] flex-col gap-1.5 rounded-xl px-2 pb-2 pt-2.5 lg:flex">
+      {/* Which file the strip is describing, moved from the foot to the top */}
+      <p
+        title={activeUpload?.filename || (activeUpload?.source === 'demo' ? 'Synthetic sample' : 'No dataset')}
+        className="num w-full truncate border-b border-k-hairline pb-1.5 pt-0.5 text-center text-2xs leading-tight text-k-ink-muted"
+      >
+        {activeUpload?.source === 'demo' ? 'sample' : activeUpload?.filename || (activeUpload ? 'loaded' : '—')}
+      </p>
+
       {/* The scroll is on the nav, never on the aside: a panel that both clips and paints
           is where a focus ring or an overflowed label disappears, and an `overflow-hidden`
           aside would cut the opened column off at its own edge. A short window is the only
@@ -109,12 +117,6 @@ export default function AppSidebar() {
           })}
         </ul>
       </nav>
-
-      {/* Which file the strip is describing, at the foot, in the place the reference app
-          put its own status plate. The name is one hover away in the opened column. */}
-      <p className="num w-full truncate border-t border-k-hairline pt-1.5 text-center text-2xs leading-tight text-k-ink-faint">
-        {activeUpload?.source === 'demo' ? 'sample' : activeUpload ? 'loaded' : '—'}
-      </p>
 
       {/* The column wears the dock's own `sunken`, starts 1px inside its right border and
           squares that corner while it is up, so rail and wing are one object rather than a
