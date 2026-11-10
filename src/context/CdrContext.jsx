@@ -250,6 +250,35 @@ export function CdrProvider({ children }) {
     return calculateShiftAnalysis(rawCalls, extNameMap, shiftConfig, manualOverrides);
   }, [rawCalls, extNameMap, shiftConfig, manualOverrides]);
 
+  // Auto-populate extension mappings from the active CDR report with empty mappings
+  useEffect(() => {
+    if (!rawCalls || rawCalls.length === 0) return;
+    const seenExts = new Set(rawCalls.map((c) => c.extension).filter(Boolean));
+    if (seenExts.size === 0) return;
+
+    setExtNameMap((prev) => {
+      const prevKeys = Object.keys(prev);
+      // When a user switches to a real uploaded report and all existing mappings are just demo extensions with 0 calls,
+      // seed directly with the new report's extensions rather than keeping unused demo agents.
+      const isOnlyDemo =
+        activeUpload?.source !== 'demo' &&
+        prevKeys.length > 0 &&
+        prevKeys.every((k) => k in DEFAULT_EXT_MAP && !seenExts.has(k));
+
+      const base = isOnlyDemo ? {} : { ...prev };
+      let changed = isOnlyDemo;
+
+      for (const ext of seenExts) {
+        if (!(ext in base)) {
+          base[ext] = '';
+          changed = true;
+        }
+      }
+
+      return changed ? base : prev;
+    });
+  }, [rawCalls, activeUpload?.source]);
+
   // 7. Dataset management (In-browser storage for static deployment)
   const applyDataset = useCallback((dataset) => {
     setRawRecords(dataset.rows || []);
@@ -432,20 +461,42 @@ export function CdrProvider({ children }) {
     addToast(`Updated Agent Name for Extension ${ext}`, 'success');
   }, [addToast]);
 
-  const removeExtMapping = useCallback((ext) => {
-    setExtNameMap(prev => {
-      const copy = { ...prev };
-      delete copy[ext];
-      return copy;
-    });
-    addToast(`Removed extension ${ext} mapping`, 'info');
-  }, [addToast]);
+  const removeExtMapping = useCallback(
+    (ext) => {
+      const hasCalls = rawCalls.some((c) => c.extension === ext);
+      if (hasCalls) {
+        if (!extNameMap[ext]) {
+          addToast(`Extension ${ext} has calls in this report with no custom name assigned`, 'info');
+          return;
+        }
+        setExtNameMap((prev) => ({
+          ...prev,
+          [ext]: ''
+        }));
+        addToast(`Cleared custom name for extension ${ext}`, 'info');
+      } else {
+        setExtNameMap((prev) => {
+          const copy = { ...prev };
+          delete copy[ext];
+          return copy;
+        });
+        addToast(`Removed extension ${ext} mapping`, 'info');
+      }
+    },
+    [rawCalls, extNameMap, addToast]
+  );
 
   const resetExtMappings = useCallback(() => {
-    setExtNameMap(DEFAULT_EXT_MAP);
-    saveToStorage('ext_map', DEFAULT_EXT_MAP);
-    addToast('Reset agent mappings to default', 'info');
-  }, [addToast]);
+    if (activeUpload?.source === 'demo') {
+      setExtNameMap(DEFAULT_EXT_MAP);
+      addToast('Reset agent mappings to demo defaults', 'info');
+    } else {
+      const seenExts = [...new Set(rawCalls.map((c) => c.extension).filter(Boolean))];
+      const emptyMap = Object.fromEntries(seenExts.map((ext) => [ext, '']));
+      setExtNameMap(emptyMap);
+      addToast(`Reset ${seenExts.length} extensions from report to empty mappings`, 'info');
+    }
+  }, [activeUpload?.source, rawCalls, addToast]);
 
   const updateShiftConfig = useCallback((newConfig) => {
     const timingChanged =

@@ -59,7 +59,8 @@ function AgentCard({ ext, name, stats, onRename, onDelete, onReport }) {
         <button
           type="button"
           onClick={() => onDelete(ext)}
-          aria-label={`Remove the mapping for ${ext}`}
+          title={name ? `Clear name for extension ${ext}` : `Remove extension ${ext}`}
+          aria-label={name ? `Clear name for extension ${ext}` : `Remove extension ${ext}`}
           className="flex-none rounded p-1.5 text-k-ink-muted transition-colors hover:bg-k-critical/15 hover:text-k-critical"
         >
           <Trash style={{ fontSize: 15 }} />
