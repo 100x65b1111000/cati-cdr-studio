@@ -137,7 +137,7 @@ export default function RundownTable() {
             (item.region_summary || '').toLowerCase().includes(q);
           if (!hit) return;
         }
-        out.push(item);
+        out.push({ ...item, name });
       });
     });
 

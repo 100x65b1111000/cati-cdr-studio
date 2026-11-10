@@ -34,25 +34,10 @@ export function CdrProvider({ children }) {
   // 1. Persistent State
   const [extNameMap, setExtNameMap] = useState(() => {
     const saved = loadFromStorage('ext_map', null);
-    if (!saved || typeof saved !== 'object') return DEFAULT_EXT_MAP;
-    const legacyNames = [
-      'harshita', 'unnati', 'shivani', 'yukti', 'purnima', 'shivam', 'palak',
-      'pranjali', 'aakansha', 'bhumika', 'himanshu', 'akchat', 'shreya',
-      'deeksha', 'ayan', 'falak', 'sakshi', 'simran'
-    ];
-    const hasLegacyExts = Object.keys(saved).some((k) => k.startsWith('10404'));
-    const hasLegacyNames = Object.values(saved).some(
-      (v) => typeof v === 'string' && legacyNames.some((n) => v.toLowerCase().includes(n))
-    );
-    const hasGenericNames = Object.values(saved).some(
-      (v) => typeof v === 'string' && /^Agent 10[0-2][0-9]$/.test(v)
-    );
-    if (hasLegacyExts || hasLegacyNames || hasGenericNames) {
-      removeFromStorage('ext_map');
-      saveToStorage('ext_map', DEFAULT_EXT_MAP);
-      return DEFAULT_EXT_MAP;
+    if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
+      return saved;
     }
-    return saved;
+    return DEFAULT_EXT_MAP;
   });
 
   // Named `colorScheme` rather than `colorMode` because AnalyticsView lists it in a
@@ -98,9 +83,16 @@ export function CdrProvider({ children }) {
   const [savedViews, setSavedViews] = useState(() => loadFromStorage('saved_views', []));
 
   // 2. Runtime State
-  const [rawRecords, setRawRecords] = useState([]);
-  const [activeUpload, setActiveUpload] = useState(null);
-  const [uploadHistory, setUploadHistory] = useState([]);
+  const [datasetState, setDatasetState] = useState(() => {
+    const saved = loadFromStorage('dataset', null);
+    if (saved && Array.isArray(saved.rows) && saved.rows.length > 0) {
+      return saved;
+    }
+    return buildDemoDataset(DEFAULT_EXT_MAP);
+  });
+  const rawRecords = datasetState.rows || [];
+  const activeUpload = datasetState.upload || null;
+  const uploadHistory = datasetState.history || [];
   // The URL is the view, so a back button, a shared link and a hotkey all do one thing.
   const router = useRouter();
   const activeTab = usePathname().split('/')[1] || 'rundown';
@@ -285,9 +277,7 @@ export function CdrProvider({ children }) {
 
   // 7. Dataset management (In-browser storage for static deployment)
   const applyDataset = useCallback((dataset) => {
-    setRawRecords(dataset.rows || []);
-    setActiveUpload(dataset.upload || null);
-    setUploadHistory(dataset.history || []);
+    setDatasetState(dataset);
   }, []);
 
   const resetToDemoData = useCallback(() => {
@@ -304,24 +294,6 @@ export function CdrProvider({ children }) {
       setIsParsing(false);
     }
   }, [extNameMap, applyDataset, addToast]);
-
-  useEffect(() => {
-    setIsParsing(true);
-    try {
-      const saved = loadFromStorage('dataset', null);
-      if (saved && Array.isArray(saved.rows) && saved.rows.length > 0) {
-        applyDataset(saved);
-      } else {
-        const demo = buildDemoDataset(extNameMap);
-        applyDataset(demo);
-        saveToStorage('dataset', demo);
-      }
-    } catch (err) {
-      setParseError(err.message);
-    } finally {
-      setIsParsing(false);
-    }
-  }, []); // Boot only
 
   // 8. Actions
   const handleFileDropOrSelect = useCallback((file) => {
@@ -367,7 +339,16 @@ export function CdrProvider({ children }) {
         uploadedAt: new Date().toISOString()
       };
 
-      const previousEntry = activeUpload ? { ...activeUpload, rows: rawRecords } : null;
+      const previousEntry = activeUpload
+        ? {
+            id: activeUpload.id,
+            filename: activeUpload.filename,
+            source: activeUpload.source,
+            rowCount: activeUpload.rowCount,
+            uploadedAt: activeUpload.uploadedAt
+          }
+        : null;
+
       const newHistory = previousEntry
         ? [previousEntry, ...uploadHistory.filter((u) => u.id !== previousEntry.id)].slice(0, 5)
         : uploadHistory;
@@ -380,6 +361,27 @@ export function CdrProvider({ children }) {
 
       applyDataset(newDataset);
       saveToStorage('dataset', newDataset);
+
+      // Auto-populate empty mappings for new extensions and purge unused demo defaults
+      const seenExts = new Set(
+        parseRawCallRecords(pendingUpload.rows).map((c) => c.extension).filter(Boolean)
+      );
+      setExtNameMap((prev) => {
+        const updated = { ...prev };
+        for (const demoExt of Object.keys(DEFAULT_EXT_MAP)) {
+          if (!seenExts.has(demoExt) && updated[demoExt] === DEFAULT_EXT_MAP[demoExt]) {
+            delete updated[demoExt];
+          }
+        }
+        for (const ext of seenExts) {
+          if (!(ext in updated)) {
+            updated[ext] = '';
+          }
+        }
+        saveToStorage('ext_map', updated);
+        return updated;
+      });
+
       setDateRange(DEFAULT_DATE_RANGE);
       addToast(`Generated Rundown Report for ${pendingUpload.rows.length} CDR records!`, 'success');
       setPendingUpload(null);
@@ -388,7 +390,7 @@ export function CdrProvider({ children }) {
     } finally {
       setIsParsing(false);
     }
-  }, [pendingUpload, activeUpload, rawRecords, uploadHistory, applyDataset, addToast]);
+  }, [pendingUpload, activeUpload, uploadHistory, applyDataset, addToast]);
 
   const restoreUpload = useCallback((id) => {
     setIsParsing(true);
@@ -458,11 +460,16 @@ export function CdrProvider({ children }) {
   }, [addToast]);
 
   const updateExtMapping = useCallback((ext, name) => {
-    setExtNameMap(prev => ({
-      ...prev,
-      [ext]: name.trim()
-    }));
-    addToast(`Updated Agent Name for Extension ${ext}`, 'success');
+    const trimmed = (name || '').trim();
+    setExtNameMap(prev => {
+      const updated = {
+        ...prev,
+        [ext]: trimmed
+      };
+      saveToStorage('ext_map', updated);
+      return updated;
+    });
+    addToast(trimmed ? `Mapped Extension ${ext} to ${trimmed}` : `Cleared custom name for Extension ${ext}`, 'success');
   }, [addToast]);
 
   const removeExtMapping = useCallback(
