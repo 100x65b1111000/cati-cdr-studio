@@ -12,6 +12,31 @@ import { generateDemoCDRData } from '../services/demoDataGenerator';
 
 const CdrContext = createContext(null);
 
+function syncExtRoster(currentMap, calls) {
+  if (!calls || calls.length === 0) return currentMap;
+  const seenExts = new Set(calls.map((c) => c.extension).filter(Boolean));
+  if (seenExts.size === 0) return currentMap;
+  const base = { ...currentMap };
+  let changed = false;
+
+  const isDemo = Array.from(seenExts).every((e) => e in DEFAULT_EXT_MAP);
+  if (!isDemo) {
+    for (const demoExt of Object.keys(DEFAULT_EXT_MAP)) {
+      if (!seenExts.has(demoExt) && base[demoExt] === DEFAULT_EXT_MAP[demoExt]) {
+        delete base[demoExt];
+        changed = true;
+      }
+    }
+  }
+  for (const ext of seenExts) {
+    if (!(ext in base)) {
+      base[ext] = '';
+      changed = true;
+    }
+  }
+  return changed ? base : currentMap;
+}
+
 function buildDemoDataset(extMap) {
   const extensions = Object.keys(extMap && Object.keys(extMap).length > 0 ? extMap : DEFAULT_EXT_MAP)
     .filter((e) => !e.startsWith('10404'));
@@ -244,35 +269,7 @@ export function CdrProvider({ children }) {
 
   // Auto-populate extension mappings from the active CDR report with empty mappings
   useEffect(() => {
-    if (!rawCalls || rawCalls.length === 0) return;
-    const seenExts = new Set(rawCalls.map((c) => c.extension).filter(Boolean));
-    if (seenExts.size === 0) return;
-
-    setExtNameMap((prev) => {
-      const base = { ...prev };
-      let changed = false;
-
-      // When the report contains real non-demo extensions, clean out unused sample demo defaults
-      const isDemoReport = Array.from(seenExts).every((e) => e in DEFAULT_EXT_MAP);
-      if (!isDemoReport) {
-        for (const demoExt of Object.keys(DEFAULT_EXT_MAP)) {
-          if (!seenExts.has(demoExt) && base[demoExt] === DEFAULT_EXT_MAP[demoExt]) {
-            delete base[demoExt];
-            changed = true;
-          }
-        }
-      }
-
-      // Add any extension from the CDR report that isn't mapped yet
-      for (const ext of seenExts) {
-        if (!(ext in base)) {
-          base[ext] = '';
-          changed = true;
-        }
-      }
-
-      return changed ? base : prev;
-    });
+    setExtNameMap((prev) => syncExtRoster(prev, rawCalls));
   }, [rawCalls]);
 
   // 7. Dataset management (In-browser storage for static deployment)
@@ -362,26 +359,6 @@ export function CdrProvider({ children }) {
       applyDataset(newDataset);
       saveToStorage('dataset', newDataset);
 
-      // Auto-populate empty mappings for new extensions and purge unused demo defaults
-      const seenExts = new Set(
-        parseRawCallRecords(pendingUpload.rows).map((c) => c.extension).filter(Boolean)
-      );
-      setExtNameMap((prev) => {
-        const updated = { ...prev };
-        for (const demoExt of Object.keys(DEFAULT_EXT_MAP)) {
-          if (!seenExts.has(demoExt) && updated[demoExt] === DEFAULT_EXT_MAP[demoExt]) {
-            delete updated[demoExt];
-          }
-        }
-        for (const ext of seenExts) {
-          if (!(ext in updated)) {
-            updated[ext] = '';
-          }
-        }
-        saveToStorage('ext_map', updated);
-        return updated;
-      });
-
       setDateRange(DEFAULT_DATE_RANGE);
       addToast(`Generated Rundown Report for ${pendingUpload.rows.length} CDR records!`, 'success');
       setPendingUpload(null);
@@ -392,6 +369,7 @@ export function CdrProvider({ children }) {
     }
   }, [pendingUpload, activeUpload, uploadHistory, applyDataset, addToast]);
 
+  // shortcut: browser localStorage is capped at ~5MB so history stores metadata only; upgrade to IndexedDB when multi-dataset offline caching is needed.
   const restoreUpload = useCallback((id) => {
     setIsParsing(true);
     try {
