@@ -1,15 +1,16 @@
-'use client';
+import ViewRenderer from './ViewRenderer';
 
-import { notFound, usePathname } from 'next/navigation';
-import { NAV } from '../../../components/layout/navConfig';
+export function generateStaticParams() {
+  return [
+    { view: 'rundown' },
+    { view: 'rawCdr' },
+    { view: 'analytics' },
+    { view: 'directory' },
+    { view: 'settings' }
+  ];
+}
 
-// The URL segment is the view id, so the route list needs no second source of truth.
-// Each view arrives through navConfig's lazy import, which is where the code splitting
-// actually happens now.
-export default function ViewPage() {
-  const id = usePathname().split('/')[1];
-  const view = NAV.find((n) => n.id === id);
-  if (!view) notFound();
-  const View = view.component;
-  return <View />;
+export default async function ViewPage({ params }) {
+  const { view } = await params;
+  return <ViewRenderer viewId={view} />;
 }

@@ -10,9 +10,8 @@ import Segmented from '../ui/Segmented';
 
 const MODE_OPTIONS = Object.entries(COLOR_MODES).map(([id, mode]) => ({ id, label: mode.label }));
 
-// Every key this app writes through storage.js. `raw_records` is retired (the dataset lives on
-// the server now) and `color_scheme` is the old mode key, so neither belongs here.
-const LOCAL_KEYS = ['ext_map', 'color_mode', 'motion', 'shift_config', 'manual_overrides', 'date_range', 'saved_views'];
+// Every key this app writes through storage.js.
+const LOCAL_KEYS = ['dataset', 'ext_map', 'color_mode', 'motion', 'shift_config', 'manual_overrides', 'date_range', 'saved_views'];
 
 const ROW = 'flex items-baseline justify-between gap-4 px-3.5 py-2';
 const minutes = (hhmm) => {
@@ -102,6 +101,7 @@ export default function SettingsView() {
     activeUpload,
     uploadHistory,
     restoreUpload,
+    resetToDemoData,
     isParsing,
     dateRange,
     colorScheme,
@@ -307,7 +307,7 @@ export default function SettingsView() {
         )}
       </Plate>
 
-      <Plate title="Dataset" note="shared by every browser">
+      <Plate title="Dataset" note="in this browser">
         <div className="divide-y divide-k-hairline">
           {[
             ['Rows read', activeUpload ? activeUpload.rowCount : rawRecords.length, skipped ? `${skipped} skipped` : ''],
@@ -349,8 +349,7 @@ export default function SettingsView() {
           </ul>
         )}
         <p className="mt-auto border-t border-k-hairline px-3.5 py-2.5 text-2xs leading-relaxed text-k-ink-muted">
-          Every browser on this team reads the same dataset, so a wrong upload is replaced here
-          rather than by re-dropping the file.
+          This dataset is stored locally in your browser. Restoring earlier uploads or dropping a new CSV updates this device immediately.
         </p>
       </Plate>
 
@@ -401,20 +400,17 @@ export default function SettingsView() {
           </label>
           <div className="flex items-center justify-between gap-4 px-3.5 py-2">
             <span className="min-w-0">
-              <span className="block text-xs text-k-ink-muted">Session</span>
-              <span className="num block truncate text-2xs text-k-ink-muted">team password, 12 hours</span>
+              <span className="block text-xs text-k-ink-muted">Sample data</span>
+              <span className="num block truncate text-2xs text-k-ink-muted">synthetic CATI team CDR</span>
             </span>
-            {/* A plain form post, not a fetch: the redirect is the server's, so there is no
-                client-side routing to keep in step with a cookie that no longer exists. */}
-            <form method="post" action="/api/auth/logout">
-              <button
-                type="submit"
-                style={{ '--tone': 'var(--k-danger)' }}
-                className={`${quiet} hover:text-k-critical`}
-              >
-                Sign out
-              </button>
-            </form>
+            <button
+              type="button"
+              onClick={resetToDemoData}
+              disabled={isParsing}
+              className={`${quiet} hover:text-k-accent`}
+            >
+              Reload sample
+            </button>
           </div>
           <div className="flex items-center justify-between gap-4 px-3.5 py-2">
             <span className="min-w-0 text-xs text-k-ink-muted">

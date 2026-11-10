@@ -8,24 +8,27 @@ import { reducedMotion } from '../utils/motion';
 import { parseRawCallRecords, calculateShiftAnalysis } from '../services/shiftCalculator';
 import { COLOR_MODES, DEFAULT_MODE, cssVarName, getMode, hexToRgbTriplet } from '../theme/colorSchemes';
 import { NAV } from '../components/layout/navConfig';
+import { generateDemoCDRData } from '../services/demoDataGenerator';
 
 const CdrContext = createContext(null);
 
-// Records live on the server now. Every route that changes them answers with the new
-// dataset, so one helper covers fetch, upload, sample data and restore.
-async function api(url, init) {
-  const res = await fetch(url, init);
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `The server replied ${res.status}.`);
-  return data;
+function buildDemoDataset(extMap) {
+  const extensions = Object.keys(extMap && Object.keys(extMap).length > 0 ? extMap : DEFAULT_EXT_MAP)
+    .filter((e) => !e.startsWith('10404'));
+  const roster = Object.fromEntries(extensions.map((ext) => [ext, ext]));
+  const rows = generateDemoCDRData(roster);
+  return {
+    upload: {
+      id: Date.now(),
+      filename: 'sample.cdr.csv',
+      source: 'demo',
+      rowCount: rows.length,
+      uploadedAt: new Date().toISOString()
+    },
+    rows,
+    history: []
+  };
 }
-
-const demoRequest = (extensions) =>
-  api('/api/calls/demo', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ extensions })
-  });
 
 export function CdrProvider({ children }) {
   // 1. Persistent State
@@ -247,34 +250,45 @@ export function CdrProvider({ children }) {
     return calculateShiftAnalysis(rawCalls, extNameMap, shiftConfig, manualOverrides);
   }, [rawCalls, extNameMap, shiftConfig, manualOverrides]);
 
-  // 7. Dataset from the server
+  // 7. Dataset management (In-browser storage for static deployment)
   const applyDataset = useCallback((dataset) => {
     setRawRecords(dataset.rows || []);
     setActiveUpload(dataset.upload || null);
     setUploadHistory(dataset.history || []);
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    // Retired key: the records are shared now, so a browser copy is stale by definition.
-    removeFromStorage('raw_records');
+  const resetToDemoData = useCallback(() => {
     setIsParsing(true);
-    (async () => {
-      try {
-        let dataset = await api('/api/calls');
-        // An empty server seeds the sample, so a first run still shows something. The
-        // roster read here is this browser's stored one, which is who the sample is for.
-        if (dataset.rows.length === 0) dataset = await demoRequest(Object.keys(extNameMap));
-        if (!cancelled) applyDataset(dataset);
-      } catch (err) {
-        if (!cancelled) setParseError(err.message);
-      } finally {
-        if (!cancelled) setIsParsing(false);
+    try {
+      const demo = buildDemoDataset(extNameMap);
+      applyDataset(demo);
+      saveToStorage('dataset', demo);
+      setDateRange(DEFAULT_DATE_RANGE);
+      addToast('Loaded synthetic CATI team sample data.', 'info');
+    } catch (err) {
+      setParseError(err.message);
+    } finally {
+      setIsParsing(false);
+    }
+  }, [extNameMap, applyDataset, addToast]);
+
+  useEffect(() => {
+    setIsParsing(true);
+    try {
+      const saved = loadFromStorage('dataset', null);
+      if (saved && Array.isArray(saved.rows) && saved.rows.length > 0) {
+        applyDataset(saved);
+      } else {
+        const demo = buildDemoDataset(extNameMap);
+        applyDataset(demo);
+        saveToStorage('dataset', demo);
       }
-    })();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- boot only
-  }, []);
+    } catch (err) {
+      setParseError(err.message);
+    } finally {
+      setIsParsing(false);
+    }
+  }, []); // Boot only
 
   // 8. Actions
   const handleFileDropOrSelect = useCallback((file) => {
@@ -292,8 +306,6 @@ export function CdrProvider({ children }) {
       complete: function(results) {
         setIsParsing(false);
         if (results.data && results.data.length > 0) {
-          // The File is kept for the confirm step: the server does the storing, and
-          // re-parsing here is only so the preview can show the count first.
           setPendingUpload({
             file,
             fileName: file.name,
@@ -310,13 +322,31 @@ export function CdrProvider({ children }) {
     });
   }, []);
 
-  const confirmPendingUpload = useCallback(async () => {
-    if (!pendingUpload?.file) return;
-    const form = new FormData();
-    form.append('file', pendingUpload.file);
+  const confirmPendingUpload = useCallback(() => {
+    if (!pendingUpload?.rows) return;
     setIsParsing(true);
     try {
-      applyDataset(await api('/api/calls', { method: 'POST', body: form }));
+      const newUpload = {
+        id: Date.now(),
+        filename: pendingUpload.fileName,
+        source: 'upload',
+        rowCount: pendingUpload.rows.length,
+        uploadedAt: new Date().toISOString()
+      };
+
+      const previousEntry = activeUpload ? { ...activeUpload, rows: rawRecords } : null;
+      const newHistory = previousEntry
+        ? [previousEntry, ...uploadHistory.filter((u) => u.id !== previousEntry.id)].slice(0, 5)
+        : uploadHistory;
+
+      const newDataset = {
+        upload: newUpload,
+        rows: pendingUpload.rows,
+        history: newHistory
+      };
+
+      applyDataset(newDataset);
+      saveToStorage('dataset', newDataset);
       setDateRange(DEFAULT_DATE_RANGE);
       addToast(`Generated Rundown Report for ${pendingUpload.rows.length} CDR records!`, 'success');
       setPendingUpload(null);
@@ -325,24 +355,42 @@ export function CdrProvider({ children }) {
     } finally {
       setIsParsing(false);
     }
-  }, [pendingUpload, applyDataset, addToast]);
+  }, [pendingUpload, activeUpload, rawRecords, uploadHistory, applyDataset, addToast]);
 
-  const restoreUpload = useCallback(async (id) => {
+  const restoreUpload = useCallback((id) => {
     setIsParsing(true);
     try {
-      applyDataset(await api('/api/calls/restore', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ id })
-      }));
+      const target = uploadHistory.find((u) => u.id === id);
+      if (!target || !target.rows) {
+        throw new Error('Upload data not found in browser history.');
+      }
+      const previousEntry = activeUpload ? { ...activeUpload, rows: rawRecords } : null;
+      const newHistory = previousEntry
+        ? [previousEntry, ...uploadHistory.filter((u) => u.id !== id)].slice(0, 5)
+        : uploadHistory.filter((u) => u.id !== id);
+
+      const restoredDataset = {
+        upload: {
+          id: target.id,
+          filename: target.filename,
+          source: target.source,
+          rowCount: target.rowCount,
+          uploadedAt: target.uploadedAt
+        },
+        rows: target.rows,
+        history: newHistory
+      };
+
+      applyDataset(restoredDataset);
+      saveToStorage('dataset', restoredDataset);
       setDateRange(DEFAULT_DATE_RANGE);
-      addToast('Previous upload restored.', 'success');
+      addToast(`Previous upload "${target.filename}" restored.`, 'success');
     } catch (err) {
       setParseError(err.message);
     } finally {
       setIsParsing(false);
     }
-  }, [applyDataset, addToast]);
+  }, [activeUpload, rawRecords, uploadHistory, applyDataset, addToast]);
 
   const cancelPendingUpload = useCallback(() => {
     setPendingUpload(null);
@@ -486,6 +534,7 @@ export function CdrProvider({ children }) {
     handleFileDropOrSelect,
     confirmPendingUpload,
     cancelPendingUpload,
+    resetToDemoData,
     updateManualOverride,
     clearManualOverride,
     updateExtMapping,
