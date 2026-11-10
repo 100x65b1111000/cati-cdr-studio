@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { GlyphCaretDown as CaretDown, GlyphCaretUp as CaretUp, GlyphTrash as Trash, GlyphEye as Eye } from '../ui/Glyph';
 import { useCdr } from '../../context/CdrContext';
+import { DEFAULT_EXT_MAP } from '../../constants/defaultData';
 import AddAgentModal from './AddAgentModal';
 import EmptyState from '../ui/EmptyState';
 import SearchInput from '../ui/SearchInput';
@@ -94,7 +95,7 @@ function AgentCard({ ext, name, stats, onRename, onDelete, onReport }) {
 }
 
 export default function AgentDirectory() {
-  const { extNameMap, analysis, dateRange, updateExtMapping, removeExtMapping, resetExtMappings, setIsAddAgentOpen, setSelectedAgentDetail, slide } =
+  const { extNameMap, rawCalls, analysis, dateRange, updateExtMapping, removeExtMapping, resetExtMappings, setIsAddAgentOpen, setSelectedAgentDetail, slide } =
     useCdr();
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState('extension');
@@ -120,11 +121,28 @@ export default function AgentDirectory() {
     return out;
   }, [analysis, dateRange]);
 
+  // Extensions to show: every extension from the active CDR report + any custom mappings
+  // (pruning unused demo defaults if the active report is from a real file)
+  const allExtensions = useMemo(() => {
+    const extsInReport = new Set((rawCalls || []).map((c) => c.extension).filter(Boolean));
+    const isDemo = extsInReport.size > 0 && Array.from(extsInReport).every((e) => e in DEFAULT_EXT_MAP);
+
+    const keys = new Set([...extsInReport, ...Object.keys(extNameMap || {})]);
+    return Array.from(keys).filter((ext) => {
+      // If we have a real uploaded report with calls, hide unused demo defaults
+      if (!isDemo && extsInReport.size > 0 && DEFAULT_EXT_MAP[ext] && !extsInReport.has(ext)) {
+        return false;
+      }
+      return true;
+    });
+  }, [rawCalls, extNameMap]);
+
   const rows = useMemo(() => {
     const q = search.toLowerCase().trim();
-    const list = Object.keys(extNameMap).filter((ext) => {
+    const list = allExtensions.filter((ext) => {
       if (!q) return true;
-      return ext.toLowerCase().includes(q) || (extNameMap[ext] || '').toLowerCase().includes(q);
+      const name = extNameMap[ext] || '';
+      return ext.toLowerCase().includes(q) || name.toLowerCase().includes(q);
     });
     const dir = sortAsc ? 1 : -1;
     list.sort((a, b) => {
@@ -133,9 +151,10 @@ export default function AgentDirectory() {
       return dir * numeric.compare(a, b);
     });
     return list;
-  }, [extNameMap, search, sortField, sortAsc, stats]);
+  }, [allExtensions, extNameMap, search, sortField, sortAsc, stats]);
 
-  const mapped = Object.keys(extNameMap).length;
+  const mapped = allExtensions.length;
+  const namedCount = allExtensions.filter((ext) => extNameMap[ext]?.trim()).length;
   const busy = rows.reduce((sum, ext) => sum + (stats[ext]?.calls || 0), 0);
 
   return (
@@ -146,8 +165,11 @@ export default function AgentDirectory() {
           search field is sunken, and a sunken field on a sunken plate has no edge left. */}
       <div className="no-print flex flex-wrap items-center gap-2 border-b border-k-hairline px-3.5 py-2.5">
         <p className="mr-1 flex items-baseline gap-1.5 text-2xs leading-tight text-k-ink-muted">
-          Extensions mapped
+          Extensions
           <span className="num text-md font-semibold text-k-accent-fg">{mapped}</span>
+          {namedCount > 0 && namedCount < mapped && (
+            <span className="text-2xs text-k-ink-faint">({namedCount} named)</span>
+          )}
         </p>
         <p className="mr-1 flex items-baseline gap-1.5 text-2xs leading-tight text-k-ink-muted">
           Calls in range

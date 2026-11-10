@@ -257,17 +257,21 @@ export function CdrProvider({ children }) {
     if (seenExts.size === 0) return;
 
     setExtNameMap((prev) => {
-      const prevKeys = Object.keys(prev);
-      // When a user switches to a real uploaded report and all existing mappings are just demo extensions with 0 calls,
-      // seed directly with the new report's extensions rather than keeping unused demo agents.
-      const isOnlyDemo =
-        activeUpload?.source !== 'demo' &&
-        prevKeys.length > 0 &&
-        prevKeys.every((k) => k in DEFAULT_EXT_MAP && !seenExts.has(k));
+      const base = { ...prev };
+      let changed = false;
 
-      const base = isOnlyDemo ? {} : { ...prev };
-      let changed = isOnlyDemo;
+      // When the report contains real non-demo extensions, clean out unused sample demo defaults
+      const isDemoReport = Array.from(seenExts).every((e) => e in DEFAULT_EXT_MAP);
+      if (!isDemoReport) {
+        for (const demoExt of Object.keys(DEFAULT_EXT_MAP)) {
+          if (!seenExts.has(demoExt) && base[demoExt] === DEFAULT_EXT_MAP[demoExt]) {
+            delete base[demoExt];
+            changed = true;
+          }
+        }
+      }
 
+      // Add any extension from the CDR report that isn't mapped yet
       for (const ext of seenExts) {
         if (!(ext in base)) {
           base[ext] = '';
@@ -277,7 +281,7 @@ export function CdrProvider({ children }) {
 
       return changed ? base : prev;
     });
-  }, [rawCalls, activeUpload?.source]);
+  }, [rawCalls]);
 
   // 7. Dataset management (In-browser storage for static deployment)
   const applyDataset = useCallback((dataset) => {
